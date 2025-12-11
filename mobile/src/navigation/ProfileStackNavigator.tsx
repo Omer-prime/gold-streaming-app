@@ -35,6 +35,12 @@ import MyProfileScreen from "../screens/MyProfileScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import PostMomentScreen from "../screens/PostMomentScreen";
 
+// 🆕 Visit profile (other user)
+import VisitProfileScreen from "../screens/VisitProfileScreen";
+
+// 🆕 Moment comments screen
+import MomentCommentsScreen from "../screens/MomentCommentsScreen";
+
 // Settings subtree screens
 import AccountSecurityScreen from "../screens/AccountSecurityScreen";
 import SecurityPasswordScreen from "../screens/SecurityPasswordScreen";
@@ -71,6 +77,12 @@ export type ProfileStackParamList = {
   HonorWall: undefined;
   EditProfile: undefined;
   PostMoment: undefined;
+
+  // 🆕 visiting another user's profile
+  VisitProfile: { userId: string };
+
+  // 🆕 comments under a moment
+  MomentComments: { momentId: string; ownerName: string };
 
   Settings: undefined;
 
@@ -162,6 +174,20 @@ const ProfileStackNavigator: React.FC = () => {
       <Stack.Screen
         name="PostMoment"
         component={PostMomentScreen}
+        options={{ headerShown: false }}
+      />
+
+      {/* 🆕 Visit other user's profile */}
+      <Stack.Screen
+        name="VisitProfile"
+        component={VisitProfileScreen}
+        options={{ headerShown: false }}
+      />
+
+      {/* 🆕 Moment comments */}
+      <Stack.Screen
+        name="MomentComments"
+        component={MomentCommentsScreen}
         options={{ headerShown: false }}
       />
 

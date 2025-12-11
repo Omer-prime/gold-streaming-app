@@ -7,15 +7,19 @@ import type { NavigatorScreenParams } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import ChatStackNavigator from "./ChatStackNavigator";
-import HomeFeedScreen from "../screens/HomeFeedScreen";
 import ProfileStackNavigator from "./ProfileStackNavigator";
 import type { ProfileStackParamList } from "./ProfileStackNavigator";
 import PartyScreen from "../screens/PartyScreen";
 import ExploreStackNavigator from "./ExploreStackNavigator";
-import { API_BASE_URL } from "../config"; // 👈 use shared base URL
+import { API_BASE_URL } from "../config";
+
+// 🆕 import Home stack
+import HomeStackNavigator, {
+  type HomeStackParamList,
+} from "./HomeStackNavigator";
 
 type MainTabsParamList = {
-  Home: undefined;
+  Home: NavigatorScreenParams<HomeStackParamList>;
   Party: undefined;
   Explore: undefined;
   Chat: undefined;
@@ -76,10 +80,10 @@ const MainTabsNavigator: React.FC = () => {
         },
       }}
     >
-      {/* 🏠 HOME */}
+      {/* 🏠 HOME (stack) */}
       <Tab.Screen
         name="Home"
-        component={HomeFeedScreen}
+        component={HomeStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size ?? 22} color={color} />

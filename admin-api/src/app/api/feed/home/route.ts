@@ -9,11 +9,11 @@ export const dynamic = "force-dynamic";
  * GET /api/feed/home
  *
  * Query params:
- *  - userId?: string
- *  - tab?: "following" | "square" | "video"
- *  - country?: string  // "PK", "PH", "all", "popular"
- *  - limit?: number    // default 20, max 50
- *  - cursor?: string   // for pagination
+ * - userId?: string
+ * - tab?: "following" | "square" | "video"
+ * - country?: string // "PK", "PH", "all", "popular"
+ * - limit?: number // default 20, max 50
+ * - cursor?: string // for pagination
  */
 export async function GET(req: NextRequest) {
   try {
@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
 
     const userId = searchParams.get("userId") ?? undefined;
     const rawTab = (searchParams.get("tab") ?? "following").toLowerCase();
+
     const tab: "following" | "square" | "video" =
       rawTab === "square" || rawTab === "video"
         ? (rawTab as "square" | "video")
@@ -45,7 +46,9 @@ export async function GET(req: NextRequest) {
       // Build host filter cleanly as a UserWhereInput
       const hostWhere: Prisma.UserWhereInput = {
         followers: {
-          some: { followerId: userId },
+          some: {
+            followerId: userId,
+          },
         },
       };
 
@@ -62,7 +65,7 @@ export async function GET(req: NextRequest) {
 
       const whereStream: Prisma.StreamWhereInput = {
         isLive: true,
-        host: hostWhere, // this satisfies the XOR as a pure UserWhereInput
+        host: hostWhere,
       };
 
       const streams = await prisma.stream.findMany({
@@ -124,6 +127,7 @@ export async function GET(req: NextRequest) {
     /* ---------------------------------------------------------------------- */
     /*  SQUARE / VIDEO TABS: moments feed                                     */
     /* ---------------------------------------------------------------------- */
+
     const isVideoTab = tab === "video";
 
     const whereMoment: Prisma.MomentWhereInput = isVideoTab
@@ -181,6 +185,7 @@ export async function GET(req: NextRequest) {
 
     let nextCursor: string | null = null;
     let data = moments;
+
     if (moments.length > limit) {
       const next = moments[moments.length - 1];
       nextCursor = next.id;
@@ -193,37 +198,81 @@ export async function GET(req: NextRequest) {
       const likes = await prisma.momentLike.findMany({
         where: {
           userId,
-          momentId: { in: data.map((m) => m.id) },
+          momentId: {
+            in: data.map((m) => m.id),
+          },
         },
-        select: { momentId: true },
+        select: {
+          momentId: true,
+        },
       });
+
       likedIds = new Set(likes.map((l) => l.momentId));
     }
 
-    const items = data.map((m) => ({
-      id: m.id,
-      userId: m.user.id,
-      userName: m.user.nickname || m.user.username,
-      avatarUrl: m.user.avatarUrl,
-      countryFlag: m.user.country?.flagEmoji ?? null,
-      countryCode: m.user.country?.code ?? null,
-      text: m.text,
-      imageUrl: m.imageUrl,
-      videoUrl: m.videoUrl,
-      thumbnailUrl: m.thumbnailUrl,
-      likeCount: m.likeCount,
-      commentCount: m.commentCount,
-      shareCount: m.shareCount,
-      saveCount: m.saveCount,
-      topicTitle: m.topic?.title ?? null,
-      createdAt: m.createdAt.toISOString(),
-      isLikedByMe: likedIds.has(m.id),
-    }));
+    // For each moment, load up to 2 oldest comments as preview
+    const items = await Promise.all(
+      data.map(async (m) => {
+        let commentsPreview:
+          | { id: string; text: string; userName: string }[]
+          | [] = [];
+
+        try {
+          const cmts = await prisma.momentComment.findMany({
+            where: { momentId: m.id },
+            orderBy: { createdAt: "asc" },
+            take: 2,
+            include: {
+              user: {
+                select: {
+                  username: true,
+                  nickname: true,
+                },
+              },
+            },
+          });
+
+          commentsPreview = cmts.map((c) => ({
+            id: c.id,
+            text: c.content,
+            userName:
+              c.user.nickname && c.user.nickname.trim().length > 0
+                ? c.user.nickname
+                : c.user.username,
+          }));
+        } catch {
+          // ignore preview errors
+        }
+
+        return {
+          id: m.id,
+          userId: m.user.id,
+          userName: m.user.nickname || m.user.username,
+          avatarUrl: m.user.avatarUrl,
+          countryFlag: m.user.country?.flagEmoji ?? null,
+          countryCode: m.user.country?.code ?? null,
+          text: m.text,
+          imageUrl: m.imageUrl,
+          videoUrl: m.videoUrl,
+          thumbnailUrl: m.thumbnailUrl,
+          likeCount: m.likeCount,
+          commentCount: m.commentCount,
+          shareCount: m.shareCount,
+          saveCount: m.saveCount,
+          topicTitle: m.topic?.title ?? null,
+          createdAt: m.createdAt.toISOString(),
+          isLikedByMe: likedIds.has(m.id),
+          commentsPreview,
+        };
+      })
+    );
 
     // Square tab also returns topics (admin controlled)
     if (!isVideoTab) {
       const topics = await prisma.topic.findMany({
-        where: { isActive: true },
+        where: {
+          isActive: true,
+        },
         orderBy: [
           { isTrending: "desc" },
           { sortOrder: "asc" },

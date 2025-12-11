@@ -64,6 +64,13 @@ enum MomentType {
   VIDEO
 }
 
+// ⭐ Topic category for Square topics (Daily, Official, etc.)
+enum TopicCategory {
+  DAILY
+  OFFICIAL
+  NORMAL
+}
+
 model Country {
   id        Int     @id @default(autoincrement())
   code      String  @unique // e.g. "PK", "PH"
@@ -434,9 +441,9 @@ model Moment {
   userId    String
   user      User       @relation(fields: [userId], references: [id])
 
-  type        MomentType @default(TEXT)
-  text        String?
-  imageUrl    String?
+  type         MomentType @default(TEXT)
+  text         String?
+  imageUrl     String?
   videoUrl     String?
   thumbnailUrl String?
 
@@ -594,15 +601,16 @@ model Notification {
 
 // ⭐ Topics for Square feed (admin controlled)
 model Topic {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
   description String?
-  isTrending  Boolean  @default(false)
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  hotScore    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isTrending  Boolean       @default(false)
+  isActive    Boolean       @default(true)
+  category    TopicCategory @default(NORMAL)
+  sortOrder   Int           @default(0)
+  hotScore    Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   moments Moment[]
 

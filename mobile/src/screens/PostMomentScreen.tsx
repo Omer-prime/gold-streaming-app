@@ -15,16 +15,28 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useNavigation } from "@react-navigation/native";
+import {
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import { API_BASE_URL } from "../config";
 
+// Local params type instead of ProfileStackParamList
+type PostMomentParams = {
+  PostMoment: {
+    topicId?: string;
+    topicTitle?: string;
+  };
+};
+
 type PostMomentNav = NativeStackNavigationProp<
-  ProfileStackParamList,
+  PostMomentParams,
   "PostMoment"
 >;
+type PostMomentRoute = RouteProp<PostMomentParams, "PostMoment">;
 
 const recommendedTopics = [
   "#Rocket Host Video Collection",
@@ -39,6 +51,11 @@ const recommendedTopics = [
 
 const PostMomentScreen: React.FC = () => {
   const navigation = useNavigation<PostMomentNav>();
+  const route = useRoute<PostMomentRoute>();
+
+  const topicIdFromRoute = route.params?.topicId ?? undefined;
+  const topicTitleFromRoute = route.params?.topicTitle ?? undefined;
+
   const [text, setText] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
@@ -149,6 +166,7 @@ const PostMomentScreen: React.FC = () => {
           userId,
           text: trimmed || null,
           imageUrl: imageUri ?? null,
+          topicId: topicIdFromRoute ?? null,
         }),
       });
 
@@ -214,6 +232,14 @@ const PostMomentScreen: React.FC = () => {
           >
             {/* Text + image picker row */}
             <View className="px-4 mt-2">
+              {topicTitleFromRoute && (
+                <View className="mb-2 self-start rounded-full bg-[#EEF2FF] px-3 py-1">
+                  <Text className="text-[11px] text-[#4F46E5]">
+                    Posting to #{topicTitleFromRoute}
+                  </Text>
+                </View>
+              )}
+
               <TextInput
                 value={text}
                 onChangeText={(val) => {

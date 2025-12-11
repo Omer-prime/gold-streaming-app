@@ -8,6 +8,7 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,13 +29,13 @@ type PartyRoom = {
   thumbnailUrl?: string | null;
 };
 
-type SquareTopic = {
+export type SquareTopic = {
   id: string;
   title: string;
   hotCount: number;
 };
 
-type SquarePost = {
+export type SquarePost = {
   id: string;
   userId: string;
   userName: string;
@@ -47,10 +48,16 @@ type SquarePost = {
   commentCount: number;
   isLikedByMe: boolean;
   topicTitle: string | null;
+  commentsPreview?: {
+    id: string;
+    text: string;
+    userName: string;
+  }[];
 };
 
 const HomeFeedScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<HomeTopTab>("Following");
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   const [countryFilter, setCountryFilter] =
     useState<CountryFilter>("Popular");
@@ -58,7 +65,9 @@ const HomeFeedScreen: React.FC = () => {
   // Following tab data
   const [followingRooms, setFollowingRooms] = useState<PartyRoom[]>([]);
   const [followingLoading, setFollowingLoading] = useState(false);
-  const [followingError, setFollowingError] = useState<string | null>(null);
+  const [followingError, setFollowingError] = useState<string | null>(
+    null
+  );
 
   // Square tab data
   const [squareTopics, setSquareTopics] = useState<SquareTopic[]>([]);
@@ -80,6 +89,11 @@ const HomeFeedScreen: React.FC = () => {
         setFollowingError(null);
 
         const userId = await AsyncStorage.getItem("gl_user_id");
+
+        if (!cancelled) {
+          setMyUserId(userId);
+        }
+
         if (!userId) {
           if (!cancelled) {
             setFollowingRooms([]);
@@ -104,7 +118,9 @@ const HomeFeedScreen: React.FC = () => {
         if (!res.ok) {
           const json = await res.json().catch(() => null);
           if (!cancelled) {
-            setFollowingError(json?.error || "Failed to load following feed");
+            setFollowingError(
+              json?.error || "Failed to load following feed"
+            );
             setFollowingRooms([]);
           }
           return;
@@ -139,7 +155,9 @@ const HomeFeedScreen: React.FC = () => {
       } catch (err) {
         console.error("load following feed error", err);
         if (!cancelled) {
-          setFollowingError("Network error while loading following feed");
+          setFollowingError(
+            "Network error while loading following feed"
+          );
           setFollowingRooms([]);
         }
       } finally {
@@ -158,7 +176,7 @@ const HomeFeedScreen: React.FC = () => {
 
   /* ---------------------------------------------------------------------- */
   /*  LOAD SQUARE FEED (moments – global feed like Popo Square)             */
-  /*  GET /api/profile/moments?limit=20                                     */
+  /*  Uses: GET /api/feed/home?tab=square&userId=...                        */
   /* ---------------------------------------------------------------------- */
   useEffect(() => {
     if (activeTab !== "Square") return;
@@ -170,8 +188,21 @@ const HomeFeedScreen: React.FC = () => {
         setSquareLoading(true);
         setSquareError(null);
 
+        const storedUserId = await AsyncStorage.getItem("gl_user_id");
+
+        if (!cancelled) {
+          setMyUserId(storedUserId);
+        }
+
+        const params = new URLSearchParams();
+        params.set("tab", "square");
+        params.set("limit", "20");
+        if (storedUserId) {
+          params.set("userId", storedUserId);
+        }
+
         const res = await fetch(
-          `${API_BASE_URL}/api/profile/moments?limit=20`
+          `${API_BASE_URL}/api/feed/home?${params.toString()}`
         );
 
         if (!res.ok) {
@@ -184,46 +215,60 @@ const HomeFeedScreen: React.FC = () => {
           return;
         }
 
-        const json = (await res.json()) as {
-          moments: {
-            id: string;
-            userId: string;
-            text: string | null;
-            imageUrl: string | null;
-            likeCount: number;
-            commentCount: number;
-            createdAt: string;
-            user: {
-              id: string;
-              nickname: string | null;
-              username: string;
-              avatarUrl: string | null;
-            };
-          }[];
-        };
+        const json = await res.json();
 
         if (!cancelled) {
-          const mapped: SquarePost[] = (json.moments || []).map((m) => ({
-            id: m.id,
-            userId: m.userId,
-            userName:
-              m.user.nickname && m.user.nickname.trim().length > 0
-                ? m.user.nickname
-                : m.user.username,
-            avatarUrl: m.user.avatarUrl ?? null,
-            countryFlag: null, // later: plug from user.country if you want
-            text: m.text ?? null,
-            imageUrl: m.imageUrl ?? null,
-            createdAt: m.createdAt,
-            likeCount: m.likeCount ?? 0,
-            commentCount: m.commentCount ?? 0,
-            isLikedByMe: false, // later when like API is ready
-            topicTitle: null, // later: plug Topic.title
-          }));
+          const mappedTopics: SquareTopic[] = (json.topics || []).map(
+            (t: any) => ({
+              id: t.id,
+              title: t.title,
+              hotCount:
+                typeof t.hotCount === "number" && !isNaN(t.hotCount)
+                  ? t.hotCount
+                  : 0,
+            })
+          );
 
-          // topics will come from a dedicated endpoint later – for now empty
-          setSquareTopics([]);
-          setSquarePosts(mapped);
+          const mappedPosts: SquarePost[] = (json.items || []).map(
+            (m: any) => ({
+              id: m.id,
+              userId: m.userId,
+              userName: m.userName,
+              avatarUrl: m.avatarUrl ?? null,
+              countryFlag: m.countryFlag ?? null,
+              text: m.text ?? null,
+              imageUrl: m.imageUrl ?? null,
+              createdAt: m.createdAt,
+              likeCount:
+                typeof m.likeCount === "number" && !isNaN(m.likeCount)
+                  ? m.likeCount
+                  : 0,
+              commentCount:
+                typeof m.commentCount === "number" &&
+                !isNaN(m.commentCount)
+                  ? m.commentCount
+                  : 0,
+              isLikedByMe: !!m.isLikedByMe,
+              topicTitle: m.topicTitle ?? null,
+              commentsPreview: Array.isArray(m.commentsPreview)
+                ? m.commentsPreview.map((c: any) => ({
+                    id: String(c.id),
+                    text:
+                      typeof c.text === "string"
+                        ? c.text
+                        : "",
+                    userName:
+                      typeof c.userName === "string" &&
+                      c.userName.trim().length > 0
+                        ? c.userName
+                        : "User",
+                  }))
+                : [],
+            })
+          );
+
+          setSquareTopics(mappedTopics);
+          setSquarePosts(mappedPosts);
         }
       } catch (err) {
         console.error("load square feed error", err);
@@ -301,6 +346,8 @@ const HomeFeedScreen: React.FC = () => {
             posts={squarePosts}
             loading={squareLoading}
             error={squareError}
+            myUserId={myUserId}
+            onUpdatePosts={setSquarePosts}
           />
         )}
         {activeTab === "Video" && <VideoFeed />}
@@ -406,7 +453,7 @@ const FollowingFeed: React.FC<{
         />
       ))}
 
-      {/* Event banner (kept from design) */}
+      {/* Keep Following screen event if you want */}
       {rooms.length > 0 && <EventBanner />}
     </ScrollView>
   );
@@ -510,8 +557,102 @@ const SquareFeed: React.FC<{
   posts: SquarePost[];
   loading: boolean;
   error: string | null;
-}> = ({ topics, posts, loading, error }) => {
-  const navigation = useNavigation<any>();
+  myUserId: string | null;
+  onUpdatePosts: React.Dispatch<React.SetStateAction<SquarePost[]>>;
+}> = ({ topics, posts, loading, error, myUserId, onUpdatePosts }) => {
+  const navigation = useNavigation<any>(); // MainTabs navigation
+
+  const handlePressProfile = (userId: string) => {
+    navigation.navigate("Profile", {
+      screen: "VisitProfile",
+      params: { userId },
+    });
+  };
+
+  const handleOpenComments = (post: SquarePost) => {
+    navigation.navigate("Profile", {
+      screen: "MomentComments",
+      params: { momentId: post.id, ownerName: post.userName },
+    });
+  };
+
+  const handleToggleLike = async (post: SquarePost) => {
+    if (!myUserId) {
+      Alert.alert("Login required", "Please login to like posts.");
+      return;
+    }
+
+    const prevLiked = post.isLikedByMe;
+    const prevCount = post.likeCount;
+    const nextLiked = !prevLiked;
+    const nextCount = prevCount + (nextLiked ? 1 : -1);
+
+    // optimistic update
+    onUpdatePosts((current) =>
+      current.map((p) =>
+        p.id === post.id
+          ? {
+              ...p,
+              isLikedByMe: nextLiked,
+              likeCount: nextCount < 0 ? 0 : nextCount,
+            }
+          : p
+      )
+    );
+
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/profile/moments/like`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            momentId: post.id,
+            userId: myUserId,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to toggle like");
+      }
+
+      const json = await res.json().catch(() => null);
+      const serverLiked =
+        typeof json?.liked === "boolean" ? json.liked : nextLiked;
+      const serverCount =
+        typeof json?.likeCount === "number"
+          ? json.likeCount
+          : nextCount;
+
+      onUpdatePosts((current) =>
+        current.map((p) =>
+          p.id === post.id
+            ? {
+                ...p,
+                isLikedByMe: serverLiked,
+                likeCount: serverCount < 0 ? 0 : serverCount,
+              }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("toggle like error", err);
+      // revert on error
+      onUpdatePosts((current) =>
+        current.map((p) =>
+          p.id === post.id
+            ? {
+                ...p,
+                isLikedByMe: prevLiked,
+                likeCount: prevCount,
+              }
+            : p
+        )
+      );
+      Alert.alert("Error", "Unable to like this post right now.");
+    }
+  };
 
   return (
     <View className="flex-1 bg-white">
@@ -520,28 +661,21 @@ const SquareFeed: React.FC<{
         contentContainerStyle={{ paddingBottom: 96 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner */}
-        <View className="px-4 pt-4">
-          <View className="h-28 rounded-2xl bg-[#8B5CF6] px-4 justify-center">
-            <Text className="text-white text-[14px] font-semibold">
-              FAN CLUB TOPIC EVENT
-            </Text>
-            <Text className="text-purple-100 text-[11px] mt-1">
-              12/11/2025 - 18/11/2025 [UTC+8]
-            </Text>
-          </View>
-        </View>
-
-        {/* Topics row */}
-        <View className="mt-4 px-4 flex-row items-center justify-between">
+        {/* Hot topics header */}
+        <View className="px-4 pt-4 flex-row items-center justify-between">
           <Text className="text-[14px] font-semibold text-gray-900">
-            Topics
+            Hot topics
           </Text>
-          <Pressable>
+          <Pressable
+            onPress={() => {
+              navigation.navigate("HotTopics");
+            }}
+          >
             <Text className="text-[13px] text-[#6C4DFF]">More &gt;</Text>
           </Pressable>
         </View>
 
+        {/* Topics row */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -552,6 +686,12 @@ const SquareFeed: React.FC<{
               key={topic.id}
               title={topic.title}
               hotCount={topic.hotCount.toString()}
+              onPress={() =>
+                navigation.navigate("TopicDetail", {
+                  topicId: topic.id,
+                  topicTitle: topic.title,
+                })
+              }
             />
           ))}
           {topics.length === 0 && (
@@ -581,13 +721,23 @@ const SquareFeed: React.FC<{
         )}
 
         {posts.map((post) => (
-          <SquarePostCard key={post.id} post={post} />
+          <SquarePostCard
+            key={post.id}
+            post={post}
+            onPressProfile={handlePressProfile}
+            onPressComments={handleOpenComments}
+            onToggleLike={handleToggleLike}
+          />
         ))}
       </ScrollView>
 
       {/* Floating camera “Post” button – like Popo Live */}
       <Pressable
-        onPress={() => navigation.navigate("PostMoment")}
+        onPress={() =>
+          navigation.navigate("Profile", {
+            screen: "PostMoment",
+          })
+        }
         className="absolute bottom-6 right-5 h-14 w-14 rounded-full bg-[#FF9800] items-center justify-center shadow-md shadow-black/30"
       >
         <Ionicons name="camera-outline" size={24} color="#FFFFFF" />
@@ -596,11 +746,15 @@ const SquareFeed: React.FC<{
   );
 };
 
-const TopicCard: React.FC<{ title: string; hotCount: string }> = ({
-  title,
-  hotCount,
-}) => (
-  <View className="mr-3 h-20 w-40 rounded-2xl bg-[#F9FAFB] px-3 py-2 justify-between">
+const TopicCard: React.FC<{
+  title: string;
+  hotCount: string;
+  onPress?: () => void;
+}> = ({ title, hotCount, onPress }) => (
+  <Pressable
+    className="mr-3 h-20 w-40 rounded-2xl bg-[#F9FAFB] px-3 py-2 justify-between"
+    onPress={onPress}
+  >
     <View className="flex-row items-center">
       <View className="h-8 w-8 rounded-xl bg-gray-300 mr-2" />
       <Text className="flex-1 text-[12px] font-semibold text-gray-900">
@@ -613,7 +767,7 @@ const TopicCard: React.FC<{ title: string; hotCount: string }> = ({
       </View>
       <Text className="text-[10px] text-gray-500">{hotCount}</Text>
     </View>
-  </View>
+  </Pressable>
 );
 
 // small helper for "x mins ago"
@@ -631,31 +785,49 @@ function formatTimeAgo(iso: string): string {
   return `${days} d${days > 1 ? "s" : ""} ago`;
 }
 
-const SquarePostCard: React.FC<{ post: SquarePost }> = ({ post }) => {
+type SquarePostCardProps = {
+  post: SquarePost;
+  onPressProfile?: (userId: string) => void;
+  onPressComments?: (post: SquarePost) => void;
+  onToggleLike?: (post: SquarePost) => void;
+};
+
+export const SquarePostCard: React.FC<SquarePostCardProps> = ({
+  post,
+  onPressProfile,
+  onPressComments,
+  onToggleLike,
+}) => {
   const createdLabel = formatTimeAgo(post.createdAt);
 
   return (
     <View className="mt-5 px-4 pb-4 border-b border-gray-100">
       {/* header */}
-      <View className="flex-row items-center">
-        <View className="h-10 w-10 rounded-full bg-[#E5E5FF] mr-3 overflow-hidden">
-          {post.avatarUrl && (
-            <Image
-              source={{ uri: post.avatarUrl }}
-              style={{ width: "100%", height: "100%" }}
-              resizeMode="cover"
-            />
-          )}
-        </View>
-        <View className="flex-1">
-          <Text className="text-[14px] font-semibold text-gray-900">
-            {post.userName}
-          </Text>
-          {/* fake online dot (same feel as Popo) */}
-          <Text className="text-[10px] text-green-600">● Online</Text>
-        </View>
+      <View className="flex-row items-center justify-between">
+        <Pressable
+          className="flex-row items-center flex-1"
+          onPress={() => onPressProfile?.(post.userId)}
+        >
+          <View className="h-10 w-10 rounded-full bg-[#E5E5FF] mr-3 overflow-hidden">
+            {post.avatarUrl && (
+              <Image
+                source={{ uri: post.avatarUrl }}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="cover"
+              />
+            )}
+          </View>
+          <View className="flex-1">
+            <Text className="text-[14px] font-semibold text-gray-900">
+              {post.userName}
+            </Text>
+            {/* fake online dot (same feel as Popo) */}
+            <Text className="text-[10px] text-green-600">● Online</Text>
+          </View>
+        </Pressable>
+
         {post.countryFlag && (
-          <Text className="text-[18px]">{post.countryFlag}</Text>
+          <Text className="text-[18px] ml-2">{post.countryFlag}</Text>
         )}
       </View>
 
@@ -688,22 +860,33 @@ const SquarePostCard: React.FC<{ post: SquarePost }> = ({ post }) => {
         </View>
       )}
 
-      {/* time + actions */}
+      {/* time */}
       <Text className="mt-1 text-[11px] text-gray-500">
         {createdLabel}
       </Text>
 
+      {/* actions */}
       <View className="mt-2 flex-row items-center">
-        {/* gift / comments */}
-        <Pressable className="mr-6 flex-row items-center">
-          <Ionicons name="gift-outline" size={18} color="#F97316" />
+        {/* comments */}
+        <Pressable
+          className="mr-6 flex-row items-center"
+          onPress={() => onPressComments?.(post)}
+        >
+          <Ionicons
+            name="chatbubble-ellipses-outline"
+            size={18}
+            color="#6B7280"
+          />
           <Text className="ml-1 text-[12px] text-gray-600">
             {post.commentCount}
           </Text>
         </Pressable>
 
         {/* likes */}
-        <Pressable className="flex-row items-center">
+        <Pressable
+          className="flex-row items-center"
+          onPress={() => onToggleLike?.(post)}
+        >
           <Ionicons
             name={post.isLikedByMe ? "heart" : "heart-outline"}
             size={18}
@@ -714,6 +897,34 @@ const SquarePostCard: React.FC<{ post: SquarePost }> = ({ post }) => {
           </Text>
         </Pressable>
       </View>
+
+      {/* comments preview under actions */}
+      {((post.commentsPreview && post.commentsPreview.length > 0) ||
+        post.commentCount > 0) && (
+        <View className="mt-2">
+          {(post.commentsPreview || []).slice(0, 2).map((c) => (
+            <Text
+              key={c.id}
+              className="text-[12px] text-gray-800"
+              numberOfLines={2}
+            >
+              <Text className="font-semibold">{c.userName}: </Text>
+              {c.text}
+            </Text>
+          ))}
+
+          {post.commentCount > (post.commentsPreview?.length || 0) && (
+            <Pressable
+              onPress={() => onPressComments?.(post)}
+              className="mt-1"
+            >
+              <Text className="text-[12px] text-[#6C4DFF]">
+                View all {post.commentCount} comments
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -727,8 +938,8 @@ const VideoFeed: React.FC = () => {
     <View className="flex-1 bg-black items-center justify-center">
       <Text className="text-white text-[16px]">Video feed placeholder</Text>
       <Text className="text-gray-400 text-[12px] mt-1 text-center px-8">
-        (Backend is ready. Later you can plug in your short-video player here using
-        tab="video".)
+        (Backend is ready. Later you can plug in your short-video player here
+        using tab="video".)
       </Text>
     </View>
   );

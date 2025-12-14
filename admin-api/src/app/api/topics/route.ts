@@ -1,57 +1,55 @@
 // admin-api/src/app/api/topics/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { TopicCategory, type Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-/* -------------------------------------------------------------------------- */
-/*  GET /api/topics?category=DAILY|OFFICIAL|NORMAL|ALL                        */
-/* -------------------------------------------------------------------------- */
+/**
+ * GET /api/topics?category=DAILY|OFFICIAL|NORMAL|ALL&includeInactive=1&q=...
+ */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const rawCategory = searchParams.get("category");
 
-    const where: Prisma.TopicWhereInput = {
-      isActive: true,
-    };
+    const rawCategory = (searchParams.get("category") ?? "ALL").toUpperCase();
+    const includeInactive = (searchParams.get("includeInactive") ?? "0") === "1";
+    const q = (searchParams.get("q") ?? "").trim();
 
-    // Since your schema has no TopicCategory / category field yet,
-    // we just use isTrending as a simple split:
-    // DAILY   -> isTrending = true
-    // OFFICIAL-> isTrending = false
-    if (rawCategory && rawCategory.toUpperCase() === "DAILY") {
-      where.isTrending = true;
-    } else if (rawCategory && rawCategory.toUpperCase() === "OFFICIAL") {
-      where.isTrending = false;
+    const where: Prisma.TopicWhereInput = {};
+
+    if (!includeInactive) {
+      where.isActive = true;
+    }
+
+    if (rawCategory !== "ALL") {
+      const isValid = Object.values(TopicCategory).includes(rawCategory as TopicCategory);
+      if (isValid) where.category = rawCategory as TopicCategory;
+    }
+
+    if (q.length > 0) {
+      where.OR = [
+        { title: { contains: q, mode: "insensitive" } },
+        { description: { contains: q, mode: "insensitive" } },
+      ];
     }
 
     const topics = await prisma.topic.findMany({
       where,
-      orderBy: [
-        { isTrending: "desc" },
-        { sortOrder: "asc" },
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ isTrending: "desc" }, { hotScore: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
       select: {
         id: true,
         title: true,
         description: true,
         isTrending: true,
         isActive: true,
+        category: true,
         sortOrder: true,
         hotScore: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
-
-    // derive a simple category label for the frontend
-    const categoryLabel: "DAILY" | "OFFICIAL" | "NORMAL" =
-      rawCategory && rawCategory.toUpperCase() === "DAILY"
-        ? "DAILY"
-        : rawCategory && rawCategory.toUpperCase() === "OFFICIAL"
-        ? "OFFICIAL"
-        : "NORMAL";
 
     return NextResponse.json({
       topics: topics.map((t) => ({
@@ -59,76 +57,70 @@ export async function GET(req: NextRequest) {
         title: t.title,
         description: t.description,
         hotCount: t.hotScore,
-        category: categoryLabel, // purely for UI, not from DB
+        category: t.category,
         isTrending: t.isTrending,
+        isActive: t.isActive,
+        sortOrder: t.sortOrder,
+        updatedAt: t.updatedAt,
       })),
     });
   } catch (error) {
     console.error("[GET /api/topics]", error);
-    return NextResponse.json(
-      { error: "Failed to load topics" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load topics" }, { status: 500 });
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*  POST /api/topics  (simple admin upsert)                                   */
-/*  Body: { id?, title, description?, isTrending?, isActive?, sortOrder?,     */
-/*          hotScore? }                                                       */
-/* -------------------------------------------------------------------------- */
+/**
+ * POST /api/topics
+ * Body: { id?, title, description?, category?, isTrending?, isActive?, sortOrder?, hotScore? }
+ */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
     if (!body) {
-      return NextResponse.json(
-        { error: "Invalid JSON body" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
     const {
       id,
       title,
       description,
+      category,
       isTrending,
       isActive,
       sortOrder,
       hotScore,
-    } = body as {
+    }: {
       id?: string;
       title?: string;
       description?: string | null;
+      category?: TopicCategory | string;
       isTrending?: boolean;
       isActive?: boolean;
       sortOrder?: number;
       hotScore?: number;
-    };
+    } = body;
 
-    if (!title && !id) {
-      return NextResponse.json(
-        { error: "title is required for create" },
-        { status: 400 }
-      );
+    const safeCategory =
+      typeof category === "string" && Object.values(TopicCategory).includes(category as TopicCategory)
+        ? (category as TopicCategory)
+        : undefined;
+
+    if (!id && (!title || title.trim().length === 0)) {
+      return NextResponse.json({ error: "title is required for create" }, { status: 400 });
     }
 
     if (id) {
       const updated = await prisma.topic.update({
         where: { id },
         data: {
-          title: title ?? undefined,
+          title: typeof title === "string" ? title : undefined,
           description: description ?? undefined,
-          isTrending:
-            typeof isTrending === "boolean" ? isTrending : undefined,
+          category: safeCategory ?? undefined,
+          isTrending: typeof isTrending === "boolean" ? isTrending : undefined,
           isActive: typeof isActive === "boolean" ? isActive : undefined,
-          sortOrder:
-            typeof sortOrder === "number" && !isNaN(sortOrder)
-              ? sortOrder
-              : undefined,
-          hotScore:
-            typeof hotScore === "number" && !isNaN(hotScore)
-              ? hotScore
-              : undefined,
+          sortOrder: typeof sortOrder === "number" && !isNaN(sortOrder) ? sortOrder : undefined,
+          hotScore: typeof hotScore === "number" && !isNaN(hotScore) ? hotScore : undefined,
         },
       });
       return NextResponse.json({ topic: updated });
@@ -136,23 +128,19 @@ export async function POST(req: NextRequest) {
 
     const created = await prisma.topic.create({
       data: {
-        title: title!,
+        title: title!.trim(),
         description: description ?? null,
+        category: safeCategory ?? TopicCategory.NORMAL,
         isTrending: !!isTrending,
         isActive: typeof isActive === "boolean" ? isActive : true,
-        sortOrder:
-          typeof sortOrder === "number" && !isNaN(sortOrder) ? sortOrder : 0,
-        hotScore:
-          typeof hotScore === "number" && !isNaN(hotScore) ? hotScore : 0,
+        sortOrder: typeof sortOrder === "number" && !isNaN(sortOrder) ? sortOrder : 0,
+        hotScore: typeof hotScore === "number" && !isNaN(hotScore) ? hotScore : 0,
       },
     });
 
-    return NextResponse.json({ topic: created });
+    return NextResponse.json({ topic: created }, { status: 201 });
   } catch (error) {
     console.error("[POST /api/topics]", error);
-    return NextResponse.json(
-      { error: "Failed to save topic" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to save topic" }, { status: 500 });
   }
 }

@@ -1,55 +1,80 @@
 // src/navigation/MainTabsNavigator.tsx
 import React, { useEffect, useState } from "react";
-import { View, Text } from "react-native";
+import { View, Text, Image } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import type { NavigatorScreenParams } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import ChatStackNavigator from "./ChatStackNavigator";
-import ProfileStackNavigator from "./ProfileStackNavigator";
-import type { ProfileStackParamList } from "./ProfileStackNavigator";
+import ChatStackNavigator, { type ChatStackParamList } from "./ChatStackNavigator";
+import ProfileStackNavigator, { type ProfileStackParamList } from "./ProfileStackNavigator";
 import PartyScreen from "../screens/PartyScreen";
 import ExploreStackNavigator from "./ExploreStackNavigator";
 import { API_BASE_URL } from "../config";
-
-// 🆕 import Home stack
-import HomeStackNavigator, {
-  type HomeStackParamList,
-} from "./HomeStackNavigator";
+import HomeStackNavigator, { type HomeStackParamList } from "./HomeStackNavigator";
 
 type MainTabsParamList = {
   Home: NavigatorScreenParams<HomeStackParamList>;
   Party: undefined;
   Explore: undefined;
-  Chat: undefined;
+  Chat: NavigatorScreenParams<ChatStackParamList>;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
+const ICONS = {
+  Home: require("../../assets/following.png"),
+  Party: require("../../assets/party.png"),
+  Explore: require("../../assets/explore.png"),
+  Chat: require("../../assets/msg.png"),
+  Profile: require("../../assets/profil.png"),
+};
+
+function TabImg({
+  source,
+  focused,
+  size = 26,
+}: {
+  source: any;
+  focused: boolean;
+  size?: number;
+}) {
+  return (
+    <Image
+      source={source}
+      resizeMode="contain"
+      style={{
+        width: size,
+        height: size,
+        opacity: focused ? 1 : 0.45,
+        transform: [{ scale: focused ? 1.06 : 1 }],
+      }}
+    />
+  );
+}
+
 const MainTabsNavigator: React.FC = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
-  // 🔔 Poll unread notifications
   useEffect(() => {
     let isMounted = true;
 
     const loadUnread = async () => {
       try {
         const userId = await AsyncStorage.getItem("gl_user_id");
-        if (!userId) return;
+        if (!userId) {
+          if (isMounted) setUnreadNotifications(0);
+          return;
+        }
 
         const res = await fetch(
-          `${API_BASE_URL}/api/notifications/unread-count?userId=${encodeURIComponent(
-            userId
-          )}`
+          `${API_BASE_URL}/api/notifications/unread-count?userId=${encodeURIComponent(userId)}`
         );
         if (!res.ok) return;
 
         const json = await res.json();
         if (!isMounted) return;
-        setUnreadNotifications(json.count ?? 0);
+        setUnreadNotifications(Number(json?.count ?? 0));
       } catch (e) {
         console.error("Unread notifications count error", e);
       }
@@ -70,100 +95,65 @@ const MainTabsNavigator: React.FC = () => {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarActiveTintColor: "#6C4DFF",
-        tabBarInactiveTintColor: "#9CA3AF",
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          height: 64,
+          height: 66,
+          paddingTop: 8,
+          paddingBottom: 10,
           borderTopWidth: 1,
           borderTopColor: "#E5E7EB",
           backgroundColor: "#FFFFFF",
         },
       }}
     >
-      {/* 🏠 HOME (stack) */}
       <Tab.Screen
         name="Home"
         component={HomeStackNavigator}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size ?? 22} color={color} />
-          ),
+          tabBarIcon: ({ focused }) => <TabImg source={ICONS.Home} focused={focused} />,
         }}
       />
 
-      {/* 🎉 PARTY LIST */}
       <Tab.Screen
         name="Party"
         component={PartyScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="party-popper"
-              size={size ?? 24}
-              color={color}
-            />
-          ),
+          tabBarIcon: ({ focused }) => <TabImg source={ICONS.Party} focused={focused} />,
         }}
       />
 
-      {/* 🔥 Explore (stack) */}
       <Tab.Screen
         name="Explore"
         component={ExploreStackNavigator}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <View
-              style={{
-                height: 40,
-                width: 40,
-                borderRadius: 20,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "#6C4DFF",
-                opacity: focused ? 1 : 0.7,
-              }}
-            >
-              <Ionicons name="flame" size={22} color="#FFFFFF" />
-            </View>
-          ),
+          tabBarIcon: ({ focused }) => <TabImg source={ICONS.Explore} focused={focused} size={28} />,
         }}
       />
 
-      {/* 💬 Chat + 🔔 badge here */}
       <Tab.Screen
         name="Chat"
         component={ChatStackNavigator}
         options={{
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ focused }) => (
             <View style={{ position: "relative" }}>
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={size ?? 22}
-                color={color}
-              />
+              <TabImg source={ICONS.Chat} focused={focused} />
+
               {unreadNotifications > 0 && (
                 <View
                   style={{
                     position: "absolute",
-                    right: -2,
-                    top: -2,
+                    right: -6,
+                    top: -6,
                     minWidth: 16,
                     height: 16,
                     borderRadius: 8,
-                    paddingHorizontal: 3,
+                    paddingHorizontal: 4,
                     backgroundColor: "#EF4444",
                     justifyContent: "center",
                     alignItems: "center",
                   }}
                 >
-                  <Text
-                    style={{
-                      color: "#FFFFFF",
-                      fontSize: 10,
-                      fontWeight: "600",
-                    }}
-                    numberOfLines={1}
-                  >
+                  <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "800" }} numberOfLines={1}>
                     {unreadNotifications > 99 ? "99+" : unreadNotifications}
                   </Text>
                 </View>
@@ -172,51 +162,23 @@ const MainTabsNavigator: React.FC = () => {
           ),
         }}
         listeners={({ navigation }) => ({
-          tabPress: () => {
-            navigation.navigate("Chat");
-
-            // when user opens Chat, mark all notifications as read
-            (async () => {
-              try {
-                const userId = await AsyncStorage.getItem("gl_user_id");
-                if (!userId) return;
-
-                await fetch(`${API_BASE_URL}/api/notifications`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ userId }),
-                });
-              } catch (e) {
-                console.error(
-                  "mark notifications read on Chat tab press error",
-                  e
-                );
-              } finally {
-                setUnreadNotifications(0); // optimistically clear badge
-              }
-            })();
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate("Chat", { screen: "ChatList" });
           },
         })}
       />
 
-      {/* 👤 Profile (stack with Settings) */}
       <Tab.Screen
         name="Profile"
         component={ProfileStackNavigator}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons
-              name="person-circle-outline"
-              size={size ?? 26}
-              color={color}
-            />
-          ),
+          tabBarIcon: ({ focused }) => <TabImg source={ICONS.Profile} focused={focused} />,
         }}
         listeners={({ navigation }) => ({
-          tabPress: () => {
-            navigation.navigate("Profile", {
-              screen: "ProfileMain",
-            });
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate("Profile", { screen: "ProfileMain" });
           },
         })}
       />

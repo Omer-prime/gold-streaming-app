@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,10 +18,7 @@ import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator"
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config";
 
-type Nav = NativeStackNavigationProp<
-  ProfileStackParamList,
-  "NewMessageNotification"
->;
+type Nav = NativeStackNavigationProp<ProfileStackParamList, "NewMessageNotification">;
 
 type NotificationItem = {
   id: string;
@@ -34,8 +32,9 @@ type NotificationItem = {
 
 const NewMessageNotificationScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const searchRef = useRef<TextInput>(null);
 
-  // settings state
+  // settings
   const [liveAlerts, setLiveAlerts] = useState(true);
   const [messageSwitch, setMessageSwitch] = useState(true);
   const [sound, setSound] = useState(true);
@@ -51,17 +50,21 @@ const NewMessageNotificationScreen: React.FC = () => {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [notifError, setNotifError] = useState<string | null>(null);
 
+  // debug counters (helps you confirm API is returning)
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverUnread, setServerUnread] = useState(0);
+  const [debugUserId, setDebugUserId] = useState<string | null>(null);
+
   // -------- SETTINGS: LOAD ----------
   useEffect(() => {
     const load = async () => {
       try {
         const userId = await AsyncStorage.getItem("gl_user_id");
+        setDebugUserId(userId);
         if (!userId) return;
 
         const res = await fetch(
-          `${API_BASE_URL}/api/settings/notifications?userId=${encodeURIComponent(
-            userId
-          )}`
+          `${API_BASE_URL}/api/settings/notifications?userId=${encodeURIComponent(userId)}`
         );
         if (!res.ok) return;
         const json = await res.json();
@@ -112,16 +115,7 @@ const NewMessageNotificationScreen: React.FC = () => {
     };
 
     save();
-  }, [
-    loaded,
-    liveAlerts,
-    messageSwitch,
-    sound,
-    vibrate,
-    mutualFollowers,
-    myFollowing,
-    stranger,
-  ]);
+  }, [loaded, liveAlerts, messageSwitch, sound, vibrate, mutualFollowers, myFollowing, stranger]);
 
   // -------- NOTIFICATIONS: LOAD LIST ----------
   const loadNotifications = useCallback(async () => {
@@ -130,25 +124,39 @@ const NewMessageNotificationScreen: React.FC = () => {
       setLoadingNotifications(true);
 
       const userId = await AsyncStorage.getItem("gl_user_id");
-      if (!userId) return;
-
-      const res = await fetch(
-        `${API_BASE_URL}/api/notifications?userId=${encodeURIComponent(userId)}`
-      );
-
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        setNotifError(json?.error || "Failed to load notifications");
+      setDebugUserId(userId);
+      if (!userId) {
         setNotifications([]);
+        setServerTotal(0);
+        setServerUnread(0);
+        setNotifError("Missing userId in AsyncStorage (gl_user_id)");
         return;
       }
 
-      const json = await res.json();
-      setNotifications((json.notifications ?? []) as NotificationItem[]);
+      // force pageSize so you always see a lot
+      const res = await fetch(
+        `${API_BASE_URL}/api/notifications?userId=${encodeURIComponent(userId)}&page=1&pageSize=50`
+      );
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setNotifError(json?.error || "Failed to load notifications");
+        setNotifications([]);
+        setServerTotal(0);
+        setServerUnread(0);
+        return;
+      }
+
+      setNotifications((json?.notifications ?? []) as NotificationItem[]);
+      setServerTotal(Number(json?.total ?? 0));
+      setServerUnread(Number(json?.unreadCount ?? 0));
     } catch (e) {
       console.error("load notifications error", e);
       setNotifError("Network error while loading notifications");
       setNotifications([]);
+      setServerTotal(0);
+      setServerUnread(0);
     } finally {
       setLoadingNotifications(false);
     }
@@ -158,7 +166,6 @@ const NewMessageNotificationScreen: React.FC = () => {
     loadNotifications();
   }, [loadNotifications]);
 
-  // reload when screen focuses (so new admin notifications appear)
   useFocusEffect(
     useCallback(() => {
       loadNotifications();
@@ -180,9 +187,8 @@ const NewMessageNotificationScreen: React.FC = () => {
       if (!res.ok) return;
 
       const nowIso = new Date().toISOString();
-      setNotifications((prev) =>
-        prev.map((n) => (n.readAt ? n : { ...n, readAt: nowIso }))
-      );
+      setNotifications((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: nowIso })));
+      setServerUnread(0);
     } catch (e) {
       console.error("mark all read error", e);
     }
@@ -215,26 +221,35 @@ const NewMessageNotificationScreen: React.FC = () => {
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <View className="flex-row items-center px-4 pt-3 pb-2 border-b border-gray-100">
-        <Pressable
-          onPress={() => navigation.goBack()}
-          className="mr-3 h-9 w-9 items-center justify-center rounded-full"
-        >
+        <Pressable onPress={() => navigation.goBack()} className="mr-3 h-9 w-9 items-center justify-center rounded-full">
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
-        <Text className="text-[18px] font-semibold text-[#111827]">
-          New messages notification
-        </Text>
+        <Text className="text-[18px] font-semibold text-[#111827]">Notifications</Text>
       </View>
 
-      <View className="px-4 pt-3">
-        <View className="flex-row items-center rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2">
+      {/* Search bar (zIndex fix) */}
+      <View className="px-4 pt-3" style={{ zIndex: 10 }}>
+        <View
+          className="flex-row items-center rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2"
+          style={{ elevation: 2 }}
+        >
           <Ionicons name="search-outline" size={16} color="#9CA3AF" />
           <TextInput
+            ref={searchRef}
             value={search}
             onChangeText={setSearch}
             placeholder="Search notification settings"
             placeholderTextColor="#9CA3AF"
-            style={{ marginLeft: 8, flex: 1, fontSize: 13, color: "#111827", paddingVertical: 0 }}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            style={{
+              marginLeft: 8,
+              flex: 1,
+              fontSize: 13,
+              color: "#111827",
+              paddingVertical: Platform.OS === "android" ? 0 : 6,
+            }}
           />
           {search.length > 0 && (
             <Pressable onPress={() => setSearch("")}>
@@ -242,17 +257,21 @@ const NewMessageNotificationScreen: React.FC = () => {
             </Pressable>
           )}
         </View>
+
+        {/* tiny debug line (remove later) */}
+        <Text className="mt-1 text-[10px] text-[#9CA3AF]">
+          uid: {debugUserId ?? "null"} • total: {serverTotal} • unread: {serverUnread}
+        </Text>
       </View>
 
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 24 }}
-        refreshControl={
-          <RefreshControl refreshing={loadingNotifications} onRefresh={loadNotifications} />
-        }
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={loadingNotifications} onRefresh={loadNotifications} />}
       >
-        <SectionTitle title="Notifications" />
+        <SectionTitle title="Notifications list" />
 
         {notifError && (
           <View className="px-4 pb-2">
@@ -273,54 +292,21 @@ const NewMessageNotificationScreen: React.FC = () => {
             {hasUnread && (
               <View className="px-4 pt-1 pb-2 flex-row justify-end">
                 <Pressable onPress={handleMarkAllRead}>
-                  <Text className="text-[11px] text-[#6C4DFF] font-semibold">
-                    Mark all as read
-                  </Text>
+                  <Text className="text-[11px] text-[#6C4DFF] font-semibold">Mark all as read</Text>
                 </Pressable>
               </View>
             )}
-
             {notifications.map((n) => (
               <NotificationCard key={n.id} item={n} />
             ))}
           </>
         )}
 
-        {isSearching ? (
-          <>
-            <SectionTitle title="Search results" />
-            {filteredRows.map((row) => (
-              <SimpleToggleRow
-                key={row.key}
-                label={row.label}
-                value={row.value}
-                onValueChange={row.onValueChange}
-              />
-            ))}
-            {filteredRows.length === 0 && (
-              <View className="px-4 pt-4">
-                <Text className="text-[12px] text-[#9CA3AF]">
-                  No settings matched your search.
-                </Text>
-              </View>
-            )}
-          </>
-        ) : (
-          <>
-            <SectionTitle title="Message notifications" />
-            <SimpleToggleRow label="Live room opening alerts" value={liveAlerts} onValueChange={setLiveAlerts} />
-            <SimpleToggleRow label="Message notification switch" value={messageSwitch} onValueChange={setMessageSwitch} />
+        <SectionTitle title={isSearching ? "Search results" : "Notification settings"} />
 
-            <SectionTitle title="Message alert settings" />
-            <SimpleToggleRow label="Sound" value={sound} onValueChange={setSound} />
-            <SimpleToggleRow label="Vibrate" value={vibrate} onValueChange={setVibrate} />
-
-            <SectionTitle title="Who can send me a private message?" />
-            <SimpleToggleRow label="Mutual followers" value={mutualFollowers} onValueChange={setMutualFollowers} />
-            <SimpleToggleRow label="My Following" value={myFollowing} onValueChange={setMyFollowing} />
-            <SimpleToggleRow label="Stranger" value={stranger} onValueChange={setStranger} />
-          </>
-        )}
+        {(isSearching ? filteredRows : allRows).map((row) => (
+          <SimpleToggleRow key={row.key} label={row.label} value={row.value} onValueChange={row.onValueChange} />
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -344,17 +330,14 @@ const SimpleToggleRow: React.FC<{
 );
 
 const NotificationCard: React.FC<{ item: NotificationItem }> = ({ item }) => {
-  const created = new Date(item.createdAt);
-  const timeLabel = created.toLocaleString();
+  const timeLabel = new Date(item.createdAt).toLocaleString();
   const isUnread = !item.readAt;
 
   return (
     <View className="px-4 pt-2">
       <View className="flex-row rounded-xl border border-[#E5E7EB] bg-white px-3 py-2">
         <View className="mr-2 mt-2">
-          {isUnread && (
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#F97316" }} />
-          )}
+          {isUnread && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#F97316" }} />}
         </View>
 
         <View style={{ flex: 1 }}>
@@ -362,9 +345,7 @@ const NotificationCard: React.FC<{ item: NotificationItem }> = ({ item }) => {
             <Text className="text-[14px] text-[#111827]" numberOfLines={2}>
               {item.title}
             </Text>
-            <Text className="ml-2 text-[10px] text-[#9CA3AF]">
-              {item.type}
-            </Text>
+            <Text className="ml-2 text-[10px] text-[#9CA3AF]">{item.type}</Text>
           </View>
 
           {!!item.body && (

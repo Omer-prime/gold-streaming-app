@@ -1,13 +1,6 @@
-// src/screens/TopicDetailScreen.tsx
+// mobile/src/screens/TopicDetailScreen.tsx
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  ActivityIndicator,
-  Pressable,
-  Alert,
-} from "react-native";
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -20,6 +13,8 @@ type TopicDetailRouteParams = {
   topicId: string;
   topicTitle: string;
 };
+
+const USER_ID_KEY = "gl_user_id";
 
 const TopicDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -39,22 +34,16 @@ const TopicDetailScreen: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const storedUserId = await AsyncStorage.getItem("gl_user_id");
-        if (!cancelled) {
-          setMyUserId(storedUserId);
-        }
+        const storedUserId = await AsyncStorage.getItem(USER_ID_KEY);
+        if (!cancelled) setMyUserId(storedUserId);
 
         const params = new URLSearchParams();
         params.set("tab", "square");
         params.set("limit", "20");
         params.set("topicId", topicId);
-        if (storedUserId) {
-          params.set("userId", storedUserId);
-        }
+        if (storedUserId) params.set("userId", storedUserId);
 
-        const res = await fetch(
-          `${API_BASE_URL}/api/feed/home?${params.toString()}`
-        );
+        const res = await fetch(`${API_BASE_URL}/api/feed/home?${params.toString()}`);
 
         if (!res.ok) {
           const json = await res.json().catch(() => null);
@@ -68,28 +57,21 @@ const TopicDetailScreen: React.FC = () => {
         const json = await res.json();
 
         if (!cancelled) {
-          const mappedPosts: SquarePost[] = (json.items || []).map(
-            (m: any) => ({
-              id: m.id,
-              userId: m.userId,
-              userName: m.userName,
-              avatarUrl: m.avatarUrl ?? null,
-              countryFlag: m.countryFlag ?? null,
-              text: m.text ?? null,
-              imageUrl: m.imageUrl ?? null,
-              createdAt: m.createdAt,
-              likeCount:
-                typeof m.likeCount === "number" && !isNaN(m.likeCount)
-                  ? m.likeCount
-                  : 0,
-              commentCount:
-                typeof m.commentCount === "number" && !isNaN(m.commentCount)
-                  ? m.commentCount
-                  : 0,
-              isLikedByMe: !!m.isLikedByMe,
-              topicTitle: m.topicTitle ?? null,
-            })
-          );
+          const mappedPosts: SquarePost[] = (json.items || []).map((m: any) => ({
+            id: String(m.id),
+            userId: String(m.userId),
+            userName: String(m.userName ?? "User"),
+            avatarUrl: m.avatarUrl ?? null,
+            countryFlag: m.countryFlag ?? null,
+            text: m.text ?? null,
+            imageUrl: m.imageUrl ?? null,
+            createdAt: String(m.createdAt),
+            likeCount: typeof m.likeCount === "number" ? m.likeCount : 0,
+            commentCount: typeof m.commentCount === "number" ? m.commentCount : 0,
+            isLikedByMe: !!m.isLikedByMe,
+            topicTitle: m.topicTitle ?? null,
+            commentsPreview: Array.isArray(m.commentsPreview) ? m.commentsPreview : [],
+          }));
 
           setPosts(mappedPosts);
         }
@@ -105,7 +87,6 @@ const TopicDetailScreen: React.FC = () => {
     };
 
     load();
-
     return () => {
       cancelled = true;
     };
@@ -134,88 +115,50 @@ const TopicDetailScreen: React.FC = () => {
     const prevLiked = post.isLikedByMe;
     const prevCount = post.likeCount;
     const nextLiked = !prevLiked;
-    const nextCount = prevCount + (nextLiked ? 1 : -1);
+    const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
 
-    setPosts((current) =>
-      current.map((p) =>
-        p.id === post.id
-          ? {
-              ...p,
-              isLikedByMe: nextLiked,
-              likeCount: nextCount < 0 ? 0 : nextCount,
-            }
-          : p
-      )
-    );
+    setPosts((cur) => cur.map((p) => (p.id === post.id ? { ...p, isLikedByMe: nextLiked, likeCount: nextCount } : p)));
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/moments/like`, {
+      const res = await fetch(`${API_BASE_URL}/api/profile/moments/like`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          momentId: post.id,
-          userId: myUserId,
-        }),
+        body: JSON.stringify({ momentId: post.id, userId: myUserId }),
       });
 
-      if (!res.ok) throw new Error("Failed to toggle like");
+      if (!res.ok) throw new Error("Failed");
 
       const json = await res.json().catch(() => null);
+      const serverLiked = typeof json?.liked === "boolean" ? json.liked : nextLiked;
+      const serverCount = typeof json?.likeCount === "number" ? json.likeCount : nextCount;
 
-      const serverLiked =
-        typeof json?.liked === "boolean" ? json.liked : nextLiked;
-      const serverCount =
-        typeof json?.likeCount === "number" ? json.likeCount : nextCount;
-
-      setPosts((current) =>
-        current.map((p) =>
+      setPosts((cur) =>
+        cur.map((p) =>
           p.id === post.id
-            ? {
-                ...p,
-                isLikedByMe: serverLiked,
-                likeCount: serverCount < 0 ? 0 : serverCount,
-              }
+            ? { ...p, isLikedByMe: serverLiked, likeCount: Math.max(0, serverCount) }
             : p
         )
       );
     } catch (err) {
       console.error("toggle like error", err);
-      setPosts((current) =>
-        current.map((p) =>
-          p.id === post.id
-            ? {
-                ...p,
-                isLikedByMe: prevLiked,
-                likeCount: prevCount,
-              }
-            : p
-        )
-      );
+      setPosts((cur) => cur.map((p) => (p.id === post.id ? { ...p, isLikedByMe: prevLiked, likeCount: prevCount } : p)));
       Alert.alert("Error", "Unable to like this post right now.");
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100">
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
-        <Text
-          className="text-[16px] font-semibold text-gray-900"
-          numberOfLines={1}
-        >
+        <Text className="text-[16px] font-semibold text-gray-900" numberOfLines={1}>
           {topicTitle}
         </Text>
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView
-        className="flex-1 bg-white"
-        contentContainerStyle={{ paddingBottom: 96 }}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView className="flex-1 bg-white" contentContainerStyle={{ paddingBottom: 96 }} showsVerticalScrollIndicator={false}>
         {loading && (
           <View className="px-4 py-4">
             <ActivityIndicator size="small" color="#6C4DFF" />
@@ -230,9 +173,7 @@ const TopicDetailScreen: React.FC = () => {
 
         {!loading && !error && posts.length === 0 && (
           <View className="px-4 mt-4">
-            <Text className="text-[13px] text-gray-500">
-              No moments yet under this topic.
-            </Text>
+            <Text className="text-[13px] text-gray-500">No moments yet under this topic.</Text>
           </View>
         )}
 

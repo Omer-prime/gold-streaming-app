@@ -129,6 +129,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             pathname={pathname}
             onClick={() => setMobileOpen(false)}
           />
+          <NavLink
+            href="/admin/topics"
+            label="Topics"
+            icon="🏷️"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
 
           <div className="mt-4 pt-4 border-t border-slate-900/80">
             <SectionLabel>Operations</SectionLabel>

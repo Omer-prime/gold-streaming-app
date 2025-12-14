@@ -71,6 +71,13 @@ enum TopicCategory {
   NORMAL
 }
 
+// ✅ NEW: audience targeting for admin notifications
+enum NotificationAudience {
+  ALL_USERS
+  ALL_HOSTS
+  SPECIFIC_USERS
+}
+
 model Country {
   id        Int     @id @default(autoincrement())
   code      String  @unique // e.g. "PK", "PH"
@@ -161,6 +168,9 @@ model User {
 
   // ⭐ Notifications (system / admin / message)
   notifications Notification[]
+
+  // ✅ NEW: campaigns created by this admin
+  adminNotificationsCreated AdminNotification[] @relation("AdminNotificationCreator")
 
   // ⭐ Direct chat (1-1 messages)
   chatThreadsA ChatThread[] @relation("ChatThreadUserA")
@@ -448,7 +458,7 @@ model Moment {
   thumbnailUrl String?
 
   topicId String?
-  topic   Topic?     @relation(fields: [topicId], references: [id])
+  topic   Topic? @relation(fields: [topicId], references: [id])
 
   likeCount    Int @default(0)
   commentCount Int @default(0)
@@ -517,10 +527,10 @@ model PKBattle {
   type PKType
 
   hostId String
-  host   User   @relation("PKHost", fields: [hostId], references: [id])
+  host   User @relation("PKHost", fields: [hostId], references: [id])
 
   opponentId String?
-  opponent   User?   @relation("PKOpponent", fields: [opponentId], references: [id])
+  opponent   User? @relation("PKOpponent", fields: [opponentId], references: [id])
 
   streamId String?
   stream   Stream? @relation(fields: [streamId], references: [id])
@@ -544,10 +554,10 @@ model ChatThread {
   updatedAt DateTime @updatedAt
 
   userAId String
-  userA   User   @relation("ChatThreadUserA", fields: [userAId], references: [id])
+  userA   User @relation("ChatThreadUserA", fields: [userAId], references: [id])
 
   userBId String
-  userB   User   @relation("ChatThreadUserB", fields: [userBId], references: [id])
+  userB   User @relation("ChatThreadUserB", fields: [userBId], references: [id])
 
   lastMessageText String?
   lastMessageAt   DateTime?
@@ -569,7 +579,7 @@ model ChatMessage {
   thread   ChatThread @relation(fields: [threadId], references: [id])
 
   senderId String
-  sender   User   @relation(fields: [senderId], references: [id])
+  sender   User @relation(fields: [senderId], references: [id])
 
   content String
   isRead  Boolean @default(false)
@@ -579,11 +589,38 @@ model ChatMessage {
   @@index([createdAt])
 }
 
+// ✅ NEW: Admin notification campaign (one-to-many into Notification)
+model AdminNotification {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  createdById String
+  createdBy   User @relation("AdminNotificationCreator", fields: [createdById], references: [id])
+
+  audience      NotificationAudience @default(ALL_USERS)
+  targetUserIds String[]            @default([]) // only used when SPECIFIC_USERS
+
+  // e.g. SYSTEM, ADMIN, MESSAGE
+  type    String @default("ADMIN")
+  title   String
+  body    String
+  metaJson Json?
+
+  notifications Notification[]
+
+  @@index([createdById, createdAt])
+  @@index([audience, createdAt])
+}
+
 // ⭐ Notifications (system & admin → user, incl. chat)
 model Notification {
   id     String   @id @default(cuid())
   userId String
   user   User     @relation(fields: [userId], references: [id])
+
+  // ✅ link to campaign (optional)
+  adminNotificationId String?
+  adminNotification   AdminNotification? @relation(fields: [adminNotificationId], references: [id])
 
   // e.g. SYSTEM, ADMIN, MESSAGE
   type    String @default("SYSTEM")
@@ -597,6 +634,7 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+  @@index([adminNotificationId])
 }
 
 // ⭐ Topics for Square feed (admin controlled)

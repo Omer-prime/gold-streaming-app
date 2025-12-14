@@ -1,6 +1,5 @@
-// scripts/create-admin.cjs
+// scripts/create-admin-user.cjs
 
-// 1) Load .env so Prisma sees DATABASE_URL
 const path = require("path");
 require("dotenv").config({
   path: path.join(__dirname, "..", ".env"),
@@ -12,18 +11,14 @@ const bcrypt = require("bcryptjs");
 const prisma = new PrismaClient();
 
 async function main() {
-  const username = "gl_master_admin";
-  const email = "admin@goldlive.app";
-  const password = "Gl0ld!Admin#2025_Strong";
-
-  console.log("Ensuring admin user exists (and password is up to date)...");
-  console.log("Username:", username);
-  console.log("Email:", email);
-  console.log("Password:", password);
+  // Usage:
+  // node scripts/create-admin-user.cjs <username> <email> <password>
+  const username = process.argv[2] || "leao";
+  const email = process.argv[3] || "leao@goldlive.app";
+  const password = process.argv[4] || "5641casa";
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  // ✅ upsert = create if missing, update if exists
   const user = await prisma.user.upsert({
     where: { username },
     update: {
@@ -36,9 +31,7 @@ async function main() {
       email,
       passwordHash,
       role: "ADMIN",
-      wallet: {
-        create: { balance: 0 },
-      },
+      wallet: { create: { balance: 0 } },
     },
   });
 
@@ -54,6 +47,7 @@ async function main() {
 main()
   .catch((err) => {
     console.error("❌ Error creating admin:", err);
+    process.exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();

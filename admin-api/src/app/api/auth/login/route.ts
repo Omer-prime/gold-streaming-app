@@ -17,7 +17,6 @@ function computeProfileCompleted(user: {
     Boolean(user.gender),
     Boolean(user.countryId),
   ];
-
   return pieces.every(Boolean);
 }
 
@@ -33,7 +32,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // normalize inputs (avoid trailing spaces etc.)
     identifier = identifier.trim();
     password = password.trim();
 
@@ -46,21 +44,13 @@ export async function POST(req: NextRequest) {
 
     const isEmail = identifier.includes("@");
 
-    // 1) Find user by username OR email (email case-insensitive-ish)
     let user = await prisma.user.findFirst({
       where: isEmail
-        ? {
-            OR: [
-              { email: identifier },
-              { email: identifier.toLowerCase() },
-            ],
-          }
-        : {
-            username: identifier,
-          },
+        ? { OR: [{ email: identifier }, { email: identifier.toLowerCase() }] }
+        : { username: identifier },
     });
 
-    // 2) DEV ONLY: auto-create admin/admin123 if not found
+    // DEV ONLY: auto-create admin/admin123 if not found
     if (
       !user &&
       process.env.NODE_ENV !== "production" &&
@@ -75,33 +65,20 @@ export async function POST(req: NextRequest) {
           email: "admin@example.com",
           passwordHash,
           role: "ADMIN",
-          wallet: {
-            create: {
-              balance: 0,
-            },
-          },
+          wallet: { create: { balance: 0 } },
         },
       });
 
-      console.log(
-        "[POST /api/auth/login] Dev admin auto-created: admin / admin123"
-      );
+      console.log("[POST /api/auth/login] Dev admin auto-created: admin / admin123");
     }
 
-    // 3) If still no user or no password hash → invalid
     if (!user) {
       console.log("[LOGIN] No user for identifier:", identifier);
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     if (!user.passwordHash) {
-      console.log(
-        "[LOGIN] User has no passwordHash (maybe social-login only):",
-        user.id
-      );
+      console.log("[LOGIN] User has no passwordHash:", user.id);
       return NextResponse.json(
         {
           error:
@@ -111,17 +88,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4) Check password
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
       console.log("[LOGIN] Password mismatch for user:", user.id);
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    // 5) Compute if profile is completed
     const profileCompleted = computeProfileCompleted({
       nickname: user.nickname ?? null,
       dateOfBirth: user.dateOfBirth ?? null,
@@ -131,7 +103,7 @@ export async function POST(req: NextRequest) {
 
     const token = signAuthToken({ sub: user.id, role: user.role });
 
-    // 🔔 Send login notification email (best-effort)
+    // best-effort email (your SMTP is failing right now, but that's OK)
     if (user.email) {
       const displayName = user.nickname || user.username || "there";
       try {
@@ -139,18 +111,18 @@ export async function POST(req: NextRequest) {
           to: user.email,
           subject: "New login to your Gold Live account",
           html: `
-          <p>Hi ${displayName},</p>
-          <p>There was a new login to your Gold Live account.</p>
-          <p>If this wasn't you, please change your password immediately.</p>
-          <p style="margin-top:16px;">— Gold Live Team</p>
-        `,
+            <p>Hi ${displayName},</p>
+            <p>There was a new login to your Gold Live account.</p>
+            <p>If this wasn't you, please change your password immediately.</p>
+            <p style="margin-top:16px;">— Gold Live Team</p>
+          `,
         });
       } catch (e) {
         console.warn("[LOGIN] Failed sending login email:", e);
       }
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       user: {
         id: user.id,
         username: user.username,
@@ -160,11 +132,22 @@ export async function POST(req: NextRequest) {
       },
       token,
     });
+
+    // ✅ Set cookie so middleware can see you are logged in
+    const proto = req.headers.get("x-forwarded-proto") ?? "http";
+    const secure = proto === "https";
+
+    res.cookies.set("gl_auth_token", token, {
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
+    return res;
   } catch (error) {
     console.error("[POST /api/auth/login]", error);
-    return NextResponse.json(
-      { error: "Failed to login" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to login" }, { status: 500 });
   }
 }

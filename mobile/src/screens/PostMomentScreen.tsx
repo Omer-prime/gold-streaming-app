@@ -1,5 +1,4 @@
-// src/screens/PostMomentScreen.tsx
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -15,16 +14,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import {
-  useNavigation,
-  useRoute,
-  type RouteProp,
-} from "@react-navigation/native";
+import type { ImagePickerAsset } from "expo-image-picker";
+import { Video, ResizeMode } from "expo-av";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { API_BASE_URL } from "../config";
 
-// Local params type instead of ProfileStackParamList
 type PostMomentParams = {
   PostMoment: {
     topicId?: string;
@@ -32,24 +28,16 @@ type PostMomentParams = {
   };
 };
 
-type PostMomentNav = NativeStackNavigationProp<
-  PostMomentParams,
-  "PostMoment"
->;
+type PostMomentNav = NativeStackNavigationProp<PostMomentParams, "PostMoment">;
 type PostMomentRoute = RouteProp<PostMomentParams, "PostMoment">;
 
-const recommendedTopics = [
-  "#Rocket Host Video Collection",
-  "#Outfit Of The Day(OOTD)",
-  "#Everyday life",
-  "#SHOW YOURSELF",
-  "#Topics you are interested in",
-  "#The most beautiful travel photos",
-  "#Recommend a movie",
-  "#My hobby",
-];
+type MediaPicked =
+  | { kind: "image"; asset: ImagePickerAsset }
+  | { kind: "video"; asset: ImagePickerAsset };
 
-const PostMomentScreen: React.FC = () => {
+type ApiTopic = { id: string; title: string; hotScore?: number; hotCount?: number };
+
+export default function PostMomentScreen() {
   const navigation = useNavigation<PostMomentNav>();
   const route = useRoute<PostMomentRoute>();
 
@@ -57,106 +45,200 @@ const PostMomentScreen: React.FC = () => {
   const topicTitleFromRoute = route.params?.topicTitle ?? undefined;
 
   const [text, setText] = useState("");
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [media, setMedia] = useState<MediaPicked | null>(null);
   const [posting, setPosting] = useState(false);
+
+  const [topicLoading, setTopicLoading] = useState(false);
+  const [topics, setTopics] = useState<ApiTopic[]>([]);
+
+  const recommendedTopics = useMemo(() => {
+    if (topics.length > 0) return topics.map((t) => `#${t.title}`);
+    return [
+      "#Rocket Host Video Collection",
+      "#Outfit Of The Day(OOTD)",
+      "#Everyday life",
+      "#SHOW YOURSELF",
+      "#Topics you are interested in",
+      "#The most beautiful travel photos",
+      "#Recommend a movie",
+      "#My hobby",
+    ];
+  }, [topics]);
 
   const appendToText = (snippet: string) => {
     setText((prev) => {
-      let next =
-        prev.trim().length === 0 ? snippet : prev.trimEnd() + " " + snippet;
+      let next = prev.trim().length === 0 ? snippet : prev.trimEnd() + " " + snippet;
       if (next.length > 250) next = next.slice(0, 250);
       return next;
     });
   };
 
-  const handleTopicPress = (topic: string) => {
-    appendToText(topic);
+  const loadTopics = async () => {
+    try {
+      setTopicLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/topics?category=ALL&includeInactive=0`);
+      if (!res.ok) return;
+      const json = await res.json().catch(() => null);
+      const list = (json?.topics as ApiTopic[]) ?? [];
+      setTopics(Array.isArray(list) ? list.slice(0, 10) : []);
+    } catch {
+      // ignore
+    } finally {
+      setTopicLoading(false);
+    }
   };
 
-  const pickFromLibrary = async () => {
+  useEffect(() => {
+    loadTopics();
+  }, []);
+
+  const ensureLibraryPerm = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
-        "Permission needed",
-        "Please allow photo access so you can upload a picture."
-      );
-      return;
+      Alert.alert("Permission needed", "Please allow access so you can upload.");
+      return false;
     }
+    return true;
+  };
+
+  const ensureCameraPerm = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow camera access.");
+      return false;
+    }
+    return true;
+  };
+
+  const pickImageFromLibrary = async () => {
+    if (!(await ensureLibraryPerm())) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: false,
-      quality: 0.7,
+      quality: 0.75,
     });
 
-    if (!result.canceled && result.assets && result.assets[0]?.uri) {
-      setImageUri(result.assets[0].uri);
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setMedia({ kind: "image", asset: result.assets[0] });
     }
   };
 
-  const openCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission needed",
-        "Please allow camera access so you can take a picture."
-      );
-      return;
+  const pickVideoFromLibrary = async () => {
+    if (!(await ensureLibraryPerm())) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsMultipleSelection: false,
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setMedia({ kind: "video", asset: result.assets[0] });
     }
+  };
+
+  const openCameraPhoto = async () => {
+    if (!(await ensureCameraPerm())) return;
 
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
+      quality: 0.75,
     });
 
-    if (!result.canceled && result.assets && result.assets[0]?.uri) {
-      setImageUri(result.assets[0].uri);
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setMedia({ kind: "image", asset: result.assets[0] });
     }
   };
 
+  const openCameraVideo = async () => {
+    if (!(await ensureCameraPerm())) return;
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      quality: 1,
+      videoMaxDuration: 60,
+    });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setMedia({ kind: "video", asset: result.assets[0] });
+    }
+  };
+
+  // ✅ Popo-style sheet: Add photos / Add videos / Cancel
   const handleAddPress = () => {
-    Alert.alert("Add photo", "Choose how you want to add a picture", [
-      { text: "Camera", onPress: openCamera },
-      { text: "Gallery", onPress: pickFromLibrary },
+    Alert.alert("Add", "Choose media type", [
+      { text: "Add photos", onPress: pickImageFromLibrary },
+      { text: "Add videos", onPress: pickVideoFromLibrary },
       { text: "Cancel", style: "cancel" },
     ]);
   };
 
-  const handleAddEmoji = () => {
-    appendToText("😊");
-  };
+  const uploadPickedMedia = async (picked: MediaPicked) => {
+    const userId = await AsyncStorage.getItem("gl_user_id");
+    if (!userId) throw new Error("Not logged in");
 
-  const handleMention = () => {
-    appendToText("@username");
-  };
+    const fd = new FormData();
+    fd.append("kind", picked.kind);
 
-  const handleVideoPress = () => {
-    Alert.alert(
-      "Video coming soon",
-      "Here you will be able to record or upload short videos for your moment."
+    const fileName =
+      picked.asset.fileName ??
+      (picked.kind === "video" ? `moment-${Date.now()}.mp4` : `moment-${Date.now()}.jpg`);
+
+    const mime =
+      picked.asset.mimeType ??
+      (picked.kind === "video" ? "video/mp4" : "image/jpeg");
+
+    fd.append(
+      "file",
+      {
+        uri: picked.asset.uri,
+        name: fileName,
+        type: mime,
+      } as any
     );
+
+    const res = await fetch(`${API_BASE_URL}/api/uploads/moment`, {
+      method: "POST",
+      body: fd,
+    });
+
+    const json = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      throw new Error(json?.error || "Upload failed");
+    }
+
+    return String(json?.url ?? "");
   };
 
   const handlePost = async () => {
     if (posting) return;
 
     const trimmed = text.trim();
-
-    if (!trimmed && !imageUri) {
-      Alert.alert(
-        "Nothing to post",
-        "Please write something or add a photo before posting."
-      );
+    if (!trimmed && !media) {
+      Alert.alert("Nothing to post", "Please write something or add a photo/video.");
       return;
     }
 
     try {
       setPosting(true);
+
       const userId = await AsyncStorage.getItem("gl_user_id");
       if (!userId) {
         Alert.alert("Not logged in", "Please login again.");
-        setPosting(false);
         return;
+      }
+
+      let imageUrl: string | null = null;
+      let videoUrl: string | null = null;
+
+      if (media) {
+        const url = await uploadPickedMedia(media);
+        if (!url) throw new Error("Upload returned empty URL");
+
+        if (media.kind === "image") imageUrl = url;
+        if (media.kind === "video") videoUrl = url;
       }
 
       const res = await fetch(`${API_BASE_URL}/api/profile/moments`, {
@@ -165,24 +247,30 @@ const PostMomentScreen: React.FC = () => {
         body: JSON.stringify({
           userId,
           text: trimmed || null,
-          imageUrl: imageUri ?? null,
+          imageUrl,
+          videoUrl,
           topicId: topicIdFromRoute ?? null,
         }),
       });
 
+      const json = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        console.log("Post moment error", json || res.status);
         Alert.alert("Error", json?.error || "Failed to post moment.");
-        setPosting(false);
         return;
       }
 
-      Alert.alert("Posted", "Your moment is ready in Gold Live feed.");
+      Alert.alert(
+        "Posted",
+        media?.kind === "video"
+          ? "Your video will appear in the Video tab."
+          : "Your post will appear in Square."
+      );
+
       navigation.goBack();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Post moment error", err);
-      Alert.alert("Error", "Network error while posting moment.");
+      Alert.alert("Error", err?.message || "Network error while posting moment.");
     } finally {
       setPosting(false);
     }
@@ -196,27 +284,19 @@ const PostMomentScreen: React.FC = () => {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 py-3">
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={8}
-            className="pr-2"
-          >
+          <Pressable onPress={() => navigation.goBack()} hitSlop={8} className="pr-2">
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </Pressable>
-          <Text className="text-[16px] font-semibold text-[#111827]">
-            Post moments
-          </Text>
+
+          <Text className="text-[16px] font-semibold text-[#111827]">Post moments</Text>
+
           <Pressable
             className="px-3 py-1 rounded-full bg-[#6366F1] flex-row items-center justify-center"
             onPress={handlePost}
             disabled={posting}
           >
             {posting && (
-              <ActivityIndicator
-                size="small"
-                color="#ffffff"
-                style={{ marginRight: 6 }}
-              />
+              <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
             )}
             <Text className="text-[13px] text-white font-semibold">
               {posting ? "Posting..." : "Post"}
@@ -230,7 +310,6 @@ const PostMomentScreen: React.FC = () => {
             contentContainerStyle={{ paddingBottom: 80 }}
             showsVerticalScrollIndicator={false}
           >
-            {/* Text + image picker row */}
             <View className="px-4 mt-2">
               {topicTitleFromRoute && (
                 <View className="mb-2 self-start rounded-full bg-[#EEF2FF] px-3 py-1">
@@ -254,43 +333,75 @@ const PostMomentScreen: React.FC = () => {
                 {text.length}/250
               </Text>
 
+              {/* Media picker */}
               <View className="mt-4">
-                {imageUri ? (
-                  <Pressable
-                    onPress={handleAddPress}
-                    className="h-20 w-20 rounded-md overflow-hidden bg-[#F3F4F6]"
-                  >
-                    <Image
-                      source={{ uri: imageUri }}
-                      style={{ width: "100%", height: "100%" }}
-                    />
-                  </Pressable>
-                ) : (
+                {!media ? (
                   <Pressable
                     onPress={handleAddPress}
                     className="h-20 w-20 rounded-md bg-[#F3F4F6] items-center justify-center"
                   >
                     <Ionicons name="add" size={24} color="#9CA3AF" />
                   </Pressable>
+                ) : (
+                  <View className="relative h-24 w-24 rounded-md overflow-hidden bg-[#F3F4F6]">
+                    {media.kind === "image" ? (
+                      <Image
+                        source={{ uri: media.asset.uri }}
+                        style={{ width: "100%", height: "100%" }}
+                      />
+                    ) : (
+                      <Video
+                        source={{ uri: media.asset.uri }}
+                        style={{ width: "100%", height: "100%" }}
+                        resizeMode={ResizeMode.COVER}
+                        shouldPlay={false}
+                        isLooping={false}
+                        useNativeControls={false}
+                      />
+                    )}
+
+                    <Pressable
+                      onPress={() => setMedia(null)}
+                      className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/60 items-center justify-center"
+                    >
+                      <Ionicons name="close" size={14} color="#fff" />
+                    </Pressable>
+
+                    {media.kind === "video" && (
+                      <View className="absolute inset-0 items-center justify-center">
+                        <View className="h-9 w-9 rounded-full bg-black/40 items-center justify-center">
+                          <Ionicons name="play" size={18} color="#fff" />
+                        </View>
+                      </View>
+                    )}
+                  </View>
                 )}
               </View>
             </View>
 
             {/* Recommended topics */}
             <View className="px-4 mt-5">
-              <Text className="text-[13px] text-[#6B7280] mb-2">
-                Recommended topics
-              </Text>
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-[13px] text-[#6B7280]">
+                  Recommended topics
+                </Text>
+                {topicLoading ? (
+                  <Text className="text-[11px] text-[#9CA3AF]">Loading…</Text>
+                ) : (
+                  <Pressable onPress={loadTopics}>
+                    <Text className="text-[11px] text-[#6C4DFF]">Refresh</Text>
+                  </Pressable>
+                )}
+              </View>
+
               <View className="flex-row flex-wrap">
                 {recommendedTopics.map((topic) => (
                   <Pressable
                     key={topic}
                     className="px-3 py-1 mr-2 mb-2 rounded-full bg-[#F3F4F6]"
-                    onPress={() => handleTopicPress(topic)}
+                    onPress={() => appendToText(topic)}
                   >
-                    <Text className="text-[11px] text-[#4B5563]">
-                      {topic}
-                    </Text>
+                    <Text className="text-[11px] text-[#4B5563]">{topic}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -299,24 +410,21 @@ const PostMomentScreen: React.FC = () => {
 
           {/* Bottom toolbar */}
           <View className="flex-row items-center justify-around border-t border-[#E5E7EB] py-2">
-            <ToolbarIcon name="camera-outline" onPress={openCamera} />
-            <ToolbarIcon name="videocam-outline" onPress={handleVideoPress} />
-            <ToolbarIcon name="happy-outline" onPress={handleAddEmoji} />
-            <ToolbarIcon name="at-outline" onPress={handleMention} />
+            <Pressable className="p-2" onPress={openCameraPhoto}>
+              <Ionicons name="camera-outline" size={22} color="#6B7280" />
+            </Pressable>
+            <Pressable className="p-2" onPress={openCameraVideo}>
+              <Ionicons name="videocam-outline" size={22} color="#6B7280" />
+            </Pressable>
+            <Pressable className="p-2" onPress={() => appendToText("😊")}>
+              <Ionicons name="happy-outline" size={22} color="#6B7280" />
+            </Pressable>
+            <Pressable className="p-2" onPress={() => appendToText("@username")}>
+              <Ionicons name="at-outline" size={22} color="#6B7280" />
+            </Pressable>
           </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-};
-
-const ToolbarIcon: React.FC<{
-  name: keyof typeof Ionicons.glyphMap;
-  onPress?: () => void;
-}> = ({ name, onPress }) => (
-  <Pressable className="p-2" onPress={onPress}>
-    <Ionicons name={name} size={22} color="#6B7280" />
-  </Pressable>
-);
-
-export default PostMomentScreen;
+}

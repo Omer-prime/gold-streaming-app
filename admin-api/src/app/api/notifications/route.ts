@@ -1,4 +1,3 @@
-// admin-api/src/app/api/notifications/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -14,10 +13,7 @@ export async function GET(req: NextRequest) {
     const onlyUnread = searchParams.get("onlyUnread") === "1";
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "userId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
     const page = Math.max(1, Number(pageParam) || 1);
@@ -25,36 +21,32 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * pageSize;
 
     const where: any = { userId };
-    if (onlyUnread) {
-      where.readAt = null;
-    }
+    if (onlyUnread) where.readAt = null;
 
     const [total, unreadCount, notifications] = await Promise.all([
       prisma.notification.count({ where }),
-      prisma.notification.count({
-        where: { userId, readAt: null },
-      }),
+      prisma.notification.count({ where: { userId, readAt: null } }),
       prisma.notification.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip,
         take: pageSize,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          body: true,
+          createdAt: true,
+          readAt: true,
+          adminNotificationId: true, // ✅ momentId ref for like/comment
+        },
       }),
     ]);
 
-    return NextResponse.json({
-      notifications,
-      total,
-      unreadCount,
-      page,
-      pageSize,
-    });
+    return NextResponse.json({ notifications, total, unreadCount, page, pageSize });
   } catch (error) {
     console.error("List notifications error:", error);
-    return NextResponse.json(
-      { error: "Failed to load notifications" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load notifications" }, { status: 500 });
   }
 }
 
@@ -67,10 +59,7 @@ export async function POST(req: NextRequest) {
     const ids = body?.ids as string[] | undefined;
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "userId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
     const where: any = { userId, readAt: null };
@@ -89,15 +78,9 @@ export async function POST(req: NextRequest) {
       where: { userId, readAt: null },
     });
 
-    return NextResponse.json({
-      updated: result.count,
-      unreadCount,
-    });
+    return NextResponse.json({ updated: result.count, unreadCount });
   } catch (error) {
     console.error("Mark notifications read error:", error);
-    return NextResponse.json(
-      { error: "Failed to update notifications" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
   }
 }

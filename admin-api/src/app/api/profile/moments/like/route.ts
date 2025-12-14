@@ -1,8 +1,11 @@
-// admin-api/src/app/api/profile/moments/like/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+
+function actorName(u: { nickname: string | null; username: string }) {
+  return u.nickname && u.nickname.trim().length > 0 ? u.nickname : u.username;
+}
 
 /**
  * POST /api/profile/moments/like
@@ -13,17 +16,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
     if (!body) {
-      return NextResponse.json(
-        { error: "Invalid JSON body" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { userId, momentId } = body as {
-      userId?: string;
-      momentId?: string;
-    };
-
+    const { userId, momentId } = body as { userId?: string; momentId?: string };
     if (!userId || !momentId) {
       return NextResponse.json(
         { error: "userId and momentId are required" },
@@ -34,11 +30,11 @@ export async function POST(req: NextRequest) {
     const [user, moment] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true },
+        select: { id: true, username: true, nickname: true },
       }),
       prisma.moment.findUnique({
         where: { id: momentId },
-        select: { id: true, likeCount: true },
+        select: { id: true, userId: true, likeCount: true },
       }),
     ]);
 
@@ -52,44 +48,44 @@ export async function POST(req: NextRequest) {
     const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.momentLike.findFirst({
         where: { userId, momentId },
+        select: { id: true },
       });
 
-      let liked: boolean;
-      let likeCount: number;
-
       if (existing) {
-        await tx.momentLike.deleteMany({
-          where: { userId, momentId },
-        });
+        await tx.momentLike.deleteMany({ where: { userId, momentId } });
 
         const updated = await tx.moment.update({
           where: { id: momentId },
-          data: {
-            likeCount: { decrement: 1 },
-          },
+          data: { likeCount: { decrement: 1 } },
           select: { likeCount: true },
         });
 
-        liked = false;
-        likeCount = Math.max(updated.likeCount, 0);
-      } else {
-        await tx.momentLike.create({
-          data: { userId, momentId },
-        });
-
-        const updated = await tx.moment.update({
-          where: { id: momentId },
-          data: {
-            likeCount: { increment: 1 },
-          },
-          select: { likeCount: true },
-        });
-
-        liked = true;
-        likeCount = Math.max(updated.likeCount, 0);
+        return { liked: false, likeCount: Math.max(updated.likeCount, 0) };
       }
 
-      return { liked, likeCount };
+      await tx.momentLike.create({ data: { userId, momentId } });
+
+      const updated = await tx.moment.update({
+        where: { id: momentId },
+        data: { likeCount: { increment: 1 } },
+        select: { likeCount: true },
+      });
+
+      // ✅ create notification (only when LIKE happens)
+      if (moment.userId !== userId) {
+        await tx.notification.create({
+          data: {
+            userId: moment.userId, // receiver (owner)
+            type: "moment_like",
+            title: "New like",
+            body: `${actorName(user)} liked your post.`,
+            // ✅ reuse this field as "ref id" (momentId) so app can open it
+            adminNotificationId: momentId,
+          } as any,
+        });
+      }
+
+      return { liked: true, likeCount: Math.max(updated.likeCount, 0) };
     });
 
     return NextResponse.json(result);

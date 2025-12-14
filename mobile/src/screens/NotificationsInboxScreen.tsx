@@ -1,4 +1,3 @@
-// src/screens/NotificationsInboxScreen.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
@@ -13,12 +12,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config";
-import type { ChatStackParamList } from "../navigation/ChatStackNavigator";
-
-type Nav = NativeStackNavigationProp<ChatStackParamList, "NotificationsInbox">;
 
 type NotificationItem = {
   id: string;
@@ -27,11 +22,11 @@ type NotificationItem = {
   body: string;
   createdAt: string;
   readAt: string | null;
-  adminNotificationId?: string | null;
+  adminNotificationId?: string | null; // ✅ we store momentId here
 };
 
 export default function NotificationsInboxScreen() {
-  const navigation = useNavigation<Nav>();
+  const navigation = useNavigation<any>();
 
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -62,13 +57,7 @@ export default function NotificationsInboxScreen() {
         return;
       }
 
-      // ✅ support multiple possible response shapes
-      const list =
-        (json?.notifications as NotificationItem[]) ??
-        (json?.items as NotificationItem[]) ??
-        (json?.data?.notifications as NotificationItem[]) ??
-        [];
-
+      const list = (json?.notifications as NotificationItem[]) ?? [];
       setItems(Array.isArray(list) ? list : []);
     } catch (e) {
       console.error("Notifications inbox load error", e);
@@ -88,6 +77,24 @@ export default function NotificationsInboxScreen() {
       load();
     }, [load])
   );
+
+  const markRead = useCallback(async (id: string) => {
+    try {
+      const userId = await AsyncStorage.getItem("gl_user_id");
+      if (!userId) return;
+
+      await fetch(`${API_BASE_URL}/api/notifications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, ids: [id] }),
+      });
+
+      const nowIso = new Date().toISOString();
+      setItems((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: nowIso } : n)));
+    } catch (e) {
+      console.error("mark read error", e);
+    }
+  }, []);
 
   const markAllRead = useCallback(async () => {
     try {
@@ -109,6 +116,28 @@ export default function NotificationsInboxScreen() {
     }
   }, []);
 
+  const openNotification = useCallback(
+    async (item: NotificationItem) => {
+      await markRead(item.id);
+
+      // ✅ Like/Comment notification => open that post comments screen
+      if (
+        (item.type === "moment_like" || item.type === "moment_comment") &&
+        item.adminNotificationId
+      ) {
+        navigation.navigate("Profile", {
+          screen: "MomentComments",
+          params: { momentId: item.adminNotificationId, ownerName: "Post" },
+        });
+        return;
+      }
+
+      // fallback
+      // you can add other actions here later (admin notifications, etc.)
+    },
+    [markRead, navigation]
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
@@ -124,7 +153,6 @@ export default function NotificationsInboxScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      {/* Header */}
       <View className="flex-row items-center justify-between px-4 pt-3 pb-2 border-b border-gray-100">
         <View className="flex-row items-center">
           <Pressable
@@ -133,17 +161,20 @@ export default function NotificationsInboxScreen() {
           >
             <Ionicons name="chevron-back" size={20} color="#111827" />
           </Pressable>
-          <Text className="text-[18px] font-semibold text-[#111827]">Notifications</Text>
+          <Text className="text-[18px] font-semibold text-[#111827]">
+            Notifications
+          </Text>
         </View>
 
         {hasUnread && (
           <Pressable onPress={markAllRead}>
-            <Text className="text-[12px] font-semibold text-[#6C4DFF]">Mark all read</Text>
+            <Text className="text-[12px] font-semibold text-[#6C4DFF]">
+              Mark all read
+            </Text>
           </Pressable>
         )}
       </View>
 
-      {/* Search */}
       <View className="px-4 pt-3">
         <View
           className="flex-row items-center rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2"
@@ -191,26 +222,38 @@ export default function NotificationsInboxScreen() {
           </View>
         ) : filtered.length === 0 ? (
           <View className="px-4 py-6">
-            <Text className="text-[12px] text-[#9CA3AF]">No notifications yet.</Text>
+            <Text className="text-[12px] text-[#9CA3AF]">
+              No notifications yet.
+            </Text>
           </View>
         ) : (
-          filtered.map((n) => <NotificationCard key={n.id} item={n} />)
+          filtered.map((n) => (
+            <NotificationCard key={n.id} item={n} onPress={() => openNotification(n)} />
+          ))
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const NotificationCard: React.FC<{ item: NotificationItem }> = ({ item }) => {
+const NotificationCard: React.FC<{
+  item: NotificationItem;
+  onPress: () => void;
+}> = ({ item, onPress }) => {
   const timeLabel = new Date(item.createdAt).toLocaleString();
   const isUnread = !item.readAt;
 
   return (
     <View className="px-4 pt-2">
-      <View className="flex-row rounded-xl border border-[#E5E7EB] bg-white px-3 py-2">
+      <Pressable
+        onPress={onPress}
+        className="flex-row rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 active:opacity-80"
+      >
         <View className="mr-2 mt-2">
           {isUnread && (
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#F97316" }} />
+            <View
+              style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#F97316" }}
+            />
           )}
         </View>
 
@@ -230,7 +273,11 @@ const NotificationCard: React.FC<{ item: NotificationItem }> = ({ item }) => {
 
           <Text className="mt-1 text-[11px] text-[#9CA3AF]">{timeLabel}</Text>
         </View>
-      </View>
+
+        <View className="ml-2 mt-2">
+          <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+        </View>
+      </Pressable>
     </View>
   );
 };

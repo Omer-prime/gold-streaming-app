@@ -30,8 +30,15 @@ enum StreamMode {
 // ⭐ PK battle type (for PK data screen)
 enum PKType {
   RANDOM
+ 
   FRIEND
   TEAM
+}
+
+enum StreamProtocol {
+  CAMERA_ONLY
+  WEBRTC
+  RTMP
 }
 
 // ⭐ honor wall item types
@@ -81,7 +88,7 @@ enum NotificationAudience {
 model Country {
   id        Int     @id @default(autoincrement())
   code      String  @unique // e.g. "PK", "PH"
-  name      String  // e.g. "Pakistan"
+  name      String // e.g. "Pakistan"
   flagEmoji String? // e.g. "🇵🇰"
   isActive  Boolean @default(true)
   sortOrder Int     @default(0) // for custom ordering in lists
@@ -121,8 +128,8 @@ model User {
 
   // ⚙️ per-user settings
   settings  UserSettings?
-  blocks    UserBlock[] @relation("UserBlocker")
-  blockedBy UserBlock[] @relation("UserBlocked")
+  blocks    UserBlock[]   @relation("UserBlocker")
+  blockedBy UserBlock[]   @relation("UserBlocked")
 
   // honor items
   honors UserHonor[]
@@ -173,8 +180,8 @@ model User {
   adminNotificationsCreated AdminNotification[] @relation("AdminNotificationCreator")
 
   // ⭐ Direct chat (1-1 messages)
-  chatThreadsA ChatThread[] @relation("ChatThreadUserA")
-  chatThreadsB ChatThread[] @relation("ChatThreadUserB")
+  chatThreadsA ChatThread[]  @relation("ChatThreadUserA")
+  chatThreadsB ChatThread[]  @relation("ChatThreadUserB")
   chatMessages ChatMessage[]
 
   // moments / posts feed (Square + Video)
@@ -195,14 +202,14 @@ model User {
   pkBattlesAsOpponent PKBattle[] @relation("PKOpponent")
 
   // ⭐ FEED / RANKING STATS (for Explore, Host/Rich boards, etc.)
-  followersCount     Int      @default(0) // number of followers
-  followingCount     Int      @default(0) // number of people this user follows
-  totalCoinsReceived Int      @default(0) // gifts received (for host / gift ranking)
-  totalCoinsSpent    Int      @default(0) // coins spent (for rich ranking)
+  followersCount     Int @default(0) // number of followers
+  followingCount     Int @default(0) // number of people this user follows
+  totalCoinsReceived Int @default(0) // gifts received (for host / gift ranking)
+  totalCoinsSpent    Int @default(0) // coins spent (for rich ranking)
 
   // current live status snapshot (mirrors their active Stream)
-  isLive      Boolean  @default(false)
-  liveViewers Int      @default(0)
+  isLive      Boolean   @default(false)
+  liveViewers Int       @default(0)
   lastLiveAt  DateTime?
 
   // ⭐ Device management – all devices used by this user
@@ -216,17 +223,20 @@ model User {
 }
 
 model Stream {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   title       String
   description String?
-  /// Short label for Party screen: e.g. "Dancing", "Make Friends"
   tag         String?
 
   hostId String
-  host   User     @relation("UserStreams", fields: [hostId], references: [id])
+  host   User   @relation("UserStreams", fields: [hostId], references: [id])
 
-  // SOLO / PARTY / PK for stats & filtering
-  mode StreamMode @default(SOLO)
+  mode     StreamMode     @default(SOLO)
+  protocol StreamProtocol @default(CAMERA_ONLY)
+
+  // ✅ for LiveKit rooms
+  roomName String? @unique
+  roomSid  String?
 
   isLive       Boolean   @default(false)
   viewers      Int       @default(0)
@@ -265,7 +275,7 @@ model Gift {
   id        Int      @id @default(autoincrement())
   name      String
   iconUrl   String?
-  price     Int      // in coins
+  price     Int // in coins
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -447,9 +457,9 @@ model UserHonor {
 
 // ⭐ Moments / posts (Square + Video feed)
 model Moment {
-  id        String     @id @default(cuid())
-  userId    String
-  user      User       @relation(fields: [userId], references: [id])
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   type         MomentType @default(TEXT)
   text         String?
@@ -458,7 +468,7 @@ model Moment {
   thumbnailUrl String?
 
   topicId String?
-  topic   Topic? @relation(fields: [topicId], references: [id])
+  topic   Topic?  @relation(fields: [topicId], references: [id])
 
   likeCount    Int @default(0)
   commentCount Int @default(0)
@@ -503,10 +513,10 @@ model FanClubMember {
 
 // ⭐ Live applications (host verification / apply)
 model LiveApplication {
-  id        String                @id @default(cuid())
-  userId    String
-  user      User                  @relation(fields: [userId], references: [id])
-  status    LiveApplicationStatus @default(PENDING)
+  id     String                @id @default(cuid())
+  userId String
+  user   User                  @relation(fields: [userId], references: [id])
+  status LiveApplicationStatus @default(PENDING)
 
   // 🧑‍💻 Base64-encoded face image captured from mobile
   faceImageBase64 String?
@@ -527,10 +537,10 @@ model PKBattle {
   type PKType
 
   hostId String
-  host   User @relation("PKHost", fields: [hostId], references: [id])
+  host   User   @relation("PKHost", fields: [hostId], references: [id])
 
   opponentId String?
-  opponent   User? @relation("PKOpponent", fields: [opponentId], references: [id])
+  opponent   User?   @relation("PKOpponent", fields: [opponentId], references: [id])
 
   streamId String?
   stream   Stream? @relation(fields: [streamId], references: [id])
@@ -554,10 +564,10 @@ model ChatThread {
   updatedAt DateTime @updatedAt
 
   userAId String
-  userA   User @relation("ChatThreadUserA", fields: [userAId], references: [id])
+  userA   User   @relation("ChatThreadUserA", fields: [userAId], references: [id])
 
   userBId String
-  userB   User @relation("ChatThreadUserB", fields: [userBId], references: [id])
+  userB   User   @relation("ChatThreadUserB", fields: [userBId], references: [id])
 
   lastMessageText String?
   lastMessageAt   DateTime?
@@ -579,7 +589,7 @@ model ChatMessage {
   thread   ChatThread @relation(fields: [threadId], references: [id])
 
   senderId String
-  sender   User @relation(fields: [senderId], references: [id])
+  sender   User   @relation(fields: [senderId], references: [id])
 
   content String
   isRead  Boolean @default(false)
@@ -593,17 +603,16 @@ model ChatMessage {
 model AdminNotification {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   createdById String
-  createdBy   User @relation("AdminNotificationCreator", fields: [createdById], references: [id])
+  createdBy   User   @relation("AdminNotificationCreator", fields: [createdById], references: [id])
 
   audience      NotificationAudience @default(ALL_USERS)
-  targetUserIds String[]            @default([]) // only used when SPECIFIC_USERS
-
-  // e.g. SYSTEM, ADMIN, MESSAGE
-  type    String @default("ADMIN")
-  title   String
-  body    String
+  targetUserIds String[]             @default([])
+  type     String @default("ADMIN")
+  title    String
+  body     String
   metaJson Json?
 
   notifications Notification[]
@@ -614,22 +623,22 @@ model AdminNotification {
 
 // ⭐ Notifications (system & admin → user, incl. chat)
 model Notification {
-  id     String   @id @default(cuid())
+  id     String @id @default(cuid())
   userId String
-  user   User     @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   // ✅ link to campaign (optional)
   adminNotificationId String?
   adminNotification   AdminNotification? @relation(fields: [adminNotificationId], references: [id])
 
   // e.g. SYSTEM, ADMIN, MESSAGE
-  type    String @default("SYSTEM")
-  title   String
-  body    String
+  type     String @default("SYSTEM")
+  title    String
+  body     String
   // extra data like { liveApplicationId, status }
   metaJson Json?
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   readAt    DateTime?
 
   @@index([userId, createdAt])
@@ -699,14 +708,14 @@ model MomentSave {
 
 // ⭐ Device management – devices used to log in
 model UserDevice {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   /// Random ID stored in AsyncStorage on mobile
   deviceId     String
   deviceName   String?
-  platform     String?  // "android", "ios", etc.
+  platform     String? // "android", "ios", etc.
   isTrusted    Boolean  @default(true)
   lastActiveAt DateTime @default(now())
   createdAt    DateTime @default(now())

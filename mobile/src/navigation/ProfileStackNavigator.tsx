@@ -115,6 +115,7 @@ export type ProfileStackParamList = {
   // NEW: real-person verification flow
   RealPersonAuth: undefined;
   FaceScan: undefined;
+  HostLiveRoom: undefined;
 
   // settings-related
   AccountSecurity: undefined;
@@ -166,6 +167,7 @@ const ProfileStackNavigator: React.FC = () => {
         component={HonorWallScreen}
         options={{ headerShown: false }}
       />
+
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}

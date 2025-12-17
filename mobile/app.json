@@ -12,6 +12,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+     "plugins": ["@livekit/react-native-expo-plugin", "@config-plugins/react-native-webrtc"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.omerprime.mobile",

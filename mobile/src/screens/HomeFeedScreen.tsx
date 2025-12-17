@@ -1,5 +1,5 @@
 // mobile/src/screens/HomeFeedScreen.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -21,7 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { API_BASE_URL } from "../config";
-import { Video, ResizeMode } from "expo-av";
+import { Video, ResizeMode, type AVPlaybackStatus } from "expo-av";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
 type HomeTopTab = "Following" | "Square" | "Video";
@@ -81,6 +81,22 @@ export type VideoMoment = {
 };
 
 const USER_ID_KEY = "gl_user_id";
+
+/** Ensure any "/media/.." becomes "https://domain/media/.." */
+function normalizeMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const u = String(url).trim();
+  if (!u) return null;
+
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  if (u.startsWith("//")) return `https:${u}`;
+
+  const base = String(API_BASE_URL || "").replace(/\/+$/, "");
+  if (!base) return u;
+
+  if (u.startsWith("/")) return `${base}${u}`;
+  return `${base}/${u}`;
+}
 
 // small helper for "x mins ago"
 function formatTimeAgo(iso: string): string {
@@ -190,13 +206,13 @@ const HomeFeedScreen: React.FC = () => {
 
         if (!cancelled) {
           const mapped: PartyRoom[] = (json.items || []).map((item) => ({
-            id: item.streamId,
-            hostId: item.hostId,
-            title: item.roomTitle,
-            tag: item.tag,
-            viewers: item.viewers,
+            id: String(item.streamId),
+            hostId: String(item.hostId),
+            title: String(item.roomTitle ?? ""),
+            tag: String(item.tag ?? ""),
+            viewers: typeof item.viewers === "number" ? item.viewers : 0,
             countryFlag: item.countryFlag ?? "",
-            thumbnailUrl: item.thumbnailUrl,
+            thumbnailUrl: normalizeMediaUrl(item.thumbnailUrl),
           }));
           setFollowingRooms(mapped);
         }
@@ -271,10 +287,10 @@ const HomeFeedScreen: React.FC = () => {
             id: String(m.id),
             userId: String(m.userId),
             userName: String(m.userName ?? "User"),
-            avatarUrl: m.avatarUrl ?? null,
+            avatarUrl: normalizeMediaUrl(m.avatarUrl ?? null),
             countryFlag: m.countryFlag ?? null,
             text: m.text ?? null,
-            imageUrl: m.imageUrl ?? null,
+            imageUrl: normalizeMediaUrl(m.imageUrl ?? null),
             createdAt: String(m.createdAt),
             likeCount: typeof m.likeCount === "number" && !isNaN(m.likeCount) ? m.likeCount : 0,
             commentCount:
@@ -348,23 +364,25 @@ const HomeFeedScreen: React.FC = () => {
         const json = (await res.json()) as { items?: any[] };
 
         if (!cancelled) {
-          const mapped: VideoMoment[] = (json.items || []).map((m: any) => ({
-            id: String(m.id),
-            userId: String(m.userId),
-            userName: String(m.userName ?? "User"),
-            avatarUrl: m.avatarUrl ?? null,
-            countryFlag: m.countryFlag ?? null,
-            text: m.text ?? null,
-            videoUrl: String(m.videoUrl ?? ""),
-            thumbnailUrl: m.thumbnailUrl ?? null,
-            createdAt: String(m.createdAt),
-            likeCount: typeof m.likeCount === "number" ? m.likeCount : 0,
-            commentCount: typeof m.commentCount === "number" ? m.commentCount : 0,
-            shareCount: typeof m.shareCount === "number" ? m.shareCount : 0,
-            isLikedByMe: !!m.isLikedByMe,
-          }));
+          const mapped: VideoMoment[] = (json.items || []).map((m: any) => {
+            const vUrl = normalizeMediaUrl(m.videoUrl ?? "") ?? "";
+            return {
+              id: String(m.id),
+              userId: String(m.userId),
+              userName: String(m.userName ?? "User"),
+              avatarUrl: normalizeMediaUrl(m.avatarUrl ?? null),
+              countryFlag: m.countryFlag ?? null,
+              text: m.text ?? null,
+              videoUrl: vUrl,
+              thumbnailUrl: normalizeMediaUrl(m.thumbnailUrl ?? null),
+              createdAt: String(m.createdAt),
+              likeCount: typeof m.likeCount === "number" ? m.likeCount : 0,
+              commentCount: typeof m.commentCount === "number" ? m.commentCount : 0,
+              shareCount: typeof m.shareCount === "number" ? m.shareCount : 0,
+              isLikedByMe: !!m.isLikedByMe,
+            };
+          });
 
-          // remove invalid
           setVideoItems(mapped.filter((x) => x.videoUrl.trim().length > 0));
         }
       } catch (err) {
@@ -487,7 +505,7 @@ const HomeFeedScreen: React.FC = () => {
               <Ionicons name="search" size={18} color={isVideoHeader ? "#E5E7EB" : "#6B7280"} />
               <TextInput
                 placeholder={activeTab === "Square" ? "Search posts, topics, users" : "Search videos, users"}
-                placeholderTextColor={isVideoHeader ? "#9CA3AF" : "#9CA3AF"}
+                placeholderTextColor="#9CA3AF"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 className={`flex-1 ml-2 text-[14px] ${isVideoHeader ? "text-white" : "text-black"}`}
@@ -495,7 +513,7 @@ const HomeFeedScreen: React.FC = () => {
               />
               {searchQuery.length > 0 && (
                 <Pressable onPress={() => setSearchQuery("")}>
-                  <Ionicons name="close-circle" size={18} color={isVideoHeader ? "#9CA3AF" : "#9CA3AF"} />
+                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
                 </Pressable>
               )}
               <Pressable
@@ -510,24 +528,9 @@ const HomeFeedScreen: React.FC = () => {
           ) : (
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
-                <TopTab
-                  label="Following"
-                  active={activeTab === "Following"}
-                  onPress={() => switchTab("Following")}
-                  dark={isVideoHeader}
-                />
-                <TopTab
-                  label="Square"
-                  active={activeTab === "Square"}
-                  onPress={() => switchTab("Square")}
-                  dark={isVideoHeader}
-                />
-                <TopTab
-                  label="Video"
-                  active={activeTab === "Video"}
-                  onPress={() => switchTab("Video")}
-                  dark={isVideoHeader}
-                />
+                <TopTab label="Following" active={activeTab === "Following"} onPress={() => switchTab("Following")} dark={isVideoHeader} />
+                <TopTab label="Square" active={activeTab === "Square"} onPress={() => switchTab("Square")} dark={isVideoHeader} />
+                <TopTab label="Video" active={activeTab === "Video"} onPress={() => switchTab("Video")} dark={isVideoHeader} />
               </View>
               <View className="flex-row items-center">
                 <Pressable
@@ -539,12 +542,7 @@ const HomeFeedScreen: React.FC = () => {
                   <Ionicons name="search" size={20} color={isVideoHeader ? "#FFFFFF" : "#111827"} />
                 </Pressable>
                 <Pressable>
-                  <Ionicons
-                    name="trophy-outline"
-                    size={22}
-                    color="#F59E0B"
-                    style={{ marginLeft: 16 }}
-                  />
+                  <Ionicons name="trophy-outline" size={22} color="#F59E0B" style={{ marginLeft: 16 }} />
                 </Pressable>
               </View>
             </View>
@@ -638,18 +636,8 @@ const FollowingFeed: React.FC<{
       {/* Country chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4 mt-3 mb-4">
         <FilterChip label="Popular" active={countryFilter === "Popular"} onPress={() => setCountryFilter("Popular")} />
-        <FilterChip
-          label="Pakistan"
-          flag="🇵🇰"
-          active={countryFilter === "Pakistan"}
-          onPress={() => setCountryFilter("Pakistan")}
-        />
-        <FilterChip
-          label="Philippines"
-          flag="🇵🇭"
-          active={countryFilter === "Philippines"}
-          onPress={() => setCountryFilter("Philippines")}
-        />
+        <FilterChip label="Pakistan" flag="🇵🇰" active={countryFilter === "Pakistan"} onPress={() => setCountryFilter("Pakistan")} />
+        <FilterChip label="Philippines" flag="🇵🇭" active={countryFilter === "Philippines"} onPress={() => setCountryFilter("Philippines")} />
         <FilterChip label="More" iconRight="chevron-forward" />
       </ScrollView>
 
@@ -698,12 +686,7 @@ const FilterChip: React.FC<{
     {flag && <Text className="mr-1 text-[13px]">{flag}</Text>}
     <Text className={`text-[13px] ${active ? "text-white font-semibold" : "text-gray-700"}`}>{label}</Text>
     {iconRight && (
-      <Ionicons
-        name={iconRight}
-        size={14}
-        color={active ? "#ffffff" : "#6B7280"}
-        style={{ marginLeft: 4 }}
-      />
+      <Ionicons name={iconRight} size={14} color={active ? "#ffffff" : "#6B7280"} style={{ marginLeft: 4 }} />
     )}
   </Pressable>
 );
@@ -712,16 +695,12 @@ const PartyCard: React.FC<{
   room: PartyRoom;
   onPress?: (room: PartyRoom) => void;
 }> = ({ room, onPress }) => (
-  <Pressable
-    className="mx-4 mb-3 flex-row rounded-2xl bg-white shadow-sm shadow-black/5 overflow-hidden"
-    onPress={() => onPress?.(room)}
-  >
+  <Pressable className="mx-4 mb-3 flex-row rounded-2xl bg-white shadow-sm shadow-black/5 overflow-hidden" onPress={() => onPress?.(room)}>
     <ImageBackground
       source={room.thumbnailUrl ? { uri: room.thumbnailUrl } : require("../../assets/placeholder-image.jpeg")}
       resizeMode="cover"
       style={{ width: 110, height: 90 }}
     />
-
     <View className="flex-1 px-3 py-2 justify-between">
       <View className="flex-row items-center justify-between">
         <Text className="flex-1 text-[13px] font-semibold text-gray-900" numberOfLines={1}>
@@ -763,7 +742,7 @@ const SquareFeed: React.FC<{
   onUpdatePosts: React.Dispatch<React.SetStateAction<SquarePost[]>>;
   searchActive: boolean;
   onToggleLike: (post: SquarePost) => void;
-}> = ({ topics, posts, loading, error, myUserId, onUpdatePosts, searchActive, onToggleLike }) => {
+}> = ({ topics, posts, loading, error, searchActive, onToggleLike }) => {
   const navigation = useNavigation<any>();
 
   const handlePressProfile = (userId: string) => {
@@ -788,11 +767,9 @@ const SquareFeed: React.FC<{
       <ScrollView className="flex-1 bg-white" contentContainerStyle={{ paddingBottom: 96 }} showsVerticalScrollIndicator={false}>
         {!searchActive && <EventBanner />}
 
-        {/* Hot topics header */}
         {!searchActive && (
           <View className="px-4 pt-2 flex-row items-center justify-between">
             <Text className="text-[14px] font-semibold text-gray-900">Hot topics</Text>
-
             {hasMoreTopics && (
               <Pressable onPress={() => navigation.navigate("HotTopics")}>
                 <Text className="text-[13px] text-[#6C4DFF]">More &gt;</Text>
@@ -801,7 +778,6 @@ const SquareFeed: React.FC<{
           </View>
         )}
 
-        {/* Topics row (ONLY 3) */}
         {!searchActive && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2 px-4">
             {topicsPreview.map((topic) => (
@@ -817,12 +793,10 @@ const SquareFeed: React.FC<{
                 }
               />
             ))}
-
             {topics.length === 0 && <TopicCard title="No topics yet" hotCount="0" />}
           </ScrollView>
         )}
 
-        {/* loading / error */}
         {loading && (
           <View className="px-4 py-4">
             <ActivityIndicator size="small" color="#6C4DFF" />
@@ -856,14 +830,9 @@ const SquareFeed: React.FC<{
 
       {/* Floating camera “Post” button */}
       <Pressable
-        onPress={() =>
-          navigation.navigate("Profile", {
-            screen: "PostMoment",
-          })
-        }
+        onPress={() => navigation.navigate("Profile", { screen: "PostMoment" })}
         className="absolute bottom-6 right-5 h-14 w-14 rounded-full bg-[#FF9800] items-center justify-center shadow-md shadow-black/30"
       >
-        {/* if you add assets/ui/cam.png, replace Ionicons below */}
         <Ionicons name="camera-outline" size={24} color="#FFFFFF" />
       </Pressable>
     </View>
@@ -898,17 +867,11 @@ type SquarePostCardProps = {
   onToggleLike?: (post: SquarePost) => void;
 };
 
-export const SquarePostCard: React.FC<SquarePostCardProps> = ({
-  post,
-  onPressProfile,
-  onPressComments,
-  onToggleLike,
-}) => {
+export const SquarePostCard: React.FC<SquarePostCardProps> = ({ post, onPressProfile, onPressComments, onToggleLike }) => {
   const createdLabel = formatTimeAgo(post.createdAt);
 
   return (
     <View className="mt-5 px-4 pb-4 border-b border-gray-100">
-      {/* header */}
       <View className="flex-row items-center justify-between">
         <Pressable className="flex-row items-center flex-1" onPress={() => onPressProfile?.(post.userId)}>
           <View className="h-10 w-10 rounded-full bg-[#E5E5FF] mr-3 overflow-hidden">
@@ -995,11 +958,14 @@ const VideoFeed: React.FC<{
 
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const idx = Math.round(y / itemHeight);
-    setActiveIndex(Math.max(0, Math.min(idx, items.length - 1)));
-  };
+  // ✅ much more accurate than "round(y / itemHeight)"
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 });
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ index?: number | null }> }) => {
+      const first = viewableItems?.find((v) => typeof v.index === "number");
+      if (typeof first?.index === "number") setActiveIndex(first.index);
+    }
+  );
 
   if (loading && items.length === 0) {
     return (
@@ -1034,7 +1000,17 @@ const VideoFeed: React.FC<{
       pagingEnabled
       snapToInterval={itemHeight}
       decelerationRate="fast"
-      onMomentumScrollEnd={onScrollEnd}
+      removeClippedSubviews
+      windowSize={5}
+      initialNumToRender={2}
+      maxToRenderPerBatch={2}
+      viewabilityConfig={viewabilityConfig.current}
+      onViewableItemsChanged={onViewableItemsChanged.current as any}
+      getItemLayout={(_, index) => ({
+        length: itemHeight,
+        offset: itemHeight * index,
+        index,
+      })}
       renderItem={({ item, index }) => (
         <VideoCard
           height={itemHeight}
@@ -1044,9 +1020,7 @@ const VideoFeed: React.FC<{
           onComment={() => onOpenComments(item.id, item.userName)}
           onShare={async () => {
             try {
-              await Share.share({
-                message: item.videoUrl,
-              });
+              await Share.share({ message: item.videoUrl });
             } catch {}
           }}
         />
@@ -1066,6 +1040,44 @@ const VideoCard: React.FC<{
   const createdLabel = formatTimeAgo(item.createdAt);
   const videoRef = useRef<Video>(null);
 
+  const [loading, setLoading] = useState(true);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  // ✅ Force play/pause (more reliable than only shouldPlay)
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        if (!videoRef.current) return;
+        if (active) {
+          await videoRef.current.playAsync();
+        } else {
+          await videoRef.current.pauseAsync();
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    if (!cancelled) run();
+    return () => {
+      cancelled = true;
+    };
+  }, [active, item.videoUrl]);
+
+  const onStatus = useCallback((st: AVPlaybackStatus) => {
+    if (!st || typeof st !== "object") return;
+    if ("isLoaded" in st && st.isLoaded) {
+      // when loaded, stop showing loader
+      setLoading(!!st.isBuffering);
+      setErrMsg(null);
+    } else if ("error" in st && (st as any).error) {
+      setLoading(false);
+      setErrMsg(String((st as any).error));
+    }
+  }, []);
+
   return (
     <View style={{ height }} className="bg-black">
       <Video
@@ -1076,12 +1088,44 @@ const VideoCard: React.FC<{
         shouldPlay={active}
         isLooping
         useNativeControls={false}
+        usePoster={!!item.thumbnailUrl}
         posterSource={item.thumbnailUrl ? { uri: item.thumbnailUrl } : undefined}
+        onLoadStart={() => {
+          setLoading(true);
+          setErrMsg(null);
+        }}
+        onError={(e) => {
+          setLoading(false);
+          setErrMsg("Video failed to load");
+          console.log("VIDEO_ERROR", item.videoUrl, e);
+        }}
+        onPlaybackStatusUpdate={onStatus}
       />
+
+      {/* ✅ loader overlay */}
+      {loading && (
+        <View className="absolute inset-0 items-center justify-center">
+          <ActivityIndicator color="#FFFFFF" />
+          <Text className="text-gray-300 text-[12px] mt-2">Loading…</Text>
+        </View>
+      )}
+
+      {/* ✅ error overlay (very helpful to debug wrong Content-Type / Range) */}
+      {errMsg && (
+        <View className="absolute inset-0 items-center justify-center px-8">
+          <Text className="text-red-300 text-[12px] text-center">{errMsg}</Text>
+          <Text className="text-gray-400 text-[11px] text-center mt-2">
+            If this stays black, check server headers: Content-Type video/mp4 + Accept-Ranges bytes
+          </Text>
+        </View>
+      )}
 
       {/* Right overlay actions */}
       <View className="absolute right-3 bottom-20 items-center">
-        <Pressable className="mb-6 items-center" onPress={() => Alert.alert("Tip", "Gift sending for video can be added next (needs a DB transaction model).")}>
+        <Pressable
+          className="mb-6 items-center"
+          onPress={() => Alert.alert("Tip", "Gift sending for video can be added next (needs a DB transaction model).")}
+        >
           <Ionicons name="gift-outline" size={28} color="#FDBA74" />
           <Text className="mt-1 text-[11px] text-white">Tip</Text>
         </Pressable>
@@ -1116,7 +1160,6 @@ const VideoCard: React.FC<{
 
         <Text className="text-gray-400 text-[11px] mt-1">{createdLabel}</Text>
 
-        {/* Music: phase-1 just show label (video's own audio). Real overlay needs FFmpeg pipeline */}
         <View className="flex-row items-center mt-2">
           <Ionicons name="musical-notes-outline" size={14} color="#E5E7EB" />
           <Text className="ml-1 text-[11px] text-gray-200" numberOfLines={1}>

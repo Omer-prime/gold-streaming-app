@@ -219,14 +219,17 @@ model Stream {
   id          String   @id @default(cuid())
   title       String
   description String?
-  /// Short label for Party screen: e.g. "Dancing", "Make Friends"
   tag         String?
 
   hostId String
   host   User     @relation("UserStreams", fields: [hostId], references: [id])
 
-  // SOLO / PARTY / PK for stats & filtering
-  mode StreamMode @default(SOLO)
+  mode     StreamMode     @default(SOLO)
+  protocol StreamProtocol @default(CAMERA_ONLY)
+
+  // ✅ for LiveKit rooms
+  roomName String? @unique
+  roomSid  String?
 
   isLive       Boolean   @default(false)
   viewers      Int       @default(0)

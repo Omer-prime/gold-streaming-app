@@ -155,6 +155,29 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               onClick={() => setMobileOpen(false)}
             />
           </div>
+          <NavLink
+            href="/admin/currency-trading"
+            label="Currency trading"
+            icon="💱"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+
+          <NavLink
+            href="/admin/base-salary-approval"
+            label="Base salary approval"
+            icon="💵"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+
+          <NavLink
+            href="/admin/reseller-approval"
+            label="Reseller approval"
+            icon="✅"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
         </nav>
 
         {/* footer */}

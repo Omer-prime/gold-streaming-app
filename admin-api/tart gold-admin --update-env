@@ -1,0 +1,35 @@
+                  List of relations
+ Schema |        Name        | Type  |     Owner      
+--------+--------------------+-------+----------------
+ public | AdminNotification  | table | gold_live_user
+ public | ChatMessage        | table | gold_live_user
+ public | ChatThread         | table | gold_live_user
+ public | Country            | table | gold_live_user
+ public | FanClub            | table | gold_live_user
+ public | FanClubMember      | table | gold_live_user
+ public | Follow             | table | gold_live_user
+ public | Friendship         | table | gold_live_user
+ public | Gift               | table | gold_live_user
+ public | GiftTransaction    | table | gold_live_user
+ public | HonorItem          | table | gold_live_user
+ public | LiveApplication    | table | gold_live_user
+ public | Message            | table | gold_live_user
+ public | Moment             | table | gold_live_user
+ public | MomentComment      | table | gold_live_user
+ public | MomentLike         | table | gold_live_user
+ public | MomentSave         | table | gold_live_user
+ public | Notification       | table | gold_live_user
+ public | PKBattle           | table | gold_live_user
+ public | ProfileVisit       | table | gold_live_user
+ public | Stream             | table | gold_live_user
+ public | Topic              | table | gold_live_user
+ public | User               | table | gold_live_user
+ public | UserBlock          | table | gold_live_user
+ public | UserDevice         | table | gold_live_user
+ public | UserHonor          | table | gold_live_user
+ public | UserPointLedger    | table | gold_live_user
+ public | UserSettings       | table | gold_live_user
+ public | Wallet             | table | gold_live_user
+ public | _prisma_migrations | table | gold_live_user
+(30 rows)
+

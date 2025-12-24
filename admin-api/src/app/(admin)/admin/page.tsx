@@ -31,15 +31,27 @@ export default async function AdminDashboardPage() {
     newUsersToday,
     activeLiveRooms,
     topHostEarnings,
+
+    // ✅ NEW (admin features)
+    currencyTradesPending,
+    currencyTradesTotal,
+    resellerAppsPending,
+    resellerAppsTotal,
+    baseSalaryPending,
+    baseSalaryTotal,
+
+    // ✅ NEW (small preview lists)
+    latestPendingTrades,
+    latestPendingResellers,
+    latestPendingSalaries,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: "HOST" } }),
     prisma.stream.count(),
     prisma.stream.count({ where: { isLive: true } }),
     prisma.gift.count(),
-    prisma.giftTransaction.aggregate({
-      _sum: { totalPrice: true },
-    }),
+
+    prisma.giftTransaction.aggregate({ _sum: { totalPrice: true } }),
     prisma.giftTransaction.aggregate({
       _sum: { totalPrice: true },
       where: { createdAt: { gte: today } },
@@ -48,21 +60,73 @@ export default async function AdminDashboardPage() {
       _sum: { totalPrice: true },
       where: { createdAt: { gte: monthStart } },
     }),
-    prisma.user.count({
-      where: { createdAt: { gte: today } },
-    }),
+    prisma.user.count({ where: { createdAt: { gte: today } } }),
+
     prisma.stream.findMany({
       where: { isLive: true },
       orderBy: { viewers: "desc" },
       take: 5,
-      include: { host: true },
+      select: {
+        id: true,
+        title: true,
+        viewers: true,
+        startedAt: true,
+        host: { select: { id: true, username: true } },
+      },
     }),
+
     // top earning hosts (by coins received all time)
     prisma.giftTransaction.groupBy({
       by: ["receiverId"],
       _sum: { totalPrice: true },
       orderBy: { _sum: { totalPrice: "desc" } },
       take: 5,
+    }),
+
+    // ✅ NEW counts
+    prisma.currencyTrade.count({ where: { status: "PENDING" } }),
+    prisma.currencyTrade.count(),
+    prisma.resellerApplication.count({ where: { status: "PENDING" } }),
+    prisma.resellerApplication.count(),
+    prisma.baseSalaryRequest.count({ where: { status: "PENDING" } }),
+    prisma.baseSalaryRequest.count(),
+
+    // ✅ NEW latest pending lists
+    prisma.currencyTrade.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        createdAt: true,
+        fromCurrency: true,
+        toCurrency: true,
+        fromAmount: true,
+        toAmount: true,
+        user: { select: { id: true, username: true } },
+      },
+    }),
+    prisma.resellerApplication.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        createdAt: true,
+        user: { select: { id: true, username: true } },
+      },
+    }),
+    prisma.baseSalaryRequest.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        createdAt: true,
+        amount: true,
+        currency: true,
+        user: { select: { id: true, username: true } },
+      },
     }),
   ]);
 
@@ -112,9 +176,7 @@ export default async function AdminDashboardPage() {
           </span>
           <span className="rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1">
             📺 Live now:{" "}
-            <span className="font-semibold text-emerald-400">
-              {liveStreams}
-            </span>
+            <span className="font-semibold text-emerald-400">{liveStreams}</span>
           </span>
         </div>
       </header>
@@ -166,7 +228,7 @@ export default async function AdminDashboardPage() {
         <StatCard
           label="Gifts Catalog"
           icon="🎁"
-          hint="Total active gift types"
+          hint="Total gift types"
           value={totalGifts}
           href="/admin/gifts"
         />
@@ -177,9 +239,32 @@ export default async function AdminDashboardPage() {
           value={`${totalCoins} coins`}
           href="/admin/gifts"
         />
+
+        {/* ✅ NEW admin features cards */}
+        <StatCard
+          label="Currency Trades (Pending)"
+          icon="💱"
+          hint={`Pending approvals • Total: ${currencyTradesTotal}`}
+          value={currencyTradesPending}
+          href="/admin/currency-trading"
+        />
+        <StatCard
+          label="Reseller Apps (Pending)"
+          icon="🧾"
+          hint={`Pending approvals • Total: ${resellerAppsTotal}`}
+          value={resellerAppsPending}
+          href="/admin/reseller-approval"
+        />
+        <StatCard
+          label="Base Salary (Pending)"
+          icon="💵"
+          hint={`Pending approvals • Total: ${baseSalaryTotal}`}
+          value={baseSalaryPending}
+          href="/admin/base-salary-approval"
+        />
       </section>
 
-      {/* lower panels: active rooms + top hosts */}
+      {/* lower panels */}
       <section className="grid gap-4 lg:grid-cols-2">
         {/* Active Live Rooms */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
@@ -236,7 +321,7 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Top Online Hosts / earnings */}
+        {/* Top Hosts */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
           <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
             <div>
@@ -276,6 +361,148 @@ export default async function AdminDashboardPage() {
                         <Td>{h.username}</Td>
                         <Td>{h.nickname ?? "-"}</Td>
                         <Td className="text-right">{h.coins}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ✅ NEW: Pending Approvals Preview */}
+      <section className="grid gap-4 lg:grid-cols-3">
+        {/* Currency Trades */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
+          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Pending Currency Trades</h2>
+              <p className="text-[11px] text-slate-400">Latest 5 requests</p>
+            </div>
+            <Link
+              href="/admin/currency-trading"
+              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
+            >
+              Open &rarr;
+            </Link>
+          </div>
+          <div className="p-4">
+            {latestPendingTrades.length === 0 ? (
+              <p className="text-xs text-slate-500">No pending trades.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[420px] text-xs">
+                  <thead className="text-slate-400">
+                    <tr className="border-b border-slate-800">
+                      <Th>User</Th>
+                      <Th>From</Th>
+                      <Th>To</Th>
+                      <Th className="text-right">Amount</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestPendingTrades.map((t) => (
+                      <tr
+                        key={t.id}
+                        className="border-b border-slate-900/80 hover:bg-slate-900/60"
+                      >
+                        <Td>{t.user?.username ?? "-"}</Td>
+                        <Td>{t.fromCurrency}</Td>
+                        <Td>{t.toCurrency}</Td>
+                        <Td className="text-right">
+                          {t.fromAmount} → {t.toAmount}
+                        </Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Reseller */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
+          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Pending Reseller Apps</h2>
+              <p className="text-[11px] text-slate-400">Latest 5 requests</p>
+            </div>
+            <Link
+              href="/admin/reseller-approval"
+              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
+            >
+              Open &rarr;
+            </Link>
+          </div>
+          <div className="p-4">
+            {latestPendingResellers.length === 0 ? (
+              <p className="text-xs text-slate-500">No pending applications.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[320px] text-xs">
+                  <thead className="text-slate-400">
+                    <tr className="border-b border-slate-800">
+                      <Th>User</Th>
+                      <Th>Submitted</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestPendingResellers.map((r) => (
+                      <tr
+                        key={r.id}
+                        className="border-b border-slate-900/80 hover:bg-slate-900/60"
+                      >
+                        <Td>{r.user?.username ?? "-"}</Td>
+                        <Td>{r.createdAt.toISOString().slice(0, 10)}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Base Salary */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
+          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Pending Base Salary</h2>
+              <p className="text-[11px] text-slate-400">Latest 5 requests</p>
+            </div>
+            <Link
+              href="/admin/base-salary-approval"
+              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
+            >
+              Open &rarr;
+            </Link>
+          </div>
+          <div className="p-4">
+            {latestPendingSalaries.length === 0 ? (
+              <p className="text-xs text-slate-500">No pending requests.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[360px] text-xs">
+                  <thead className="text-slate-400">
+                    <tr className="border-b border-slate-800">
+                      <Th>User</Th>
+                      <Th>Amount</Th>
+                      <Th>Submitted</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestPendingSalaries.map((s) => (
+                      <tr
+                        key={s.id}
+                        className="border-b border-slate-900/80 hover:bg-slate-900/60"
+                      >
+                        <Td>{s.user?.username ?? "-"}</Td>
+                        <Td>
+                          {s.amount} {s.currency}
+                        </Td>
+                        <Td>{s.createdAt.toISOString().slice(0, 10)}</Td>
                       </tr>
                     ))}
                   </tbody>

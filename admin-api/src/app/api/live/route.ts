@@ -1,11 +1,30 @@
+// admin-api/src/app/api/live/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { StreamMode, StreamProtocol } from "@prisma/client";
 
-export const runtime = "nodejs"; // ✅ important for Prisma
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function getDisplayName(u: { nickname: string | null; username: string }) {
-  return u.nickname || u.username;
+function parseMode(input: unknown): StreamMode {
+  if (typeof input !== "string") return StreamMode.SOLO;
+  return Object.values(StreamMode).includes(input as StreamMode)
+    ? (input as StreamMode)
+    : StreamMode.SOLO;
+}
+
+function parseProtocol(input: unknown): StreamProtocol {
+  if (input === "CAMERA_ONLY" || input === "DEFAULT" || input == null) {
+    return StreamProtocol.LIVEKIT;
+  }
+  if (typeof input !== "string") return StreamProtocol.LIVEKIT;
+  return Object.values(StreamProtocol).includes(input as StreamProtocol)
+    ? (input as StreamProtocol)
+    : StreamProtocol.LIVEKIT;
+}
+
+function makeRoomName(userId: string) {
+  return `gl_${userId}_${Date.now()}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -23,22 +42,24 @@ export async function GET(req: NextRequest) {
         id: true,
         username: true,
         nickname: true,
+        email: true,
         avatarUrl: true,
         liveCoverUrl: true,
         role: true,
         level: true,
         faceVerifiedAt: true,
-        liveApplications: {
-          take: 1,
-          orderBy: { updatedAt: "desc" },
-          select: { status: true },
-        },
       },
     });
 
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    const applicationStatus = (user.liveApplications?.[0]?.status ?? "NONE") as
+    const latestApp = await prisma.liveApplication.findFirst({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      select: { status: true },
+    });
+
+    const applicationStatus = (latestApp?.status ?? "NONE") as
       | "NONE"
       | "PENDING"
       | "APPROVED"
@@ -55,7 +76,9 @@ export async function GET(req: NextRequest) {
         startedAt: true,
         viewers: true,
         mode: true,
+        protocol: true,
         roomName: true,
+        roomSid: true,
         thumbnailUrl: true,
       },
     });
@@ -71,11 +94,13 @@ export async function GET(req: NextRequest) {
       },
       host: {
         id: user.id,
-        name: getDisplayName(user),
+        name: user.nickname || user.username || user.email || "Host",
         avatarUrl: user.avatarUrl,
         liveCoverUrl: user.liveCoverUrl,
       },
-      activeStream: activeStream ? { ...activeStream } : null,
+      activeStream: activeStream
+        ? { ...activeStream, room: activeStream.roomName }
+        : null,
     });
   } catch (e) {
     console.error("[GET /api/live]", e);
@@ -86,36 +111,64 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
+
     const userId = body?.userId as string | undefined;
     const title = (body?.title as string | undefined) || "My Live";
-    const mode = (body?.mode as "SOLO" | "PARTY" | "PK" | undefined) || "SOLO";
+
+    const mode = parseMode(body?.mode);
+    const protocol = parseProtocol(body?.protocol);
 
     if (!userId) return NextResponse.json({ error: "userId is required" }, { status: 400 });
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        role: true,
-        liveApplications: { take: 1, orderBy: { updatedAt: "desc" }, select: { status: true } },
-      },
+      select: { id: true, role: true },
     });
 
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    const appStatus = (user.liveApplications?.[0]?.status ?? "NONE") as
-      | "NONE"
-      | "PENDING"
-      | "APPROVED"
-      | "REJECTED";
+    const latestApp = await prisma.liveApplication.findFirst({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      select: { status: true },
+    });
 
-    const approved = user.role === "HOST" || appStatus === "APPROVED";
+    const approved = user.role === "HOST" || latestApp?.status === "APPROVED";
     if (!approved) return NextResponse.json({ error: "Not approved to go live" }, { status: 403 });
 
-    const existing = await prisma.stream.findFirst({
+    let existing = await prisma.stream.findFirst({
       where: { hostId: userId, isLive: true },
       orderBy: { startedAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        viewers: true,
+        mode: true,
+        protocol: true,
+        roomName: true,
+        roomSid: true,
+        thumbnailUrl: true,
+        startedAt: true,
+      },
     });
+
+    if (existing && !existing.roomName) {
+      existing = await prisma.stream.update({
+        where: { id: existing.id },
+        data: { roomName: makeRoomName(userId) },
+        select: {
+          id: true,
+          title: true,
+          viewers: true,
+          mode: true,
+          protocol: true,
+          roomName: true,
+          roomSid: true,
+          thumbnailUrl: true,
+          startedAt: true,
+        },
+      });
+    }
 
     const stream =
       existing ??
@@ -124,10 +177,22 @@ export async function POST(req: NextRequest) {
           hostId: userId,
           title,
           mode,
+          protocol,
           isLive: true,
           viewers: 0,
           startedAt: new Date(),
-          roomName: `gl_${userId}_${Date.now()}`,
+          roomName: makeRoomName(userId),
+        },
+        select: {
+          id: true,
+          title: true,
+          viewers: true,
+          mode: true,
+          protocol: true,
+          roomName: true,
+          roomSid: true,
+          thumbnailUrl: true,
+          startedAt: true,
         },
       }));
 
@@ -141,7 +206,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ stream });
+    return NextResponse.json({
+      stream: { ...stream, room: stream.roomName },
+    });
   } catch (e) {
     console.error("[POST /api/live]", e);
     return NextResponse.json({ error: "Failed to start live" }, { status: 500 });
@@ -158,10 +225,14 @@ export async function DELETE(req: NextRequest) {
 
     const stream =
       (streamId
-        ? await prisma.stream.findUnique({ where: { id: streamId } })
+        ? await prisma.stream.findUnique({
+            where: { id: streamId },
+            select: { id: true, isLive: true },
+          })
         : await prisma.stream.findFirst({
             where: { hostId: userId, isLive: true },
             orderBy: { startedAt: "desc" },
+            select: { id: true, isLive: true },
           })) ?? null;
 
     if (stream?.isLive) {

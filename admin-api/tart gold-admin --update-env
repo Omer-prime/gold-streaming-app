@@ -14,7 +14,7 @@
  public | HonorItem          | table | gold_live_user
  public | LiveApplication    | table | gold_live_user
  public | Message            | table | gold_live_user
- public | Moment             | table | gold_live_user
+ public | Moment             | table | gold_live_user   
  public | MomentComment      | table | gold_live_user
  public | MomentLike         | table | gold_live_user
  public | MomentSave         | table | gold_live_user

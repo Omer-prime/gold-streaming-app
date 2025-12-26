@@ -89,11 +89,17 @@ model User {
   pointsLedger              UserPointLedger[]
   settings                  UserSettings?
   wallet                    Wallet?
+  inviteCode InviteCode?
+invitesSent Invite[] @relation("Inviter")
+invitedBy   Invite[] @relation("Invitee")
 
-  // ✅ NEW (fix for Prisma opposite relations)
+  // ===== Currency/Reseller/Salary (existing) =====
   currencyTrades      CurrencyTrade[]
   resellerApplication ResellerApplication?
   baseSalaryRequests  BaseSalaryRequest[]
+
+  // ===== Wallet Ledger (coins history) =====
+  walletLedgers WalletLedger[]
 
   @@index([countryId])
   @@index([createdAt])
@@ -103,26 +109,31 @@ model User {
 }
 
 model Stream {
-  id           String            @id @default(cuid())
+  id           String         @id @default(cuid())
   title        String
   description  String?
   hostId       String
-  isLive       Boolean           @default(false)
-  viewers      Int               @default(0)
+  isLive       Boolean        @default(false)
+  viewers      Int            @default(0)
   thumbnailUrl String?
   startedAt    DateTime?
   endedAt      DateTime?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  mode         StreamMode        @default(SOLO)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  mode         StreamMode     @default(SOLO)
   tag          String?
-  protocol     StreamProtocol    @default(LIVEKIT)
-  roomName     String?           @unique
-  roomSid      String?
-  gifts        GiftTransaction[]
-  messages     Message[]
-  pkBattles    PKBattle[]
-  host         User              @relation("UserStreams", fields: [hostId], references: [id])
+  protocol     StreamProtocol @default(LIVEKIT)
+
+  // LiveKit room identifiers
+  roomName String? @unique
+  roomSid  String?
+
+  // Phase-1 PK + Gifts
+  gifts     GiftTransaction[]
+  messages  Message[]
+  pkBattles PKBattle[]
+
+  host User @relation("UserStreams", fields: [hostId], references: [id])
 
   @@index([hostId])
   @@index([isLive])
@@ -136,49 +147,92 @@ model Message {
   content   String
   streamId  String
   senderId  String?
-  sender    User?    @relation(fields: [senderId], references: [id])
-  stream    Stream   @relation(fields: [streamId], references: [id])
+
+  sender User?  @relation(fields: [senderId], references: [id])
+  stream Stream @relation(fields: [streamId], references: [id])
 
   @@index([streamId])
   @@index([senderId])
 }
 
 model Gift {
-  id           Int               @id @default(autoincrement())
-  name         String
-  iconUrl      String?
-  price        Int
-  isActive     Boolean           @default(true)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String
+  price     Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // backward compatibility for existing admin UI
+  iconUrl String?
+
+  // new media fields
+  mediaType    GiftMediaType @default(IMAGE)
+  mediaUrl     String?
+  thumbnailUrl String?
+
   transactions GiftTransaction[]
 }
 
 model Wallet {
-  id           String            @id @default(cuid())
-  userId       String            @unique
-  balance      Int               @default(0)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @default(now())
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
   transactions GiftTransaction[]
-  user         User              @relation(fields: [userId], references: [id])
+  ledgers      WalletLedger[]
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model WalletLedger {
+  id           String           @id @default(cuid())
+  createdAt    DateTime         @default(now())
+
+  userId       String
+  walletId     String
+
+  type         WalletLedgerType
+  delta        Int
+  balanceAfter Int
+  title        String?
+  metaJson     Json?
+
+  user   User   @relation(fields: [userId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([walletId, createdAt])
+  @@index([type, createdAt])
 }
 
 model GiftTransaction {
-  id         String   @id @default(cuid())
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
   streamId   String
   giftId     Int
   senderId   String
   receiverId String
   walletId   String
-  quantity   Int      @default(1)
+
+  quantity   Int @default(1)
+  unitPrice  Int
   totalPrice Int
-  gift       Gift     @relation(fields: [giftId], references: [id])
-  receiver   User     @relation("GiftReceiver", fields: [receiverId], references: [id])
-  sender     User     @relation("GiftSender", fields: [senderId], references: [id])
-  stream     Stream   @relation(fields: [streamId], references: [id])
-  wallet     Wallet   @relation(fields: [walletId], references: [id])
+
+  // optional: PK link
+  pkBattleId String?
+  targetSide PKSide?
+
+  gift     Gift   @relation(fields: [giftId], references: [id])
+  receiver User   @relation("GiftReceiver", fields: [receiverId], references: [id])
+  sender   User   @relation("GiftSender", fields: [senderId], references: [id])
+  stream   Stream @relation(fields: [streamId], references: [id])
+  wallet   Wallet @relation(fields: [walletId], references: [id])
+
+  pkBattle PKBattle? @relation(fields: [pkBattleId], references: [id])
 
   @@index([streamId])
   @@index([senderId])
@@ -186,6 +240,7 @@ model GiftTransaction {
   @@index([walletId])
   @@index([giftId])
   @@index([createdAt])
+  @@index([pkBattleId])
 }
 
 model Follow {
@@ -255,7 +310,8 @@ model UserSettings {
   exclusiveEmail     Boolean @default(false)
   hideLiveLevel      Boolean @default(false)
   hideMicStatus      Boolean @default(false)
-  user               User    @relation(fields: [userId], references: [id])
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model UserBlock {
@@ -287,8 +343,9 @@ model UserHonor {
   userId     String
   itemId     String
   obtainedAt DateTime  @default(now())
-  item       HonorItem @relation(fields: [itemId], references: [id])
-  user       User      @relation(fields: [userId], references: [id])
+
+  item HonorItem @relation(fields: [itemId], references: [id])
+  user User      @relation(fields: [userId], references: [id])
 
   @@unique([userId, itemId])
   @@index([userId])
@@ -309,11 +366,13 @@ model Moment {
   topicId      String?
   type         MomentType      @default(TEXT)
   videoUrl     String?
-  topic        Topic?          @relation(fields: [topicId], references: [id])
-  user         User            @relation(fields: [userId], references: [id])
-  comments     MomentComment[]
-  likes        MomentLike[]
-  saves        MomentSave[]
+
+  topic Topic? @relation(fields: [topicId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
+
+  comments MomentComment[]
+  likes    MomentLike[]
+  saves    MomentSave[]
 
   @@index([userId, createdAt])
   @@index([topicId])
@@ -325,8 +384,9 @@ model FanClub {
   name        String
   description String?
   createdAt   DateTime        @default(now())
-  owner       User            @relation(fields: [ownerId], references: [id])
-  members     FanClubMember[]
+
+  owner   User            @relation(fields: [ownerId], references: [id])
+  members FanClubMember[]
 
   @@index([ownerId])
 }
@@ -336,8 +396,9 @@ model FanClubMember {
   fanClubId String
   userId    String
   createdAt DateTime @default(now())
-  fanClub   FanClub  @relation(fields: [fanClubId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+
+  fanClub FanClub @relation(fields: [fanClubId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
 
   @@unique([fanClubId, userId])
   @@index([userId])
@@ -350,30 +411,47 @@ model LiveApplication {
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   faceImageBase64 String?
-  user            User                  @relation(fields: [userId], references: [id])
+
+  user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([status, createdAt])
 }
 
 model PKBattle {
-  id            String   @id @default(cuid())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  type          PKType
-  hostId        String
-  opponentId    String?
-  streamId      String?
-  hostScore     Int      @default(0)
-  opponentScore Int      @default(0)
-  hostWon       Boolean?
-  host          User     @relation("PKHost", fields: [hostId], references: [id])
-  opponent      User?    @relation("PKOpponent", fields: [opponentId], references: [id])
-  stream        Stream?  @relation(fields: [streamId], references: [id])
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  type       PKType
+  status     PKBattleStatus @default(PENDING)
+  startedAt  DateTime?
+  endedAt    DateTime?
+  durationSec Int?
+
+  hostId     String
+  opponentId String?
+  streamId   String?
+
+  hostScore     Int @default(0)
+  opponentScore Int @default(0)
+
+  // backward compatibility
+  hostWon Boolean?
+
+  // winner info
+  winnerSide PKSide?
+
+  host     User    @relation("PKHost", fields: [hostId], references: [id])
+  opponent User?   @relation("PKOpponent", fields: [opponentId], references: [id])
+  stream   Stream? @relation(fields: [streamId], references: [id])
+
+  gifts GiftTransaction[]
 
   @@index([hostId])
   @@index([opponentId])
   @@index([type])
+  @@index([status])
   @@index([createdAt])
 }
 
@@ -385,9 +463,10 @@ model ChatThread {
   userBId         String
   lastMessageText String?
   lastMessageAt   DateTime?
-  messages        ChatMessage[]
-  userA           User          @relation("ChatThreadUserA", fields: [userAId], references: [id])
-  userB           User          @relation("ChatThreadUserB", fields: [userBId], references: [id])
+
+  messages ChatMessage[]
+  userA    User @relation("ChatThreadUserA", fields: [userAId], references: [id])
+  userB    User @relation("ChatThreadUserB", fields: [userBId], references: [id])
 
   @@unique([userAId, userBId], name: "userAId_userBId")
   @@index([userAId])
@@ -396,14 +475,15 @@ model ChatThread {
 }
 
 model ChatMessage {
-  id        String     @id @default(cuid())
-  createdAt DateTime   @default(now())
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
   threadId  String
   senderId  String
   content   String
-  isRead    Boolean    @default(false)
-  sender    User       @relation(fields: [senderId], references: [id])
-  thread    ChatThread @relation(fields: [threadId], references: [id])
+  isRead    Boolean  @default(false)
+
+  sender User       @relation(fields: [senderId], references: [id])
+  thread ChatThread @relation(fields: [threadId], references: [id])
 
   @@index([threadId])
   @@index([senderId])
@@ -420,7 +500,8 @@ model AdminNotification {
   title         String
   body          String
   metaJson      Json?
-  createdBy     User                 @relation("AdminNotificationCreator", fields: [createdById], references: [id])
+
+  createdBy     User            @relation("AdminNotificationCreator", fields: [createdById], references: [id])
   notifications Notification[]
 
   @@index([createdById, createdAt])
@@ -428,17 +509,18 @@ model AdminNotification {
 }
 
 model Notification {
-  id                  String             @id @default(cuid())
+  id                  String   @id @default(cuid())
   userId              String
-  type                String             @default("SYSTEM")
+  type                String   @default("SYSTEM")
   title               String
   body                String
-  createdAt           DateTime           @default(now())
+  createdAt           DateTime @default(now())
   readAt              DateTime?
   metaJson            Json?
   adminNotificationId String?
-  adminNotification   AdminNotification? @relation(fields: [adminNotificationId], references: [id])
-  user                User               @relation(fields: [userId], references: [id])
+
+  adminNotification AdminNotification? @relation(fields: [adminNotificationId], references: [id])
+  user              User               @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
@@ -456,7 +538,8 @@ model Topic {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   category    TopicCategory @default(NORMAL)
-  moments     Moment[]
+
+  moments Moment[]
 
   @@index([isTrending, sortOrder])
 }
@@ -466,8 +549,9 @@ model MomentLike {
   momentId  String
   userId    String
   createdAt DateTime @default(now())
-  moment    Moment   @relation(fields: [momentId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+
+  moment Moment @relation(fields: [momentId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   @@unique([momentId, userId])
   @@index([momentId])
@@ -480,8 +564,9 @@ model MomentComment {
   userId    String
   content   String
   createdAt DateTime @default(now())
-  moment    Moment   @relation(fields: [momentId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+
+  moment Moment @relation(fields: [momentId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   @@index([momentId])
   @@index([userId, createdAt])
@@ -492,8 +577,9 @@ model MomentSave {
   momentId  String
   userId    String
   createdAt DateTime @default(now())
-  moment    Moment   @relation(fields: [momentId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+
+  moment Moment @relation(fields: [momentId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   @@unique([momentId, userId])
   @@index([momentId])
@@ -503,7 +589,6 @@ model MomentSave {
 model UserDevice {
   id           String   @id @default(cuid())
   userId       String
-  /// Random ID stored in AsyncStorage on mobile
   deviceId     String
   deviceName   String?
   platform     String?
@@ -511,12 +596,113 @@ model UserDevice {
   lastActiveAt DateTime @default(now())
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id])
+
+  user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, deviceId])
   @@index([userId, lastActiveAt])
 }
 
+// ===== Currency Trading + Salary Approval + Reseller Approval =====
+
+model CurrencyTrade {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId       String
+  fromCurrency String
+  toCurrency   String
+  fromAmount   Int
+  rate         Float
+  toAmount     Int
+  status       CurrencyTradeStatus @default(PENDING)
+
+  reviewedAt   DateTime?
+  reviewedById String?
+  note         String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model ResellerApplication {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String                    @unique
+  status ResellerApplicationStatus @default(PENDING)
+
+  reviewedAt   DateTime?
+  reviewedById String?
+  note         String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([status, createdAt])
+}
+
+model BaseSalaryRequest {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId   String
+  amount   Int
+  currency String                  @default("USD")
+  status   BaseSalaryRequestStatus @default(PENDING)
+
+  reviewedAt   DateTime?
+  reviewedById String?
+  note         String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+model InviteCode {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  code   String @unique
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+}
+
+model Invite {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  inviterId String
+  inviteeId String? // optional until account created
+  code      String
+
+  // status can evolve later (installed, registered, qualified, etc.)
+  status InviteStatus @default(REGISTERED)
+
+  inviter User  @relation("Inviter", fields: [inviterId], references: [id])
+  invitee User? @relation("Invitee", fields: [inviteeId], references: [id])
+
+  @@index([inviterId, createdAt])
+  @@index([code, createdAt])
+  @@unique([inviterId, inviteeId])
+}
+
+
+
+// ===== Enums =====
+enum InviteStatus {
+  REGISTERED
+  QUALIFIED
+  REWARDED
+}
 enum Role {
   USER
   HOST
@@ -585,68 +771,6 @@ enum NotificationAudience {
   SPECIFIC_USERS
 }
 
-// ===== NEW: Currency Trading + Salary Approval + Reseller Approval =====
-
-model CurrencyTrade {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userId       String
-  fromCurrency String
-  toCurrency   String
-  fromAmount   Int
-  rate         Float
-  toAmount     Int
-  status       CurrencyTradeStatus @default(PENDING)
-
-  reviewedAt   DateTime?
-  reviewedById String?
-  note         String?
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([userId, createdAt])
-  @@index([status, createdAt])
-}
-
-model ResellerApplication {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userId String                    @unique
-  status ResellerApplicationStatus @default(PENDING)
-
-  reviewedAt   DateTime?
-  reviewedById String?
-  note         String?
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([status, createdAt])
-}
-
-model BaseSalaryRequest {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userId   String
-  amount   Int
-  currency String                  @default("USD")
-  status   BaseSalaryRequestStatus @default(PENDING)
-
-  reviewedAt   DateTime?
-  reviewedById String?
-  note         String?
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([userId, createdAt])
-  @@index([status, createdAt])
-}
-
 enum CurrencyTradeStatus {
   PENDING
   APPROVED
@@ -663,4 +787,30 @@ enum BaseSalaryRequestStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// new enums for Phase-1 gifts + PK
+enum GiftMediaType {
+  IMAGE
+  GIF
+  VIDEO
+}
+
+enum WalletLedgerType {
+  TOPUP
+  GIFT_SENT
+  GIFT_RECEIVED
+  ADJUSTMENT
+}
+
+enum PKBattleStatus {
+  PENDING
+  ACTIVE
+  ENDED
+  CANCELED
+}
+
+enum PKSide {
+  HOST
+  OPPONENT
 }

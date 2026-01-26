@@ -89,9 +89,10 @@ model User {
   pointsLedger              UserPointLedger[]
   settings                  UserSettings?
   wallet                    Wallet?
-  inviteCode InviteCode?
-invitesSent Invite[] @relation("Inviter")
-invitedBy   Invite[] @relation("Invitee")
+
+  inviteCode  InviteCode?
+  invitesSent Invite[] @relation("Inviter")
+  invitedBy   Invite[] @relation("Invitee")
 
   // ===== Currency/Reseller/Salary (existing) =====
   currencyTrades      CurrencyTrade[]
@@ -408,8 +409,8 @@ model LiveApplication {
   id              String                @id @default(cuid())
   userId          String
   status          LiveApplicationStatus @default(PENDING)
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
   faceImageBase64 String?
 
   user User @relation(fields: [userId], references: [id])
@@ -419,14 +420,14 @@ model LiveApplication {
 }
 
 model PKBattle {
-  id         String   @id @default(cuid())
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String         @id @default(cuid())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
-  type       PKType
-  status     PKBattleStatus @default(PENDING)
-  startedAt  DateTime?
-  endedAt    DateTime?
+  type        PKType
+  status      PKBattleStatus @default(PENDING)
+  startedAt   DateTime?
+  endedAt     DateTime?
   durationSec Int?
 
   hostId     String
@@ -456,9 +457,9 @@ model PKBattle {
 }
 
 model ChatThread {
-  id              String        @id @default(cuid())
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   userAId         String
   userBId         String
   lastMessageText String?
@@ -664,6 +665,7 @@ model BaseSalaryRequest {
   @@index([userId, createdAt])
   @@index([status, createdAt])
 }
+
 model InviteCode {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -695,14 +697,34 @@ model Invite {
   @@unique([inviterId, inviteeId])
 }
 
+//
+// ✅ NEW: Admin-configurable Reward Tasks (used by /api/profile/rewards and admin CRUD)
+//
+model RewardTask {
+  id           String         @id @default(cuid())
+  category     RewardCategory
+  title        String
+  subtitle     String?
+  rewardPoints Int
+  target       Int
+  goToScreen   String?
+  isActive     Boolean        @default(true)
+  sortOrder    Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
+  @@index([category, isActive, sortOrder])
+  @@index([createdAt])
+}
 
 // ===== Enums =====
+
 enum InviteStatus {
   REGISTERED
   QUALIFIED
   REWARDED
 }
+
 enum Role {
   USER
   HOST
@@ -813,4 +835,14 @@ enum PKBattleStatus {
 enum PKSide {
   HOST
   OPPONENT
+}
+
+//
+// 
+//
+enum RewardCategory {
+  PK_MISSION
+  ACTIVITY
+  FAN_CLUB
+  INVITE
 }

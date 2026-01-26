@@ -240,7 +240,16 @@ export default async function AdminDashboardPage() {
           href="/admin/gifts"
         />
 
-        {/* ✅ NEW admin features cards */}
+        {/* ✅ Rewards shortcut */}
+        <StatCard
+          label="Rewards"
+          icon="🏆"
+          hint="Manage tasks & rewards shown in the app"
+          value="Manage"
+          href="/admin/rewards"
+        />
+
+        {/* ✅ admin features cards */}
         <StatCard
           label="Currency Trades (Pending)"
           icon="💱"
@@ -264,8 +273,58 @@ export default async function AdminDashboardPage() {
         />
       </section>
 
-      {/* lower panels */}
+      {/* ✅ Rewards container */}
       <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
+          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Rewards</h2>
+              <p className="text-[11px] text-slate-400">
+                Control what users see in the Reward screen (tasks, points, GO
+                actions).
+              </p>
+            </div>
+            <Link
+              href="/admin/rewards"
+              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
+            >
+              Manage &rarr;
+            </Link>
+          </div>
+
+          <div className="p-4 space-y-3">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+              <div className="text-xs text-slate-200 font-medium">
+                Mobile API endpoint
+              </div>
+              <div className="mt-1 text-[11px] text-slate-400">
+                <code className="text-slate-200">
+                  /api/profile/rewards?userId=...
+                </code>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Link
+                  href="/admin/rewards"
+                  className="inline-flex items-center justify-center rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-200 hover:border-yellow-400/60 hover:text-yellow-300"
+                >
+                  Open Rewards Manager
+                </Link>
+                <Link
+                  href="/api/profile/rewards?userId=__TEST__"
+                  className="inline-flex items-center justify-center rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-200 hover:border-yellow-400/60 hover:text-yellow-300"
+                >
+                  Preview JSON (test)
+                </Link>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Tip: once the admin Rewards page is ready, you’ll be able to add /
+              disable tasks without touching code.
+            </p>
+          </div>
+        </div>
+
         {/* Active Live Rooms */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
           <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
@@ -320,8 +379,10 @@ export default async function AdminDashboardPage() {
             )}
           </div>
         </div>
+      </section>
 
-        {/* Top Hosts */}
+      {/* Top Hosts */}
+      <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
           <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
             <div>
@@ -339,9 +400,7 @@ export default async function AdminDashboardPage() {
           </div>
           <div className="p-4">
             {topHosts.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                No gift transactions yet.
-              </p>
+              <p className="text-xs text-slate-500">No gift transactions yet.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[360px] text-xs">
@@ -369,146 +428,132 @@ export default async function AdminDashboardPage() {
             )}
           </div>
         </div>
-      </section>
 
-      {/* ✅ NEW: Pending Approvals Preview */}
-      <section className="grid gap-4 lg:grid-cols-3">
-        {/* Currency Trades */}
+        {/* ✅ Pending Approvals Preview */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
           <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
             <div>
-              <h2 className="text-sm font-semibold">Pending Currency Trades</h2>
-              <p className="text-[11px] text-slate-400">Latest 5 requests</p>
+              <h2 className="text-sm font-semibold">Pending Approvals</h2>
+              <p className="text-[11px] text-slate-400">
+                Quick view (latest 5 each)
+              </p>
             </div>
-            <Link
-              href="/admin/currency-trading"
-              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
-            >
-              Open &rarr;
-            </Link>
+            <div className="text-[11px] text-slate-500">Overview</div>
           </div>
-          <div className="p-4">
-            {latestPendingTrades.length === 0 ? (
-              <p className="text-xs text-slate-500">No pending trades.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[420px] text-xs">
-                  <thead className="text-slate-400">
-                    <tr className="border-b border-slate-800">
-                      <Th>User</Th>
-                      <Th>From</Th>
-                      <Th>To</Th>
-                      <Th className="text-right">Amount</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
+
+          <div className="p-4 space-y-4">
+            {/* Currency Trades */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950/40">
+              <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
+                <div className="text-xs font-semibold text-slate-200">
+                  Currency Trades
+                </div>
+                <Link
+                  href="/admin/currency-trading"
+                  className="text-[11px] text-slate-400 hover:text-yellow-300"
+                >
+                  Open &rarr;
+                </Link>
+              </div>
+              <div className="p-3">
+                {latestPendingTrades.length === 0 ? (
+                  <p className="text-[11px] text-slate-500">No pending trades.</p>
+                ) : (
+                  <div className="space-y-2">
                     {latestPendingTrades.map((t) => (
-                      <tr
+                      <div
                         key={t.id}
-                        className="border-b border-slate-900/80 hover:bg-slate-900/60"
+                        className="flex items-center justify-between text-[11px]"
                       >
-                        <Td>{t.user?.username ?? "-"}</Td>
-                        <Td>{t.fromCurrency}</Td>
-                        <Td>{t.toCurrency}</Td>
-                        <Td className="text-right">
-                          {t.fromAmount} → {t.toAmount}
-                        </Td>
-                      </tr>
+                        <span className="text-slate-200">
+                          {t.user?.username ?? "-"}
+                        </span>
+                        <span className="text-slate-400">
+                          {t.fromAmount} {t.fromCurrency} → {t.toAmount}{" "}
+                          {t.toCurrency}
+                        </span>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Reseller */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold">Pending Reseller Apps</h2>
-              <p className="text-[11px] text-slate-400">Latest 5 requests</p>
             </div>
-            <Link
-              href="/admin/reseller-approval"
-              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
-            >
-              Open &rarr;
-            </Link>
-          </div>
-          <div className="p-4">
-            {latestPendingResellers.length === 0 ? (
-              <p className="text-xs text-slate-500">No pending applications.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[320px] text-xs">
-                  <thead className="text-slate-400">
-                    <tr className="border-b border-slate-800">
-                      <Th>User</Th>
-                      <Th>Submitted</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
+
+            {/* Reseller */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950/40">
+              <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
+                <div className="text-xs font-semibold text-slate-200">
+                  Reseller Applications
+                </div>
+                <Link
+                  href="/admin/reseller-approval"
+                  className="text-[11px] text-slate-400 hover:text-yellow-300"
+                >
+                  Open &rarr;
+                </Link>
+              </div>
+              <div className="p-3">
+                {latestPendingResellers.length === 0 ? (
+                  <p className="text-[11px] text-slate-500">
+                    No pending applications.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
                     {latestPendingResellers.map((r) => (
-                      <tr
+                      <div
                         key={r.id}
-                        className="border-b border-slate-900/80 hover:bg-slate-900/60"
+                        className="flex items-center justify-between text-[11px]"
                       >
-                        <Td>{r.user?.username ?? "-"}</Td>
-                        <Td>{r.createdAt.toISOString().slice(0, 10)}</Td>
-                      </tr>
+                        <span className="text-slate-200">
+                          {r.user?.username ?? "-"}
+                        </span>
+                        <span className="text-slate-500">
+                          {r.createdAt.toISOString().slice(0, 10)}
+                        </span>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Base Salary */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold">Pending Base Salary</h2>
-              <p className="text-[11px] text-slate-400">Latest 5 requests</p>
             </div>
-            <Link
-              href="/admin/base-salary-approval"
-              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
-            >
-              Open &rarr;
-            </Link>
-          </div>
-          <div className="p-4">
-            {latestPendingSalaries.length === 0 ? (
-              <p className="text-xs text-slate-500">No pending requests.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[360px] text-xs">
-                  <thead className="text-slate-400">
-                    <tr className="border-b border-slate-800">
-                      <Th>User</Th>
-                      <Th>Amount</Th>
-                      <Th>Submitted</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {latestPendingSalaries.map((s) => (
-                      <tr
-                        key={s.id}
-                        className="border-b border-slate-900/80 hover:bg-slate-900/60"
-                      >
-                        <Td>{s.user?.username ?? "-"}</Td>
-                        <Td>
-                          {s.amount} {s.currency}
-                        </Td>
-                        <Td>{s.createdAt.toISOString().slice(0, 10)}</Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+            {/* Base Salary */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950/40">
+              <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
+                <div className="text-xs font-semibold text-slate-200">
+                  Base Salary Requests
+                </div>
+                <Link
+                  href="/admin/base-salary-approval"
+                  className="text-[11px] text-slate-400 hover:text-yellow-300"
+                >
+                  Open &rarr;
+                </Link>
               </div>
-            )}
+              <div className="p-3">
+                {latestPendingSalaries.length === 0 ? (
+                  <p className="text-[11px] text-slate-500">
+                    No pending requests.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {latestPendingSalaries.map((s) => (
+                      <div
+                        key={s.id}
+                        className="flex items-center justify-between text-[11px]"
+                      >
+                        <span className="text-slate-200">
+                          {s.user?.username ?? "-"}
+                        </span>
+                        <span className="text-slate-400">
+                          {s.amount} {s.currency}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>

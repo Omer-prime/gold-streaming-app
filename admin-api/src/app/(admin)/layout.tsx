@@ -108,6 +108,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             onClick={() => setMobileOpen(false)}
           />
 
+          {/* ✅ Rewards */}
+          <NavLink
+            href="/admin/rewards"
+            label="Rewards"
+            icon="🏆"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+
           <NavLink
             href="/admin/notifications"
             label="Notifications"
@@ -155,6 +164,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               onClick={() => setMobileOpen(false)}
             />
           </div>
+
           <NavLink
             href="/admin/currency-trading"
             label="Currency trading"
@@ -196,8 +206,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       {/* Mobile dark overlay behind sidebar */}
       <div
-        className={`fixed inset-0 z-30 bg-black/50 transition-opacity md:hidden ${mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          }`}
+        className={`fixed inset-0 z-30 bg-black/50 transition-opacity md:hidden ${
+          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
         onClick={() => setMobileOpen(false)}
       />
 

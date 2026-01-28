@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -6,7 +6,20 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config";
 import { Ionicons } from "@expo/vector-icons";
 
-type LiveStatus = {
+type LiveApplicationRes = {
+  application: any | null;
+  applicationStatus: "NONE" | "PENDING" | "APPROVED" | "REJECTED";
+  hostApproved: boolean;
+  requirements: {
+    faceVerified: boolean;
+    hasLiveCover: boolean;
+    wealthLevel: number;
+    requiredWealthLevel: number;
+    canApply: boolean;
+  };
+};
+
+type ScreenState = {
   approved: boolean;
   applicationStatus: "NONE" | "PENDING" | "APPROVED" | "REJECTED";
   requirements: {
@@ -14,14 +27,8 @@ type LiveStatus = {
     hasLivePhoto: boolean;
     wealthLevel: number;
     wealthRequired: number;
+    canApply: boolean;
   };
-  host: {
-    id: string;
-    name: string;
-    avatarUrl: string | null;
-    liveCoverUrl: string | null;
-  };
-  activeStream: { id: string; title: string | null } | null;
 };
 
 export default function LiveApplicationScreen() {
@@ -29,7 +36,7 @@ export default function LiveApplicationScreen() {
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [data, setData] = useState<LiveStatus | null>(null);
+  const [data, setData] = useState<ScreenState | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -43,8 +50,10 @@ export default function LiveApplicationScreen() {
         return;
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/live?userId=${encodeURIComponent(userId)}`);
-      const json = (await res.json().catch(() => null)) as LiveStatus | null;
+      const res = await fetch(
+        `${API_BASE_URL}/api/profile/live-application?userId=${encodeURIComponent(userId)}`
+      );
+      const json = (await res.json().catch(() => null)) as LiveApplicationRes | null;
 
       if (!res.ok || !json) {
         setErr((json as any)?.error || "Failed to load live status");
@@ -52,7 +61,18 @@ export default function LiveApplicationScreen() {
         return;
       }
 
-      setData(json);
+      // normalize backend keys -> mobile keys
+      setData({
+        approved: !!json.hostApproved,
+        applicationStatus: json.applicationStatus,
+        requirements: {
+          faceVerified: json.requirements.faceVerified,
+          hasLivePhoto: json.requirements.hasLiveCover,
+          wealthLevel: json.requirements.wealthLevel,
+          wealthRequired: json.requirements.requiredWealthLevel,
+          canApply: json.requirements.canApply,
+        },
+      });
     } catch (e) {
       setErr("Network error");
       setData(null);
@@ -67,14 +87,57 @@ export default function LiveApplicationScreen() {
     }, [load])
   );
 
-  const goLive = useCallback(async () => {
+  const onPressGoLive = useCallback(async () => {
     const userId = await AsyncStorage.getItem("gl_user_id");
     if (!userId) return Alert.alert("Login required");
 
+    const req = data?.requirements;
+
+    // If not approved, guide user / submit application
     if (!data?.approved) {
-      return Alert.alert("Not approved", "Complete requirements / wait for approval.");
+      if (!req) return Alert.alert("Error", "Live status not loaded yet.");
+
+      if (!req.faceVerified) {
+        // TODO: change route name
+        return navigation.navigate("FaceScan");
+      }
+
+      if (!req.hasLivePhoto) {
+        // TODO: change route name
+        return navigation.navigate("LiveCoverScreen");
+      }
+
+      if (req.wealthLevel < req.wealthRequired) {
+        return Alert.alert("Wealth level required", `You need level ${req.wealthRequired}.`);
+      }
+
+      // requirements OK → submit application if not pending
+      if (data.applicationStatus === "PENDING") {
+        return Alert.alert("Under review", "Please wait for admin approval.");
+      }
+
+      try {
+        const applyRes = await fetch(`${API_BASE_URL}/api/profile/live-application`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+        const applyJson = await applyRes.json().catch(() => null);
+
+        if (!applyRes.ok) {
+          return Alert.alert("Failed", applyJson?.error || "Failed to submit application");
+        }
+
+        Alert.alert("Submitted", "Your request is submitted. Please wait for review.");
+        load();
+      } catch {
+        Alert.alert("Network error", "Failed to submit application");
+      }
+
+      return;
     }
 
+    // Approved → start live stream (your existing /api/live route)
     try {
       const res = await fetch(`${API_BASE_URL}/api/live`, {
         method: "POST",
@@ -90,13 +153,13 @@ export default function LiveApplicationScreen() {
       navigation.navigate("LiveRoom", {
         streamId: json.stream.id,
         hostId: userId,
-        displayName: data.host.name,
-        avatarUrl: data.host.avatarUrl,
+        displayName: "Host",
+        avatarUrl: null,
       });
     } catch {
       Alert.alert("Network error", "Failed to start live");
     }
-  }, [data, navigation]);
+  }, [data, navigation, load]);
 
   const req = data?.requirements;
 
@@ -123,46 +186,47 @@ export default function LiveApplicationScreen() {
           )}
 
           <View className="border border-gray-200 rounded-2xl overflow-hidden">
-            <Row title="Face Authentication" subtitle={req?.faceVerified ? "Completed" : "Please complete authentication process first."} />
+            <Row
+              title="Face Authentication"
+              subtitle={req?.faceVerified ? "Completed" : "Please complete authentication process first."}
+             onPress={() => navigation.navigate("FaceScan")} // TODO rename
+            />
             <Divider />
-            <Row title="Live photo" subtitle={req?.hasLivePhoto ? "Uploaded" : "Please upload the live cover again."} />
+            <Row
+              title="Live photo"
+              subtitle={req?.hasLivePhoto ? "Uploaded" : "Please upload the live cover again."}
+              onPress={() => navigation.navigate("LiveCoverScreen")} // TODO rename
+            />
             <Divider />
-            <Row title={`Wealth level ≥ level ${req?.wealthRequired ?? 5}`} subtitle={`Your level: ${req?.wealthLevel ?? 1}`} />
+            <Row
+              title={`Wealth level ≥ level ${req?.wealthRequired ?? 5}`}
+              subtitle={`Your level: ${req?.wealthLevel ?? 0}`}
+              onPress={() => Alert.alert("Info", "Increase wealth level by spending/sending gifts etc.")}
+            />
           </View>
 
-          <View className="mt-4 bg-gray-50 rounded-2xl p-4 border border-gray-200">
-            <Text className="text-[14px] font-extrabold text-black">Become a host</Text>
-            <Text className="text-[12px] text-gray-500 mt-1">
-              Submit your information to apply for hosting. After passing the review, you can start live streams.
+          <View className="mt-3">
+            <Text className="text-gray-500 text-[12px]">
+              Status: <Text className="font-extrabold">{data?.applicationStatus ?? "NONE"}</Text>
             </Text>
           </View>
-
-          {data?.approved ? (
-            <View className="mt-3 flex-row items-center">
-              <Text className="text-green-600 font-extrabold">✅ You are approved. You can start live anytime.</Text>
-            </View>
-          ) : (
-            <View className="mt-3">
-              <Text className="text-gray-500 text-[12px]">
-                Status: <Text className="font-extrabold">{data?.applicationStatus ?? "NONE"}</Text>
-              </Text>
-            </View>
-          )}
 
           <View className="flex-1" />
 
           <Pressable
-            onPress={goLive}
+            onPress={onPressGoLive}
             style={{
               backgroundColor: "#FF2D55",
               borderRadius: 999,
               paddingVertical: 16,
               alignItems: "center",
               marginBottom: 18,
-              opacity: data?.approved ? 1 : 0.6,
+              opacity: data?.approved ? 1 : 0.8,
             }}
           >
-            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "900" }}>Go Live</Text>
+            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "900" }}>
+              {data?.approved ? "Go Live" : "Apply / Complete Steps"}
+            </Text>
           </Pressable>
         </View>
       )}
@@ -174,14 +238,26 @@ function Divider() {
   return <View style={{ height: 1, backgroundColor: "#F3F4F6" }} />;
 }
 
-function Row({ title, subtitle }: { title: string; subtitle: string }) {
+function Row({
+  title,
+  subtitle,
+  onPress,
+}: {
+  title: string;
+  subtitle: string;
+  onPress?: () => void;
+}) {
   return (
-    <View className="px-4 py-4 flex-row items-center justify-between bg-white">
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      className="px-4 py-4 flex-row items-center justify-between bg-white"
+    >
       <View style={{ maxWidth: "85%" }}>
         <Text className="text-[14px] font-extrabold text-black">{title}</Text>
         <Text className="text-[12px] text-gray-500 mt-1">{subtitle}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-    </View>
+    </Pressable>
   );
 }

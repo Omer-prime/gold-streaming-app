@@ -1,3 +1,4 @@
+// LiveRoomScreen.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
@@ -29,6 +30,10 @@ import {
 } from "@livekit/react-native";
 import { Track } from "livekit-client";
 
+// ✅ Expo permissions for host camera/mic
+import { Camera } from "expo-camera";
+import { Audio } from "expo-av";
+
 type ChatMsg = { id: string; text: string };
 
 type TokenResp = {
@@ -42,52 +47,60 @@ type StreamInfoResp = { isLive: boolean; viewers: number; title?: string | null 
 
 const FILL = StyleSheet.absoluteFillObject;
 
-function pickHostCameraTrack(
-  tracks: TrackReferenceOrPlaceholder[],
-  hostId?: string
-): TrackReference | null {
-  const isRef = (t: TrackReferenceOrPlaceholder): t is TrackReference => isTrackReference(t);
+/**
+ * ✅ Normalize serverUrl:
+ * LiveKit RN expects ws/wss for signal.
+ * If backend returns https://, convert to wss://.
+ */
+function normalizeLiveKitUrl(url?: string | null) {
+  const u = (url || "").trim();
+  if (!u) return "";
 
-  if (hostId) {
-    const hostTrack = tracks.find(
-      (t): t is TrackReference => isRef(t) && t.participant.identity === hostId
-    );
-    if (hostTrack) return hostTrack;
-  }
+  if (u.startsWith("wss://") || u.startsWith("ws://")) return u;
+  if (u.startsWith("https://")) return u.replace("https://", "wss://");
+  if (u.startsWith("http://")) return u.replace("http://", "ws://");
 
-  const first = tracks.find((t): t is TrackReference => isRef(t));
-  return first ?? null;
+  // if backend returns domain only
+  if (!u.includes("://")) return `wss://${u}`;
+
+  return u;
 }
 
-const StageVideo: React.FC<{ hostId?: string; fallbackAvatarUrl?: string | null }> = ({
-  hostId,
-  fallbackAvatarUrl,
-}) => {
+/**
+ * ✅ SAFER: pick any camera track if host identity mismatch happens.
+ * You can re-enable strict hostId matching later.
+ */
+function pickAnyCameraTrack(tracks: TrackReferenceOrPlaceholder[]): TrackReference | null {
+  const isRef = (t: TrackReferenceOrPlaceholder): t is TrackReference => isTrackReference(t);
+  return tracks.find((t): t is TrackReference => isRef(t)) ?? null;
+}
+
+const DebugTracks = ({ hostId }: { hostId?: string }) => {
+  const cams = useTracks([Track.Source.Camera]);
+  return (
+    <View style={{ position: "absolute", top: 88, left: 12, zIndex: 999 }}>
+      <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>
+        camTracks: {cams.length} • hostId: {String(hostId || "").slice(0, 8)}
+      </Text>
+    </View>
+  );
+};
+
+const StageVideo: React.FC<{ fallbackAvatarUrl?: string | null }> = ({ fallbackAvatarUrl }) => {
   const cameraTracks = useTracks([Track.Source.Camera]);
-  const primary = useMemo(() => pickHostCameraTrack(cameraTracks, hostId), [cameraTracks, hostId]);
+  const primary = useMemo(() => pickAnyCameraTrack(cameraTracks), [cameraTracks]);
 
-  if (primary) {
-    // ✅ FIX: VideoTrack expects ViewStyle (object), not RegisteredStyle
-    return <VideoTrack trackRef={primary} style={FILL} />;
-  }
+  if (primary) return <VideoTrack trackRef={primary} style={FILL} />;
 
-  // fallback when host hasn't published camera yet
   if (fallbackAvatarUrl) {
     return (
-      <Image
-        source={{ uri: fallbackAvatarUrl }}
-        style={FILL}
-        resizeMode="cover"
-        blurRadius={18}
-      />
+      <Image source={{ uri: fallbackAvatarUrl }} style={FILL} resizeMode="cover" blurRadius={18} />
     );
   }
 
   return (
     <View style={[FILL, { alignItems: "center", justifyContent: "center" }]}>
-      <Text style={{ color: "rgba(255,255,255,0.8)", fontWeight: "700" }}>
-        Connecting video…
-      </Text>
+      <Text style={{ color: "rgba(255,255,255,0.8)", fontWeight: "700" }}>Connecting video…</Text>
     </View>
   );
 };
@@ -108,6 +121,14 @@ export default function LiveRoomScreen() {
   const [streamTitle, setStreamTitle] = useState<string>("Live");
   const [checking, setChecking] = useState(true);
 
+  const [isConnected, setIsConnected] = useState(false);
+
+  // ✅ permissions readiness (host only)
+  const [permReady, setPermReady] = useState<boolean>(false);
+
+  // ✅ LIVE timer
+  const [elapsedSec, setElapsedSec] = useState(0);
+
   const isHost = !!isHostParam || (!!myUserId && !!hostId && myUserId === hostId);
 
   // Audio session (iOS required, safe on Android)
@@ -122,6 +143,52 @@ export default function LiveRoomScreen() {
     AsyncStorage.getItem("gl_user_id").then((id) => setMyUserId(id));
   }, []);
 
+  // ✅ Start / reset timer based on connection
+  useEffect(() => {
+    if (!isConnected) {
+      setElapsedSec(0);
+      return;
+    }
+
+    const t0 = Date.now();
+    const id = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - t0) / 1000));
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [isConnected]);
+
+  const liveTimeLabel = useMemo(() => {
+    const mm = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+    const ss = String(elapsedSec % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
+  }, [elapsedSec]);
+
+  // ✅ Request permissions for HOST (otherwise camera publish fails)
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      if (!isHost) {
+        if (alive) setPermReady(true);
+        return;
+      }
+
+      const cam = await Camera.requestCameraPermissionsAsync();
+      const mic = await Audio.requestPermissionsAsync();
+
+      const ok = cam.status === "granted" && mic.status === "granted";
+      if (alive) {
+        setPermReady(ok);
+        if (!ok) setLkErr("Camera/Microphone permission is required to go live.");
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [isHost]);
+
   // Fetch LiveKit token
   useEffect(() => {
     if (!streamId || !myUserId) return;
@@ -131,6 +198,7 @@ export default function LiveRoomScreen() {
     (async () => {
       try {
         setLkErr(null);
+        setLk(null);
 
         const res = await fetch(`${API_BASE_URL}/api/live/token`, {
           method: "POST",
@@ -143,11 +211,9 @@ export default function LiveRoomScreen() {
         });
 
         const json = (await res.json().catch(() => null)) as TokenResp | null;
-
         if (cancelled) return;
 
         if (!res.ok || !json?.token || !json?.livekitUrl) {
-          setLk(null);
           setLkErr((json as any)?.error || "Failed to get LiveKit token");
           return;
         }
@@ -171,7 +237,9 @@ export default function LiveRoomScreen() {
 
     const load = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/live/stream?streamId=${encodeURIComponent(streamId)}`);
+        const res = await fetch(
+          `${API_BASE_URL}/api/live/stream?streamId=${encodeURIComponent(streamId)}`
+        );
         const json = (await res.json().catch(() => null)) as StreamInfoResp | null;
 
         if (!mounted) return;
@@ -240,12 +308,23 @@ export default function LiveRoomScreen() {
 
   const initials = useMemo(() => (displayName || "U").slice(0, 1).toUpperCase(), [displayName]);
 
+  const serverUrl = useMemo(() => normalizeLiveKitUrl(lk?.livekitUrl), [lk?.livekitUrl]);
+
+  // ✅ Do not connect until token + serverUrl + permissions ready
+  const shouldConnect = !!lk?.token && !!serverUrl && permReady;
+
   if (lkErr) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
         <View style={{ padding: 16 }}>
           <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800" }}>Live error</Text>
           <Text style={{ color: "rgba(255,255,255,0.75)", marginTop: 8 }}>{lkErr}</Text>
+
+          {!!serverUrl && (
+            <Text style={{ color: "rgba(255,255,255,0.55)", marginTop: 8, fontSize: 12 }}>
+              LiveKit URL: {serverUrl}
+            </Text>
+          )}
 
           <Pressable
             onPress={() => navigation.goBack()}
@@ -266,21 +345,27 @@ export default function LiveRoomScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
-      {/* ✅ FIX: LiveKitRoom has NO style prop in your version */}
       <View style={{ flex: 1 }}>
         <LiveKitRoom
-          connect={!!lk?.token}
-          serverUrl={lk?.livekitUrl || ""}
+          connect={shouldConnect}
+          serverUrl={serverUrl}
           token={lk?.token || ""}
           audio={true}
           video={isHost} // viewers should NOT publish camera
-          onError={(e) => setLkErr(e?.message || "LiveKit error")}
+          onConnected={() => setIsConnected(true)}
           onDisconnected={() => {
+            setIsConnected(false);
             if (!isHost) Alert.alert("Disconnected", "You left the live room.");
           }}
+          onError={(e) => {
+            setLkErr(e?.message || "LiveKit error");
+          }}
         >
+          {/* ✅ Debug overlay to confirm tracks exist */}
+          <DebugTracks hostId={hostId} />
+
           {/* REAL live video */}
-          <StageVideo hostId={hostId} fallbackAvatarUrl={avatarUrl} />
+          <StageVideo fallbackAvatarUrl={avatarUrl} />
 
           <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
             {/* Top bar */}
@@ -320,7 +405,8 @@ export default function LiveRoomScreen() {
                     {displayName || "Host"}
                   </Text>
                   <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10 }} numberOfLines={1}>
-                    {streamTitle} • ID: {String(hostId || "").slice(0, 10)}
+                    {streamTitle} • {isConnected ? "Connected" : "Connecting"} • ID:{" "}
+                    {String(hostId || "").slice(0, 10)}
                   </Text>
                 </View>
 
@@ -333,7 +419,9 @@ export default function LiveRoomScreen() {
                     borderRadius: 999,
                   }}
                 >
-                  <Text style={{ color: "#fff", fontSize: 10, fontWeight: "900" }}>LIVE</Text>
+                  <Text style={{ color: "#fff", fontSize: 10, fontWeight: "900" }}>
+                    LIVE {isConnected ? liveTimeLabel : ""}
+                  </Text>
                 </View>
               </View>
 

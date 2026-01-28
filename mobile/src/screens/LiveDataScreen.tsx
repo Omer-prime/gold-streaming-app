@@ -1,5 +1,5 @@
 // src/screens/LiveDataScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,10 +8,11 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
@@ -22,7 +23,8 @@ type PKTabType = "Random" | "Friend" | "Team";
 type PKRange = "Today" | "Recent7" | "Monthly";
 
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.10.25:3000";
+  (process.env.EXPO_PUBLIC_API_BASE_URL || "").replace(/\/$/, "") ||
+  "http://192.168.10.25:3000";
 
 type LiveDataApiResponse = {
   mode: "live" | "pk";
@@ -37,7 +39,6 @@ type LiveDataApiResponse = {
   newFans: number;
   newFanClubMembers: number;
 
-  // extra fields
   averageOnlineUsers: number;
   partyCrownDurationSeconds: number;
 };
@@ -57,10 +58,42 @@ type PKDataApiResponse = {
   }[];
 };
 
+async function apiGetJson<T>(url: string, timeoutMs = 12000): Promise<T> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+
+    const json = (await res.json().catch(() => null)) as any;
+
+    if (!res.ok) {
+      const msg = json?.error || `Request failed (${res.status})`;
+      throw new Error(msg);
+    }
+
+    if (!json) throw new Error("Empty response from server.");
+    if (json?.error) throw new Error(json.error);
+
+    return json as T;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 const LiveDataScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
+  const isFocused = useIsFocused();
+
   const [topTab, setTopTab] = useState<TopTab>("Live");
   const [range, setRange] = useState<RangeTab>("Daily");
+
+  // user state
+  const [userId, setUserId] = useState<string | null>(null);
 
   // live data state
   const [data, setData] = useState<LiveDataApiResponse | null>(null);
@@ -87,143 +120,168 @@ const LiveDataScreen: React.FC = () => {
   // help description modal
   const [showHelp, setShowHelp] = useState(false);
 
-  /* --------- LIVE TAB FETCH --------- */
+  // pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
+
+  // polling
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+
+  // load userId once (and keep it)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const id = await AsyncStorage.getItem("gl_user_id");
+        if (mounted) setUserId(id);
+      } catch {
+        if (mounted) setUserId(null);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const rangeParam = useMemo(() => range.toLowerCase(), [range]); // daily/weekly/monthly
+
+  const refreshLive = useCallback(async () => {
+    if (!userId) {
+      setErrorText("Not logged in.");
+      setData(null);
+      return;
+    }
+
+    setLoading(true);
+    setErrorText(null);
+
+    try {
+      const url =
+        `${API_BASE_URL}/api/profile/live-data` +
+        `?userId=${encodeURIComponent(userId)}` +
+        `&mode=live` +
+        `&range=${encodeURIComponent(rangeParam)}` +
+        `&date=${encodeURIComponent(selectedDate)}`;
+
+      const json = await apiGetJson<LiveDataApiResponse>(url);
+
+      // normalize numeric fields (avoid NaN/undefined)
+      const normalized: LiveDataApiResponse = {
+        ...json,
+        wonPoints: Number(json.wonPoints ?? 0),
+        liveDurationSeconds: Number(json.liveDurationSeconds ?? 0),
+        liveEarnings: Number(json.liveEarnings ?? 0),
+        partyDurationSeconds: Number(json.partyDurationSeconds ?? 0),
+        partyEarnings: Number(json.partyEarnings ?? 0),
+        newFans: Number(json.newFans ?? 0),
+        newFanClubMembers: Number(json.newFanClubMembers ?? 0),
+        averageOnlineUsers: Number(json.averageOnlineUsers ?? 0),
+        partyCrownDurationSeconds: Number(json.partyCrownDurationSeconds ?? 0),
+      };
+
+      setData(normalized);
+    } catch (e: any) {
+      setErrorText(e?.message || "Failed to load live data.");
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, selectedDate, rangeParam]);
+
+  const refreshPK = useCallback(async () => {
+    if (!userId) {
+      setPkErrorText("Not logged in.");
+      setPkData(null);
+      return;
+    }
+
+    setPkLoading(true);
+    setPkErrorText(null);
+
+    try {
+      const typeParam =
+        pkTab === "Friend" ? "friend" : pkTab === "Team" ? "team" : "random";
+      const pkRangeParam =
+        pkRange === "Today" ? "today" : pkRange === "Recent7" ? "7days" : "monthly";
+
+      const url =
+        `${API_BASE_URL}/api/profile/pk-data` +
+        `?userId=${encodeURIComponent(userId)}` +
+        `&type=${encodeURIComponent(typeParam)}` +
+        `&range=${encodeURIComponent(pkRangeParam)}`;
+
+      const json = await apiGetJson<Partial<PKDataApiResponse>>(url);
+
+      // IMPORTANT: normalize history to [] to prevent `.map` crash
+      const history = Array.isArray((json as any)?.history) ? ((json as any).history as any[]) : [];
+
+      const normalized: PKDataApiResponse = {
+        pkType: (json as any)?.pkType ?? typeParam,
+        range: (json as any)?.range ?? pkRangeParam,
+        winRate: Number((json as any)?.winRate ?? 0),
+        pkScore: Number((json as any)?.pkScore ?? 0),
+        sessions: Number((json as any)?.sessions ?? 0),
+        history: history.map((h: any) => ({
+          id: String(h?.id ?? `${Math.random()}`),
+          createdAt: String(h?.createdAt ?? new Date().toISOString()),
+          opponentName: String(h?.opponentName ?? "Unknown"),
+          result: (h?.result === "win" || h?.result === "lose" || h?.result === "draw") ? h.result : "draw",
+          score: String(h?.score ?? "0-0"),
+        })),
+      };
+
+      setPkData(normalized);
+    } catch (e: any) {
+      setPkErrorText(e?.message || "Failed to load PK data.");
+      setPkData(null);
+    } finally {
+      setPkLoading(false);
+    }
+  }, [userId, pkTab, pkRange]);
+
+  // auto-load on changes
   useEffect(() => {
     if (topTab !== "Live") return;
+    refreshLive();
+  }, [topTab, range, selectedDate, refreshLive]);
 
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        setErrorText(null);
-
-        const userId = await AsyncStorage.getItem("gl_user_id");
-        if (!userId) {
-          if (!cancelled) {
-            setErrorText("Not logged in.");
-            setData(null);
-          }
-          return;
-        }
-
-        const modeParam = "live";
-        const rangeParam = range.toLowerCase(); // daily / weekly / monthly
-
-        const url = `${API_BASE_URL}/api/profile/live-data?userId=${encodeURIComponent(
-          userId
-        )}&mode=${modeParam}&range=${rangeParam}&date=${selectedDate}`;
-
-        const res = await fetch(url);
-        const json = (await res.json().catch(() => null)) as
-          | LiveDataApiResponse
-          | { error?: string }
-          | null;
-
-        if (cancelled) return;
-
-        if (!res.ok || !json || (json as any).error) {
-          console.log("Live data error", json || res.status);
-          setErrorText(
-            (json as any)?.error || "Failed to load live data."
-          );
-          setData(null);
-          return;
-        }
-
-        setData(json as LiveDataApiResponse);
-      } catch (err) {
-        if (!cancelled) {
-          console.error("Live data fetch error", err);
-          setErrorText("Network error while loading data.");
-          setData(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [topTab, range, selectedDate]);
-
-  /* --------- PK TAB FETCH --------- */
   useEffect(() => {
     if (topTab !== "PK") return;
+    refreshPK();
+  }, [topTab, pkTab, pkRange, refreshPK]);
 
-    let cancelled = false;
+  // real-time polling (while screen focused)
+  useEffect(() => {
+    if (!isFocused) return;
 
-    const load = async () => {
-      try {
-        setPkLoading(true);
-        setPkErrorText(null);
+    // clear old
+    if (pollRef.current) clearInterval(pollRef.current);
 
-        const userId = await AsyncStorage.getItem("gl_user_id");
-        if (!userId) {
-          if (!cancelled) {
-            setPkErrorText("Not logged in.");
-            setPkData(null);
-          }
-          return;
-        }
-
-        const typeParam =
-          pkTab === "Friend" ? "friend" : pkTab === "Team" ? "team" : "random";
-        const rangeParam =
-          pkRange === "Today"
-            ? "today"
-            : pkRange === "Recent7"
-            ? "7days"
-            : "monthly";
-
-        const url = `${API_BASE_URL}/api/profile/pk-data?userId=${encodeURIComponent(
-          userId
-        )}&type=${typeParam}&range=${rangeParam}`;
-
-        const res = await fetch(url);
-        const json = (await res.json().catch(() => null)) as
-          | PKDataApiResponse
-          | { error?: string }
-          | null;
-
-        if (cancelled) return;
-
-        if (!res.ok || !json || (json as any).error) {
-          console.log("PK data error", json || res.status);
-          setPkErrorText((json as any)?.error || "Failed to load PK data.");
-          setPkData(null);
-          return;
-        }
-
-        setPkData(json as PKDataApiResponse);
-      } catch (err) {
-        if (!cancelled) {
-          console.error("PK data fetch error", err);
-          setPkErrorText("Network error while loading PK data.");
-          setPkData(null);
-        }
-      } finally {
-        if (!cancelled) setPkLoading(false);
-      }
-    };
-
-    load();
+    pollRef.current = setInterval(() => {
+      if (topTab === "Live") refreshLive();
+      if (topTab === "PK") refreshPK();
+    }, 20000); // 20s
 
     return () => {
-      cancelled = true;
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = null;
     };
-  }, [topTab, pkTab, pkRange]);
+  }, [isFocused, topTab, refreshLive, refreshPK]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (topTab === "Live") await refreshLive();
+      else await refreshPK();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [topTab, refreshLive, refreshPK]);
 
   // derived live values
   const wonPoints = data?.wonPoints ?? 0;
   const liveDuration = formatSeconds(data?.liveDurationSeconds ?? 0);
   const partyDuration = formatSeconds(data?.partyDurationSeconds ?? 0);
-  const partyCrownDuration = formatSeconds(
-    data?.partyCrownDurationSeconds ?? 0
-  );
+  const partyCrownDuration = formatSeconds(data?.partyCrownDurationSeconds ?? 0);
   const liveEarnings = data?.liveEarnings ?? 0;
   const partyEarnings = data?.partyEarnings ?? 0;
   const newFans = data?.newFans ?? 0;
@@ -231,9 +289,7 @@ const LiveDataScreen: React.FC = () => {
   const avgOnlineUsers = data?.averageOnlineUsers ?? 0;
 
   const handleDateChange = (_event: any, date?: Date) => {
-    if (Platform.OS === "android") {
-      setShowDatePicker(false);
-    }
+    if (Platform.OS === "android") setShowDatePicker(false);
     if (date) {
       const y = date.getFullYear();
       const m = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -241,6 +297,8 @@ const LiveDataScreen: React.FC = () => {
       setSelectedDate(`${y}-${m}-${d}`);
     }
   };
+
+  const pkHistory = pkData?.history ?? [];
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -270,6 +328,7 @@ const LiveDataScreen: React.FC = () => {
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {topTab === "Live" ? (
           <>
@@ -293,10 +352,7 @@ const LiveDataScreen: React.FC = () => {
                 />
               </View>
 
-              <Pressable
-                className="flex-row items-center"
-                onPress={() => setShowDatePicker(true)}
-              >
+              <Pressable className="flex-row items-center" onPress={() => setShowDatePicker(true)}>
                 <Ionicons name="calendar-outline" size={14} color="#6B7280" />
                 <Text className="ml-1 text-[12px] text-[#111827]">
                   {data?.date ?? selectedDate}
@@ -307,25 +363,18 @@ const LiveDataScreen: React.FC = () => {
             {/* Optional error text */}
             {errorText && (
               <View className="mt-3 mx-4 rounded-2xl bg-red-50 px-3 py-2">
-                <Text className="text-[11px] text-red-600">
-                  {errorText}
-                </Text>
+                <Text className="text-[11px] text-red-600">{errorText}</Text>
               </View>
             )}
 
             {/* Stats card */}
             <View className="mt-3 mx-4 rounded-3xl bg-[#FCE7F3] px-4 py-4">
               <View className="flex-row items-center justify-between">
-                <Text className="text-[12px] text-pink-500 mb-2">
-                  Won points
-                </Text>
-                {loading && (
-                  <ActivityIndicator size="small" color="#EC4899" />
-                )}
+                <Text className="text-[12px] text-pink-500 mb-2">Won points</Text>
+                {loading && <ActivityIndicator size="small" color="#EC4899" />}
               </View>
-              <Text className="text-[28px] font-bold text-[#EC4899]">
-                {wonPoints}
-              </Text>
+
+              <Text className="text-[28px] font-bold text-[#EC4899]">{wonPoints}</Text>
 
               {/* Rows */}
               <View className="mt-3 rounded-2xl bg-white px-4 py-3 space-y-3">
@@ -366,10 +415,7 @@ const LiveDataScreen: React.FC = () => {
             <View className="mt-4 mx-4">
               <Pressable
                 className="rounded-full bg-[#6366F1] py-3"
-                onPress={() => {
-                  // @ts-ignore – using untyped navigation
-                  navigation.navigate("Reward");
-                }}
+                onPress={() => navigation.navigate("Reward")}
               >
                 <Text className="text-center text-[14px] font-semibold text-white">
                   Get more points
@@ -381,26 +427,20 @@ const LiveDataScreen: React.FC = () => {
             <View className="mt-4 mx-4">
               <Pressable
                 className="rounded-2xl bg-white px-4 py-3 flex-row items-center justify-between"
-                onPress={() =>
-                  // @ts-ignore – using untyped navigation
-                  navigation.navigate("FansRanking")
-                }
+                onPress={() => {
+                  // Pass params so FansRanking screen can fetch safely
+                  navigation.navigate("FansRanking", {
+                    userId,
+                    date: selectedDate,
+                    range: rangeParam,
+                  });
+                }}
               >
                 <View className="flex-row items-center">
-                  <Ionicons
-                    name="trophy-outline"
-                    size={18}
-                    color="#F59E0B"
-                  />
-                  <Text className="ml-2 text-[14px] text-[#111827]">
-                    Contribution
-                  </Text>
+                  <Ionicons name="trophy-outline" size={18} color="#F59E0B" />
+                  <Text className="ml-2 text-[14px] text-[#111827]">Contribution</Text>
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color="#9CA3AF"
-                />
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
               </Pressable>
             </View>
           </>
@@ -428,69 +468,46 @@ const LiveDataScreen: React.FC = () => {
 
             {/* Range buttons */}
             <View className="mt-3 px-4 flex-row justify-center">
-              <PKRangeButton
-                label="Today"
-                active={pkRange === "Today"}
-                onPress={() => setPkRange("Today")}
-              />
+              <PKRangeButton label="Today" active={pkRange === "Today"} onPress={() => setPkRange("Today")} />
               <PKRangeButton
                 label="Recent 7 days"
                 active={pkRange === "Recent7"}
                 onPress={() => setPkRange("Recent7")}
               />
-              <PKRangeButton
-                label="Monthly"
-                active={pkRange === "Monthly"}
-                onPress={() => setPkRange("Monthly")}
-              />
+              <PKRangeButton label="Monthly" active={pkRange === "Monthly"} onPress={() => setPkRange("Monthly")} />
             </View>
 
             {pkErrorText && (
               <View className="mt-3 mx-4 rounded-2xl bg-red-50 px-3 py-2">
-                <Text className="text-[11px] text-red-600">
-                  {pkErrorText}
-                </Text>
+                <Text className="text-[11px] text-red-600">{pkErrorText}</Text>
               </View>
             )}
 
             {/* Summary cards */}
             <View className="mt-4 px-4 flex-row justify-between">
-              <PKStatCard
-                label="Win%"
-                value={`${(pkData?.winRate ?? 0).toFixed(2)}%`}
-              />
-              <PKStatCard
-                label="PK Score"
-                value={String(pkData?.pkScore ?? 0)}
-              />
-              <PKStatCard
-                label="Sessions"
-                value={String(pkData?.sessions ?? 0)}
-              />
+              <PKStatCard label="Win%" value={`${(pkData?.winRate ?? 0).toFixed(2)}%`} />
+              <PKStatCard label="PK Score" value={String(pkData?.pkScore ?? 0)} />
+              <PKStatCard label="Sessions" value={String(pkData?.sessions ?? 0)} />
             </View>
 
             {/* History */}
             <View className="mt-5 px-4 mb-8">
-              <Text className="text-[13px] font-semibold text-[#111827] mb-2">
-                Historical record
-              </Text>
+              <Text className="text-[13px] font-semibold text-[#111827] mb-2">Historical record</Text>
 
               {pkLoading && !pkData && (
                 <View className="py-4 items-center">
                   <ActivityIndicator />
-                  <Text className="mt-2 text-[11px] text-gray-500">
-                    Loading PK history...
-                  </Text>
+                  <Text className="mt-2 text-[11px] text-gray-500">Loading PK history...</Text>
                 </View>
               )}
 
-              {pkData && pkData.history.length === 0 && (
+              {!pkLoading && pkHistory.length === 0 && (
                 <Text className="text-[12px] text-[#9CA3AF]">
                   No record. Invite friends to PK.
                 </Text>
               )}
 
-              {pkData?.history.map((item) => (
+              {(pkHistory ?? []).map((item) => (
                 <PKHistoryRow key={item.id} item={item} />
               ))}
             </View>
@@ -498,7 +515,7 @@ const LiveDataScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* Help modal (same text as screenshot) */}
+      {/* Help modal */}
       <Modal
         transparent
         visible={showHelp}
@@ -517,9 +534,7 @@ const LiveDataScreen: React.FC = () => {
               onPress={() => setShowHelp(false)}
               className="mt-1 rounded-full bg-[#6366F1] py-2"
             >
-              <Text className="text-center text-[14px] font-semibold text-white">
-                Confirm
-              </Text>
+              <Text className="text-center text-[14px] font-semibold text-white">Confirm</Text>
             </Pressable>
           </View>
         </View>
@@ -629,58 +644,37 @@ const PKRangeButton: React.FC<{
   </Pressable>
 );
 
-const PKStatCard: React.FC<{ label: string; value: string }> = ({
-  label,
-  value,
-}) => (
+const PKStatCard: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <View className="flex-1 mx-1 rounded-2xl bg-white px-3 py-3 shadow-sm">
     <Text className="text-[11px] text-[#6B7280] mb-1">{label}</Text>
-    <Text className="text-[16px] font-semibold text-[#111827]">
-      {value}
-    </Text>
+    <Text className="text-[16px] font-semibold text-[#111827]">{value}</Text>
   </View>
 );
 
-const PKHistoryRow: React.FC<{
-  item: PKDataApiResponse["history"][number];
-}> = ({ item }) => {
+const PKHistoryRow: React.FC<{ item: PKDataApiResponse["history"][number] }> = ({ item }) => {
   const date = new Date(item.createdAt);
-  const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${date
-    .getHours()
-    .toString()
-    .padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+  const valid = !isNaN(date.getTime());
+  const timeStr = valid
+    ? `${date.getMonth() + 1}/${date.getDate()} ${date
+        .getHours()
+        .toString()
+        .padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`
+    : "—";
 
   const resultColor =
-    item.result === "win"
-      ? "#16A34A"
-      : item.result === "lose"
-      ? "#DC2626"
-      : "#6B7280";
+    item.result === "win" ? "#16A34A" : item.result === "lose" ? "#DC2626" : "#6B7280";
 
   return (
     <View className="flex-row items-center justify-between py-2 border-b border-[#F3F4F6]">
       <View>
-        <Text className="text-[13px] text-[#111827]">
-          {item.opponentName}
-        </Text>
-        <Text className="text-[11px] text-[#9CA3AF] mt-0.5">
-          {timeStr}
-        </Text>
+        <Text className="text-[13px] text-[#111827]">{item.opponentName}</Text>
+        <Text className="text-[11px] text-[#9CA3AF] mt-0.5">{timeStr}</Text>
       </View>
       <View className="items-end">
-        <Text
-          className="text-[11px] font-semibold"
-          style={{ color: resultColor }}
-        >
-          {item.result === "win"
-            ? "Win"
-            : item.result === "lose"
-            ? "Lose"
-            : "Draw"}
+        <Text className="text-[11px] font-semibold" style={{ color: resultColor }}>
+          {item.result === "win" ? "Win" : item.result === "lose" ? "Lose" : "Draw"}
         </Text>
-        <Text className="text-[11px] text-[#6B7280] mt-0.5">
-          Score: {item.score}
-        </Text>
+        <Text className="text-[11px] text-[#6B7280] mt-0.5">Score: {item.score}</Text>
       </View>
     </View>
   );
@@ -692,12 +686,7 @@ function formatSeconds(total: number): string {
   const hours = Math.floor(s / 3600);
   const minutes = Math.floor((s % 3600) / 60);
   const seconds = s % 60;
-
-  const hStr = String(hours).padStart(2, "0");
-  const mStr = String(minutes).padStart(2, "0");
-  const sStr = String(seconds).padStart(2, "0");
-
-  return `${hStr}:${mStr}:${sStr}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function parseYYYYMMDD(str: string): Date {

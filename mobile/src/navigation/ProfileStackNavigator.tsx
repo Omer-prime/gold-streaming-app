@@ -2,9 +2,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import { SafeAreaView } from "react-native-safe-area-context";
-import { View, Text } from "react-native";
-
 import ProfileScreen from "../screens/ProfileScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 
@@ -26,6 +23,10 @@ import InviteScreen from "../screens/InviteScreen";
 import GuardianScreen from "../screens/GuardianScreen";
 import FanClubScreen from "../screens/FanClubScreen";
 import MedalWallScreen from "../screens/MedalWallScreen";
+
+// ✅ NEW: Guardian sub screens
+import MyGuardianScreen from "../screens/MyGuardianScreen";
+import GuardMeScreen from "../screens/GuardMeScreen";
 
 // ⭐ NEW: Fans ranking screen
 import FansRankingScreen from "../screens/FansRankingScreen";
@@ -73,15 +74,13 @@ import FaceScanScreen from "../screens/FaceScanScreen";
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
+
   MyProfile: undefined;
   HonorWall: undefined;
   EditProfile: undefined;
   PostMoment: undefined;
 
-  // 🆕 visiting another user's profile
   VisitProfile: { userId: string };
-
-  // 🆕 comments under a moment
   MomentComments: { momentId: string; ownerName: string };
 
   Settings: undefined;
@@ -99,25 +98,28 @@ export type ProfileStackParamList = {
   Ranking: undefined;
   Store: undefined;
   Invite: undefined;
-  Guardian: undefined;
+
+  // ✅ make Guardian params optional (so old calls won’t break)
+  Guardian: { userId?: string } | undefined;
+
+  // ✅ NEW guardian sub screens (optional userId too)
+  MyGuardian: { userId?: string } | undefined;
+  GuardMe: { userId?: string } | undefined;
+
   FanClub: undefined;
   MedalWall: undefined;
 
   Coins: undefined;
   Points: undefined;
 
-  // ⭐ NEW: Fans ranking route
   FansRanking: undefined;
 
-  // NEW: host live application
   LiveApplication: undefined;
 
-  // NEW: real-person verification flow
   RealPersonAuth: undefined;
   FaceScan: undefined;
   HostLiveRoom: undefined;
 
-  // settings-related
   AccountSecurity: undefined;
   SecurityPassword: undefined;
   LanguageSetting: undefined;
@@ -127,7 +129,6 @@ export type ProfileStackParamList = {
   PrivacySettings: undefined;
   AboutGoldLive: undefined;
 
-  // account bind + devices
   DeviceManagement: undefined;
   BindPhone: undefined;
   BindEmail: undefined;
@@ -149,252 +150,67 @@ const ProfileStackNavigator: React.FC = () => {
         headerStyle: { backgroundColor: "#FFFFFF" },
       }}
     >
-      {/* Main profile page */}
-      <Stack.Screen
-        name="ProfileMain"
-        component={ProfileScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
 
-      {/* Profile detail & editing */}
-      <Stack.Screen
-        name="MyProfile"
-        component={MyProfileScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="HonorWall"
-        component={HonorWallScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="MyProfile" component={MyProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HonorWall" component={HonorWallScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PostMoment" component={PostMomentScreen} options={{ headerShown: false }} />
 
-      <Stack.Screen
-        name="EditProfile"
-        component={EditProfileScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="PostMoment"
-        component={PostMomentScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="VisitProfile" component={VisitProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MomentComments" component={MomentCommentsScreen} options={{ headerShown: false }} />
 
-      {/* 🆕 Visit other user's profile */}
-      <Stack.Screen
-        name="VisitProfile"
-        component={VisitProfileScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
 
-      {/* 🆕 Moment comments */}
-      <Stack.Screen
-        name="MomentComments"
-        component={MomentCommentsScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="AccountSecurity" component={AccountSecurityScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="SecurityPassword" component={SecurityPasswordScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="LanguageSetting" component={LanguageSettingScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Blacklist" component={BlacklistScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PrivilegeSettings" component={PrivilegeSettingsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="NewMessageNotification" component={NewMessageNotificationScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AboutGoldLive" component={AboutGoldLiveScreen} options={{ headerShown: false }} />
 
-      {/* Settings main */}
-      <Stack.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="DeviceManagement" component={DeviceManagementScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BindPhone" component={BindPhoneScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BindEmail" component={BindEmailScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BindGoogle" component={BindGoogleScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BindFacebook" component={BindFacebookScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BindInstagram" component={BindInstagramScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BindTiktok" component={BindTiktokScreen} options={{ headerShown: false }} />
 
-      {/* Settings subtree */}
-      <Stack.Screen
-        name="AccountSecurity"
-        component={AccountSecurityScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="SecurityPassword"
-        component={SecurityPasswordScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="LanguageSetting"
-        component={LanguageSettingScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Blacklist"
-        component={BlacklistScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="PrivilegeSettings"
-        component={PrivilegeSettingsScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="NewMessageNotification"
-        component={NewMessageNotificationScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="PrivacySettings"
-        component={PrivacySettingsScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AboutGoldLive"
-        component={AboutGoldLiveScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="LiveData" component={LiveDataScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Help" component={HelpScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MyAgency" component={MyAgencyScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Level" component={LevelScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Auth" component={AuthScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Backpack" component={BackpackScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="FollowUs" component={FollowUsScreen} options={{ headerShown: false }} />
 
-      {/* Bind / device screens */}
-      <Stack.Screen
-        name="DeviceManagement"
-        component={DeviceManagementScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="BindPhone"
-        component={BindPhoneScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="BindEmail"
-        component={BindEmailScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="BindGoogle"
-        component={BindGoogleScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="BindFacebook"
-        component={BindFacebookScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="BindInstagram"
-        component={BindInstagramScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="BindTiktok"
-        component={BindTiktokScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="Coins" component={CoinsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Points" component={PointsScreen} options={{ headerShown: false }} />
 
-      {/* Main list items */}
-      <Stack.Screen
-        name="LiveData"
-        component={LiveDataScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Help"
-        component={HelpScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="MyAgency"
-        component={MyAgencyScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Level"
-        component={LevelScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Auth"
-        component={AuthScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Backpack"
-        component={BackpackScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="FollowUs"
-        component={FollowUsScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="VipCenter" component={VipCenterScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Reward" component={RewardScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Ranking" component={RankingScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Store" component={StoreScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Invite" component={InviteScreen} options={{ headerShown: false }} />
 
-      {/* Coins & Points */}
-      <Stack.Screen
-        name="Coins"
-        component={CoinsScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Points"
-        component={PointsScreen}
-        options={{ headerShown: false }}
-      />
+      {/* ✅ Guardian main */}
+      <Stack.Screen name="Guardian" component={GuardianScreen} options={{ headerShown: false }} />
 
-      {/* VIP / feature grid items */}
-      <Stack.Screen
-        name="VipCenter"
-        component={VipCenterScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Reward"
-        component={RewardScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Ranking"
-        component={RankingScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Store"
-        component={StoreScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Invite"
-        component={InviteScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Guardian"
-        component={GuardianScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="FanClub"
-        component={FanClubScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="MedalWall"
-        component={MedalWallScreen}
-        options={{ headerShown: false }}
-      />
+      {/* ✅ Guardian sub screens */}
+      <Stack.Screen name="MyGuardian" component={MyGuardianScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="GuardMe" component={GuardMeScreen} options={{ headerShown: false }} />
 
-      {/* ⭐ Fans ranking */}
-      <Stack.Screen
-        name="FansRanking"
-        component={FansRankingScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="FanClub" component={FanClubScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MedalWall" component={MedalWallScreen} options={{ headerShown: false }} />
 
-      {/* ⭐ Live application */}
-      <Stack.Screen
-        name="LiveApplication"
-        component={LiveApplicationScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="FansRanking" component={FansRankingScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="LiveApplication" component={LiveApplicationScreen} options={{ headerShown: false }} />
 
-      {/* ⭐ Real-person auth + Face scan */}
-      <Stack.Screen
-        name="RealPersonAuth"
-        component={RealPersonAuthScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="FaceScan"
-        component={FaceScanScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="RealPersonAuth" component={RealPersonAuthScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="FaceScan" component={FaceScanScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 };

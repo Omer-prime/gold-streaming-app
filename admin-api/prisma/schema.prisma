@@ -89,6 +89,8 @@ model User {
   pointsLedger              UserPointLedger[]
   settings                  UserSettings?
   wallet                    Wallet?
+  guardianGiven    GuardianBond[] @relation("GuardianGiver")
+  guardianReceived GuardianBond[] @relation("GuardianReceiver")
 
   inviteCode  InviteCode?
   invitesSent Invite[] @relation("Inviter")
@@ -780,6 +782,105 @@ model VipPlanPrivilege {
   @@unique([planId, privilegeId])
   @@index([planId, sortOrder])
 }
+model GuardianPlan {
+  id          String       @id @default(cuid())
+  tier        GuardianTier @unique
+  name        String
+  description String?
+  isActive    Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  packages       GuardianPlanPackage[]
+  planPrivileges GuardianPlanPrivilege[]
+
+  bonds GuardianBond[]
+
+  @@index([isActive, sortOrder])
+}
+
+model GuardianPlanPackage {
+  id             String   @id @default(cuid())
+  planId         String
+  label          String   // "1 Month", "3 Months", "6 Months", "12 Months"
+  durationMonths Int      // 1,3,6,12
+  priceCoins     Int
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  plan GuardianPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  bonds GuardianBond[]
+
+  @@index([planId, isActive, sortOrder])
+  @@index([durationMonths])
+}
+
+model GuardianPrivilege {
+  id           String   @id @default(cuid())
+  key          String   @unique // e.g. "higher_rank", "entry_effect"
+  label        String
+  defaultValue String?
+  icon         String?  // Ionicons name (optional)
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  planLinks GuardianPlanPrivilege[]
+
+  @@index([isActive, sortOrder])
+}
+
+model GuardianPlanPrivilege {
+  id           String   @id @default(cuid())
+  planId       String
+  privilegeId  String
+  valueOverride String?
+  locked        Boolean @default(false)
+  sortOrder     Int     @default(0)
+
+  plan      GuardianPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  privilege GuardianPrivilege @relation(fields: [privilegeId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, privilegeId])
+  @@index([planId, sortOrder])
+}
+
+model GuardianBond {
+  id        String            @id @default(cuid())
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  guardianId String
+  guardedId  String
+
+  planId     String
+  packageId  String
+
+  tier       GuardianTier
+  status     GuardianBondStatus @default(ACTIVE)
+
+  startedAt  DateTime          @default(now())
+  endsAt     DateTime
+
+  priceCoins Int
+
+  guardian User @relation("GuardianGiver", fields: [guardianId], references: [id])
+  guarded  User @relation("GuardianReceiver", fields: [guardedId], references: [id])
+
+  plan    GuardianPlan        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  package GuardianPlanPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  @@index([guardianId, status, endsAt])
+  @@index([guardedId, status, endsAt])
+  @@index([planId])
+  @@index([packageId])
+}
+
 
 
 // ===== Enums =====
@@ -889,8 +990,21 @@ enum WalletLedgerType {
   GIFT_RECEIVED
   ADJUSTMENT
   VIP_PURCHASE
+  GUARDIAN_PURCHASE
 }
 
+enum GuardianTier {
+  NONE
+  SILVER
+  GOLD
+  DIAMOND
+}
+
+enum GuardianBondStatus {
+  ACTIVE
+  EXPIRED
+  CANCELED
+}
 enum PKBattleStatus {
   PENDING
   ACTIVE

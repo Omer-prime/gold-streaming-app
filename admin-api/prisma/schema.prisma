@@ -74,6 +74,8 @@ model User {
   moments                   Moment[]
   momentComments            MomentComment[]
   momentLikes               MomentLike[]
+  storePurchases StorePurchase[]
+  storeItems     UserStoreItem[]
   momentSaves               MomentSave[]
   notifications             Notification[]
   pkBattlesAsHost           PKBattle[]          @relation("PKHost")
@@ -91,6 +93,7 @@ model User {
   wallet                    Wallet?
   guardianGiven    GuardianBond[] @relation("GuardianGiver")
   guardianReceived GuardianBond[] @relation("GuardianReceiver")
+  
 
   inviteCode  InviteCode?
   invitesSent Invite[] @relation("Inviter")
@@ -880,6 +883,109 @@ model GuardianBond {
   @@index([planId])
   @@index([packageId])
 }
+enum StoreItemType {
+  HONOR
+  PREMIUM_ID
+  RIDE
+  PROFILE_CARD
+  AVATAR_FRAME
+  PARTY_THEME
+  CHAT_BUBBLE
+  OTHER
+}
+
+enum StoreMediaType {
+  IMAGE
+  GIF
+  VIDEO
+}
+
+model StoreCategory {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  icon      String?  // Ionicons name optional
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items StoreItem[]
+
+  @@index([isActive, sortOrder])
+}
+
+model StoreItem {
+  id              String        @id @default(cuid())
+  categoryId       String
+  type            StoreItemType @default(OTHER)
+
+  title           String
+  description     String?
+  priceCoins      Int
+
+  // grouping like your UI sections: "New This Month", "Avatar Frame", etc.
+  section         String?
+  sectionSortOrder Int          @default(0)
+
+  mediaType       StoreMediaType @default(IMAGE)
+  mediaUrl        String?
+  thumbnailUrl    String?
+
+  isActive        Boolean       @default(true)
+  isFeatured      Boolean       @default(false) // used for "Popular"
+  sortOrder       Int           @default(0)
+
+  // null = permanent, else item is time-limited (e.g. 7 days)
+  durationDays    Int?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  category  StoreCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  purchases StorePurchase[]
+  userItems UserStoreItem[]
+
+  @@index([categoryId, isActive, sortOrder])
+  @@index([isFeatured, isActive, sortOrder])
+  @@index([section, sectionSortOrder])
+}
+
+model StorePurchase {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId   String
+  itemId   String
+
+  quantity   Int @default(1)
+  unitPrice  Int
+  totalPrice Int
+  metaJson   Json?
+
+  user User      @relation(fields: [userId], references: [id])
+  item StoreItem @relation(fields: [itemId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([itemId, createdAt])
+}
+
+model UserStoreItem {
+  id        String   @id @default(cuid())
+  userId    String
+  itemId    String
+
+  obtainedAt       DateTime @default(now())
+  lastPurchasedAt  DateTime @default(now())
+  expiresAt        DateTime? // null = permanent
+
+  user User      @relation(fields: [userId], references: [id])
+  item StoreItem @relation(fields: [itemId], references: [id])
+
+  @@unique([userId, itemId])
+  @@index([userId, expiresAt])
+}
+
 
 
 
@@ -991,6 +1097,7 @@ enum WalletLedgerType {
   ADJUSTMENT
   VIP_PURCHASE
   GUARDIAN_PURCHASE
+  STORE_PURCHASE
 }
 
 enum GuardianTier {

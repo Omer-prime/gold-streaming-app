@@ -123,6 +123,23 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             pathname={pathname}
             onClick={() => setMobileOpen(false)}
           />
+        
+          <NavLink
+            href="/admin/guardian"
+            label="Guardian Plans"
+            icon="🛡️"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+
+        
+          <NavLink
+            href="/admin/store"
+            label="Store"
+            icon="🛍️"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
 
           <NavLink
             href="/admin/notifications"

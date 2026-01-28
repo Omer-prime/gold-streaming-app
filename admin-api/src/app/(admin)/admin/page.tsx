@@ -20,6 +20,34 @@ export default async function AdminDashboardPage() {
   const monthStart = startOfMonth();
   const now = new Date();
 
+  // NOTE: Store models may or may not exist yet in Prisma client.
+  // So we fetch them safely using try/catch.
+  const getStoreCountsSafe = async () => {
+    try {
+      const anyPrisma = prisma as any;
+      const [cats, items] = await Promise.all([
+        anyPrisma.storeCategory?.count?.() ?? 0,
+        anyPrisma.storeItem?.count?.() ?? 0,
+      ]);
+      return { storeCategoriesCount: Number(cats || 0), storeItemsCount: Number(items || 0) };
+    } catch {
+      return { storeCategoriesCount: 0, storeItemsCount: 0 };
+    }
+  };
+
+  const getGuardianCountsSafe = async () => {
+    try {
+      const anyPrisma = prisma as any;
+      const [plans, activeBonds] = await Promise.all([
+        anyPrisma.guardianPlan?.count?.() ?? 0,
+        anyPrisma.guardianBond?.count?.({ where: { status: "ACTIVE", endsAt: { gt: now } } }) ?? 0,
+      ]);
+      return { guardianPlansCount: Number(plans || 0), guardianActiveBonds: Number(activeBonds || 0) };
+    } catch {
+      return { guardianPlansCount: 0, guardianActiveBonds: 0 };
+    }
+  };
+
   const [
     totalUsers,
     totalHosts,
@@ -33,7 +61,7 @@ export default async function AdminDashboardPage() {
     activeLiveRooms,
     topHostEarnings,
 
-    // ✅ NEW (admin features)
+    // ✅ admin features
     currencyTradesPending,
     currencyTradesTotal,
     resellerAppsPending,
@@ -41,14 +69,20 @@ export default async function AdminDashboardPage() {
     baseSalaryPending,
     baseSalaryTotal,
 
-    // ✅ NEW (small preview lists)
+    // ✅ preview lists
     latestPendingTrades,
     latestPendingResellers,
     latestPendingSalaries,
 
-    // ✅ VIP (NEW)
+    // ✅ VIP
     vipActiveUsers,
     vipPlansCount,
+
+    // ✅ Guardian safe counts
+    guardianCounts,
+
+    // ✅ Store safe counts
+    storeCounts,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: "HOST" } }),
@@ -87,7 +121,6 @@ export default async function AdminDashboardPage() {
       take: 5,
     }),
 
-    // ✅ NEW counts
     prisma.currencyTrade.count({ where: { status: "PENDING" } }),
     prisma.currencyTrade.count(),
     prisma.resellerApplication.count({ where: { status: "PENDING" } }),
@@ -95,7 +128,6 @@ export default async function AdminDashboardPage() {
     prisma.baseSalaryRequest.count({ where: { status: "PENDING" } }),
     prisma.baseSalaryRequest.count(),
 
-    // ✅ NEW latest pending lists
     prisma.currencyTrade.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "desc" },
@@ -133,11 +165,17 @@ export default async function AdminDashboardPage() {
       },
     }),
 
-    // ✅ VIP (NEW) counts
-    prisma.user.count({ where: { vipExpiresAt: { gt: now }, vipTier: { not: "NONE" } } }),
-    // if you didn't add VipPlan model yet, comment this line until you migrate
+    prisma.user.count({
+      where: { vipExpiresAt: { gt: now }, vipTier: { not: "NONE" } },
+    }),
     prisma.vipPlan.count(),
+
+    getGuardianCountsSafe(),
+    getStoreCountsSafe(),
   ]);
+
+  const { guardianPlansCount, guardianActiveBonds } = guardianCounts;
+  const { storeCategoriesCount, storeItemsCount } = storeCounts;
 
   const totalCoins = totalCoinsAgg._sum.totalPrice ?? 0;
   const coinsToday = coinsTodayAgg._sum.totalPrice ?? 0;
@@ -200,7 +238,7 @@ export default async function AdminDashboardPage() {
         <StatCard label="Gifts Catalog" icon="🎁" hint="Total gift types" value={totalGifts} href="/admin/gifts" />
         <StatCard label="Total Revenue (All time)" icon="🏦" hint="All time coins" value={`${totalCoins} coins`} href="/admin/gifts" />
 
-        {/* ✅ VIP shortcut (NEW) */}
+        {/* VIP */}
         <StatCard
           label="VIP (Active)"
           icon="👑"
@@ -209,10 +247,28 @@ export default async function AdminDashboardPage() {
           href="/admin/vip"
         />
 
-        {/* ✅ Rewards shortcut */}
-        <StatCard label="Rewards" icon="🏆" hint="Manage tasks & rewards shown in the app" value="Manage" href="/admin/rewards" />
+        {/* Rewards */}
+        <StatCard label="Rewards" icon="🏆" hint="Manage tasks shown in the app" value="Manage" href="/admin/rewards" />
 
-        {/* ✅ admin features cards */}
+        {/* Guardian */}
+        <StatCard
+          label="Guardian (Active)"
+          icon="🛡️"
+          hint={`Plans: ${guardianPlansCount}`}
+          value={guardianActiveBonds}
+          href="/admin/guardian"
+        />
+
+        {/* Store */}
+        <StatCard
+          label="Store"
+          icon="🛍️"
+          hint={`Categories: ${storeCategoriesCount} • Items: ${storeItemsCount}`}
+          value="Manage"
+          href="/admin/store"
+        />
+
+        {/* approvals */}
         <StatCard
           label="Currency Trades (Pending)"
           icon="💱"
@@ -236,95 +292,32 @@ export default async function AdminDashboardPage() {
         />
       </section>
 
-      {/* ✅ VIP + Rewards widgets */}
+      {/* ✅ Clean widgets (NO API endpoint boxes) */}
       <section className="grid gap-4 lg:grid-cols-2">
-        {/* VIP widget (NEW) */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold">VIP Plans</h2>
-              <p className="text-[11px] text-slate-400">
-                Control VIP tiers, prices, and privileges shown in the mobile app.
-              </p>
-            </div>
-            <Link
-              href="/admin/vip"
-              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
-            >
-              Manage &rarr;
-            </Link>
-          </div>
-
-          <div className="p-4 space-y-3">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-              <div className="text-xs text-slate-200 font-medium">
-                Mobile API endpoint
-              </div>
-              <div className="mt-1 text-[11px] text-slate-400">
-                <code className="text-slate-200">/api/profile/vip?userId=...</code>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Link
-                  href="/admin/vip"
-                  className="inline-flex items-center justify-center rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-200 hover:border-yellow-400/60 hover:text-yellow-300"
-                >
-                  Open VIP Manager
-                </Link>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-slate-500">
-              Tip: after you update a plan, the mobile app will show changes after refresh.
-            </p>
-          </div>
-        </div>
-
-        {/* Rewards widget (your existing) */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold">Rewards</h2>
-              <p className="text-[11px] text-slate-400">
-                Control what users see in the Reward screen (tasks, points, GO actions).
-              </p>
-            </div>
-            <Link
-              href="/admin/rewards"
-              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
-            >
-              Manage &rarr;
-            </Link>
-          </div>
-
-          <div className="p-4 space-y-3">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-              <div className="text-xs text-slate-200 font-medium">
-                Mobile API endpoint
-              </div>
-              <div className="mt-1 text-[11px] text-slate-400">
-                <code className="text-slate-200">/api/profile/rewards?userId=...</code>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Link
-                  href="/admin/rewards"
-                  className="inline-flex items-center justify-center rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-200 hover:border-yellow-400/60 hover:text-yellow-300"
-                >
-                  Open Rewards Manager
-                </Link>
-                <Link
-                  href="/api/profile/rewards?userId=__TEST__"
-                  className="inline-flex items-center justify-center rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-200 hover:border-yellow-400/60 hover:text-yellow-300"
-                >
-                  Preview JSON (test)
-                </Link>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-slate-500">
-              Tip: once the admin Rewards page is ready, you’ll be able to add / disable tasks without touching code.
-            </p>
-          </div>
-        </div>
+        <QuickWidget
+          title="VIP Plans"
+          subtitle={`Active VIP users: ${vipActiveUsers} • Plans: ${vipPlansCount}`}
+          href="/admin/vip"
+          button="Open VIP Manager"
+        />
+        <QuickWidget
+          title="Rewards"
+          subtitle="Manage reward tasks shown in the mobile app."
+          href="/admin/rewards"
+          button="Open Rewards Manager"
+        />
+        <QuickWidget
+          title="Guardian Plans"
+          subtitle={`Active bonds: ${guardianActiveBonds} • Plans: ${guardianPlansCount}`}
+          href="/admin/guardian"
+          button="Open Guardian Manager"
+        />
+        <QuickWidget
+          title="Store"
+          subtitle={`Categories: ${storeCategoriesCount} • Items: ${storeItemsCount}`}
+          href="/admin/store"
+          button="Open Store Manager"
+        />
       </section>
 
       {/* Active Live Rooms */}
@@ -333,22 +326,15 @@ export default async function AdminDashboardPage() {
           <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
             <div>
               <h2 className="text-sm font-semibold">Active Live Rooms</h2>
-              <p className="text-[11px] text-slate-400">
-                Top live rooms by current viewers.
-              </p>
+              <p className="text-[11px] text-slate-400">Top live rooms by current viewers.</p>
             </div>
-            <Link
-              href="/admin/streams"
-              className="text-[11px] font-medium text-slate-400 hover:text-yellow-300"
-            >
+            <Link href="/admin/streams" className="text-[11px] font-medium text-slate-400 hover:text-yellow-300">
               View all &rarr;
             </Link>
           </div>
           <div className="p-4">
             {activeLiveRooms.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                No active live rooms right now.
-              </p>
+              <p className="text-xs text-slate-500">No active live rooms right now.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[420px] text-xs">
@@ -362,18 +348,11 @@ export default async function AdminDashboardPage() {
                   </thead>
                   <tbody>
                     {activeLiveRooms.map((s) => (
-                      <tr
-                        key={s.id}
-                        className="border-b border-slate-900/80 hover:bg-slate-900/60"
-                      >
+                      <tr key={s.id} className="border-b border-slate-900/80 hover:bg-slate-900/60">
                         <Td>{s.title}</Td>
                         <Td>{s.host?.username ?? "-"}</Td>
                         <Td>{s.viewers}</Td>
-                        <Td>
-                          {s.startedAt
-                            ? s.startedAt.toISOString().slice(11, 16)
-                            : "-"}
-                        </Td>
+                        <Td>{s.startedAt ? s.startedAt.toISOString().slice(11, 16) : "-"}</Td>
                       </tr>
                     ))}
                   </tbody>
@@ -383,7 +362,7 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Pending Approvals Preview (your existing) */}
+        {/* Pending Approvals */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
           <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
             <div>
@@ -394,79 +373,35 @@ export default async function AdminDashboardPage() {
           </div>
 
           <div className="p-4 space-y-4">
-            {/* Currency Trades */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950/40">
-              <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
-                <div className="text-xs font-semibold text-slate-200">Currency Trades</div>
-                <Link href="/admin/currency-trading" className="text-[11px] text-slate-400 hover:text-yellow-300">
-                  Open &rarr;
-                </Link>
-              </div>
-              <div className="p-3">
-                {latestPendingTrades.length === 0 ? (
-                  <p className="text-[11px] text-slate-500">No pending trades.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {latestPendingTrades.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-200">{t.user?.username ?? "-"}</span>
-                        <span className="text-slate-400">
-                          {t.fromAmount} {t.fromCurrency} → {t.toAmount} {t.toCurrency}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <PreviewBox
+              title="Currency Trades"
+              href="/admin/currency-trading"
+              empty="No pending trades."
+              items={latestPendingTrades.map((t) => ({
+                left: t.user?.username ?? "-",
+                right: `${t.fromAmount} ${t.fromCurrency} → ${t.toAmount} ${t.toCurrency}`,
+              }))}
+            />
 
-            {/* Reseller */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950/40">
-              <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
-                <div className="text-xs font-semibold text-slate-200">Reseller Applications</div>
-                <Link href="/admin/reseller-approval" className="text-[11px] text-slate-400 hover:text-yellow-300">
-                  Open &rarr;
-                </Link>
-              </div>
-              <div className="p-3">
-                {latestPendingResellers.length === 0 ? (
-                  <p className="text-[11px] text-slate-500">No pending applications.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {latestPendingResellers.map((r) => (
-                      <div key={r.id} className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-200">{r.user?.username ?? "-"}</span>
-                        <span className="text-slate-500">{r.createdAt.toISOString().slice(0, 10)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <PreviewBox
+              title="Reseller Applications"
+              href="/admin/reseller-approval"
+              empty="No pending applications."
+              items={latestPendingResellers.map((r) => ({
+                left: r.user?.username ?? "-",
+                right: r.createdAt.toISOString().slice(0, 10),
+              }))}
+            />
 
-            {/* Base Salary */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950/40">
-              <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
-                <div className="text-xs font-semibold text-slate-200">Base Salary Requests</div>
-                <Link href="/admin/base-salary-approval" className="text-[11px] text-slate-400 hover:text-yellow-300">
-                  Open &rarr;
-                </Link>
-              </div>
-              <div className="p-3">
-                {latestPendingSalaries.length === 0 ? (
-                  <p className="text-[11px] text-slate-500">No pending requests.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {latestPendingSalaries.map((s) => (
-                      <div key={s.id} className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-200">{s.user?.username ?? "-"}</span>
-                        <span className="text-slate-400">{s.amount} {s.currency}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <PreviewBox
+              title="Base Salary Requests"
+              href="/admin/base-salary-approval"
+              empty="No pending requests."
+              items={latestPendingSalaries.map((s) => ({
+                left: s.user?.username ?? "-",
+                right: `${s.amount} ${s.currency}`,
+              }))}
+            />
           </div>
         </div>
       </section>
@@ -511,22 +446,21 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* (Optional space for future widgets) */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
           <div className="border-b border-slate-800 px-4 py-3">
             <h2 className="text-sm font-semibold">Next</h2>
             <p className="text-[11px] text-slate-400">
-              We can add VIP purchase monitoring here (transactions + ledger).
+              We can add VIP + Guardian purchases monitoring here (ledger).
             </p>
           </div>
-          <div className="p-4 text-xs text-slate-500">
-            Coming soon…
-          </div>
+          <div className="p-4 text-xs text-slate-500">Coming soon…</div>
         </div>
       </section>
     </div>
   );
 }
+
+/* ----------------------------- UI helpers ----------------------------- */
 
 function StatCard({
   label,
@@ -579,6 +513,78 @@ function StatCard({
   }
 
   return <div className={baseClasses}>{content}</div>;
+}
+
+function QuickWidget({
+  title,
+  subtitle,
+  href,
+  button,
+}: {
+  title: string;
+  subtitle: string;
+  href: string;
+  button: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/40">
+      <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+        <div>
+          <h2 className="text-sm font-semibold">{title}</h2>
+          <p className="text-[11px] text-slate-400">{subtitle}</p>
+        </div>
+        <Link href={href} className="text-[11px] font-medium text-slate-400 hover:text-yellow-300">
+          Manage &rarr;
+        </Link>
+      </div>
+
+      <div className="p-4">
+        <Link
+          href={href}
+          className="inline-flex items-center justify-center rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-200 hover:border-yellow-400/60 hover:text-yellow-300"
+        >
+          {button}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function PreviewBox({
+  title,
+  href,
+  items,
+  empty,
+}: {
+  title: string;
+  href: string;
+  empty: string;
+  items: Array<{ left: string; right: string }>;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950/40">
+      <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
+        <div className="text-xs font-semibold text-slate-200">{title}</div>
+        <Link href={href} className="text-[11px] text-slate-400 hover:text-yellow-300">
+          Open &rarr;
+        </Link>
+      </div>
+      <div className="p-3">
+        {items.length === 0 ? (
+          <p className="text-[11px] text-slate-500">{empty}</p>
+        ) : (
+          <div className="space-y-2">
+            {items.map((it, idx) => (
+              <div key={idx} className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-200">{it.left}</span>
+                <span className="text-slate-400">{it.right}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function Th({ children, className = "" }: { children: ReactNode; className?: string }) {

@@ -238,6 +238,35 @@ export default function AdminGuardianPage() {
             </button>
           </div>
         </div>
+        <button
+          onClick={async () => {
+            setErr(null);
+            setNotice(null);
+            try {
+              setSaving(true);
+              const res = await fetch("/api/admin/guardian/ensure-active", { method: "POST" });
+              const json = await res.json().catch(() => null);
+              if (!res.ok) throw new Error(json?.error || "Fix failed");
+              setNotice(
+                `Fixed ✅ Active plans: ${json?.meta?.activePlans ?? "?"}, Active packages: ${json?.meta?.activePackages ?? "?"}`
+              );
+              await load();
+            } catch (e: any) {
+              setErr(e?.message || "Error");
+            } finally {
+              setSaving(false);
+            }
+          }}
+          disabled={saving}
+          className={cx(
+            "rounded-xl px-3.5 py-2 text-[13px] font-medium border transition",
+            "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15",
+            "w-full sm:w-auto",
+            saving && "opacity-60 cursor-not-allowed"
+          )}
+        >
+          {saving ? "Fixing..." : "Fix Active Plans"}
+        </button>
 
         {err && (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-[13px] text-red-200">

@@ -1,3 +1,4 @@
+// admin-api/src/app/api/profile/guardian/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -11,6 +12,15 @@ export async function GET(req: NextRequest) {
   try {
     const userId = requireUserId(req);
     const now = new Date();
+
+    // counts for debugging
+    const [totalPlans, activePlans, activePackages] = await Promise.all([
+      prisma.guardianPlan.count(),
+      prisma.guardianPlan.count({ where: { isActive: true } }),
+      prisma.guardianPlanPackage.count({
+        where: { isActive: true, plan: { isActive: true } },
+      }),
+    ]);
 
     const plans = await prisma.guardianPlan.findMany({
       where: { isActive: true },
@@ -68,6 +78,12 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json({
+      meta: {
+        totalPlans,
+        activePlans,
+        activePackages,
+        now: now.toISOString(),
+      },
       plans: shapedPlans,
       myGuardian: myGuardianBond
         ? {
@@ -76,10 +92,7 @@ export async function GET(req: NextRequest) {
             startedAt: myGuardianBond.startedAt,
             endsAt: myGuardianBond.endsAt,
             guardian: myGuardianBond.guardian,
-            plan: {
-              id: myGuardianBond.planId,
-              name: myGuardianBond.plan.name,
-            },
+            plan: { id: myGuardianBond.planId, name: myGuardianBond.plan.name },
             package: {
               id: myGuardianBond.packageId,
               label: myGuardianBond.package.label,

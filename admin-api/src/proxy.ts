@@ -1,9 +1,9 @@
-// admin-api/src/middleware.ts
+// src/proxy.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
@@ -23,7 +23,6 @@ export async function middleware(req: NextRequest) {
 
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
 
-    // ✅ Admin only
     if (payload.role !== "ADMIN") {
       return new NextResponse("Forbidden", { status: 403 });
     }

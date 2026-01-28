@@ -698,7 +698,7 @@ model Invite {
 }
 
 //
-// ✅ NEW: Admin-configurable Reward Tasks (used by /api/profile/rewards and admin CRUD)
+// Admin-configurable Reward Tasks (used by /api/profile/rewards and admin CRUD)
 //
 model RewardTask {
   id           String         @id @default(cuid())
@@ -716,6 +716,71 @@ model RewardTask {
   @@index([category, isActive, sortOrder])
   @@index([createdAt])
 }
+
+model VipPlan {
+  id          String   @id @default(cuid())
+  tier        VipTier  @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  packages       VipPlanPackage[]
+  planPrivileges VipPlanPrivilege[]
+
+  @@index([isActive, sortOrder])
+}
+
+model VipPlanPackage {
+  id            String   @id @default(cuid())
+  planId        String
+  label         String   // "Monthly", "3 Months", "6 Months", "Yearly"
+  durationMonths Int     // 1,3,6,12
+  priceCoins    Int
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  plan VipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, isActive, sortOrder])
+}
+
+model VipPrivilege {
+  id           String   @id @default(cuid())
+  key          String   @unique // e.g. "daily_coins", "live_tag"
+  label        String
+  defaultValue String?
+  icon         String?  // store Ionicons name (optional)
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  planLinks VipPlanPrivilege[]
+
+  @@index([isActive, sortOrder])
+}
+
+model VipPlanPrivilege {
+  id          String   @id @default(cuid())
+  planId      String
+  privilegeId String
+
+  valueOverride String?
+  locked        Boolean @default(false)
+  sortOrder     Int     @default(0)
+
+  plan      VipPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  privilege VipPrivilege @relation(fields: [privilegeId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, privilegeId])
+  @@index([planId, sortOrder])
+}
+
 
 // ===== Enums =====
 
@@ -823,6 +888,7 @@ enum WalletLedgerType {
   GIFT_SENT
   GIFT_RECEIVED
   ADJUSTMENT
+  VIP_PURCHASE
 }
 
 enum PKBattleStatus {

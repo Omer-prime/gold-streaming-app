@@ -1,4 +1,3 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,6 +5,996 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model Country {
+  id        Int     @id @default(autoincrement())
+  code      String  @unique
+  name      String
+  flagEmoji String?
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+  users     User[]
+
+  @@index([sortOrder])
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  email              String?   @unique
+  username           String    @unique
+  passwordHash       String?
+  role               Role      @default(USER)
+  avatarUrl          String?
+  bio                String?
+  nickname           String?
+  inviterCode        String?
+  countryId          Int?
+  dateOfBirth        DateTime?
+  gender             Gender?
+  exp                Int       @default(0)
+  level              Int       @default(1)
+  vipLevel           Int       @default(0)
+  facebookId         String?   @unique
+  googleId           String?   @unique
+  instagramId        String?   @unique
+  phoneNumber        String?   @unique
+  tiktokId           String?   @unique
+  liveLevel          Int       @default(1)
+  interestTags       String[]  @default([])
+  profilePhotos      String[]  @default([])
+  faceVerifiedAt     DateTime?
+  liveCoverUrl       String?
+  vipExpiresAt       DateTime?
+  vipTier            VipTier   @default(NONE)
+  followersCount     Int       @default(0)
+  followingCount     Int       @default(0)
+  isLive             Boolean   @default(false)
+  lastLiveAt         DateTime?
+  liveViewers        Int       @default(0)
+  totalCoinsReceived Int       @default(0)
+  totalCoinsSpent    Int       @default(0)
+
+  adminNotificationsCreated AdminNotification[] @relation("AdminNotificationCreator")
+  chatMessages              ChatMessage[]
+  chatThreadsA              ChatThread[]        @relation("ChatThreadUserA")
+  chatThreadsB              ChatThread[]        @relation("ChatThreadUserB")
+  fanClubOwned              FanClub?
+  fanClubMemberships        FanClubMember[]
+  following                 Follow[]            @relation("UserFollowing")
+  followers                 Follow[]            @relation("UserFollowers")
+  friendshipsA              Friendship[]        @relation("FriendA")
+  friendshipsB              Friendship[]        @relation("FriendB")
+  receivedGifts             GiftTransaction[]   @relation("GiftReceiver")
+  sentGifts                 GiftTransaction[]   @relation("GiftSender")
+  liveApplications          LiveApplication[]
+  messages                  Message[]
+  moments                   Moment[]
+  momentComments            MomentComment[]
+  momentLikes               MomentLike[]
+  storePurchases StorePurchase[]
+  storeItems     UserStoreItem[]
+  momentSaves               MomentSave[]
+  notifications             Notification[]
+  pkBattlesAsHost           PKBattle[]          @relation("PKHost")
+  pkBattlesAsOpponent       PKBattle[]          @relation("PKOpponent")
+  profileVisitsReceived     ProfileVisit[]      @relation("Visited")
+  profileVisitsMade         ProfileVisit[]      @relation("Visitor")
+  streams                   Stream[]            @relation("UserStreams")
+  country                   Country?            @relation(fields: [countryId], references: [id])
+  blockedBy                 UserBlock[]         @relation("UserBlocked")
+  blocks                    UserBlock[]         @relation("UserBlocker")
+  devices                   UserDevice[]
+  honors                    UserHonor[]
+  pointsLedger              UserPointLedger[]
+  settings                  UserSettings?
+  wallet                    Wallet?
+  guardianGiven    GuardianBond[] @relation("GuardianGiver")
+  guardianReceived GuardianBond[] @relation("GuardianReceiver")
+  
+
+  inviteCode  InviteCode?
+  invitesSent Invite[] @relation("Inviter")
+  invitedBy   Invite[] @relation("Invitee")
+
+  // ===== Currency/Reseller/Salary (existing) =====
+  currencyTrades      CurrencyTrade[]
+  resellerApplication ResellerApplication?
+  baseSalaryRequests  BaseSalaryRequest[]
+
+  // ===== Wallet Ledger (coins history) =====
+  walletLedgers WalletLedger[]
+
+  @@index([countryId])
+  @@index([createdAt])
+  @@index([isLive, liveViewers])
+  @@index([followersCount])
+  @@index([totalCoinsReceived])
+}
+
+model Stream {
+  id           String         @id @default(cuid())
+  title        String
+  description  String?
+  hostId       String
+  isLive       Boolean        @default(false)
+  viewers      Int            @default(0)
+  thumbnailUrl String?
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  mode         StreamMode     @default(SOLO)
+  tag          String?
+  protocol     StreamProtocol @default(LIVEKIT)
+
+  // LiveKit room identifiers
+  roomName String? @unique
+  roomSid  String?
+
+  // Phase-1 PK + Gifts
+  gifts     GiftTransaction[]
+  messages  Message[]
+  pkBattles PKBattle[]
+
+  host User @relation("UserStreams", fields: [hostId], references: [id])
+
+  @@index([hostId])
+  @@index([isLive])
+  @@index([createdAt])
+  @@index([mode])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  content   String
+  streamId  String
+  senderId  String?
+
+  sender User?  @relation(fields: [senderId], references: [id])
+  stream Stream @relation(fields: [streamId], references: [id])
+
+  @@index([streamId])
+  @@index([senderId])
+}
+
+model Gift {
+  id        Int      @id @default(autoincrement())
+  name      String
+  price     Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // backward compatibility for existing admin UI
+  iconUrl String?
+
+  // new media fields
+  mediaType    GiftMediaType @default(IMAGE)
+  mediaUrl     String?
+  thumbnailUrl String?
+
+  transactions GiftTransaction[]
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  transactions GiftTransaction[]
+  ledgers      WalletLedger[]
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model WalletLedger {
+  id           String           @id @default(cuid())
+  createdAt    DateTime         @default(now())
+
+  userId       String
+  walletId     String
+
+  type         WalletLedgerType
+  delta        Int
+  balanceAfter Int
+  title        String?
+  metaJson     Json?
+
+  user   User   @relation(fields: [userId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([walletId, createdAt])
+  @@index([type, createdAt])
+}
+
+model GiftTransaction {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  streamId   String
+  giftId     Int
+  senderId   String
+  receiverId String
+  walletId   String
+
+  quantity   Int @default(1)
+  unitPrice  Int
+  totalPrice Int
+
+  // optional: PK link
+  pkBattleId String?
+  targetSide PKSide?
+
+  gift     Gift   @relation(fields: [giftId], references: [id])
+  receiver User   @relation("GiftReceiver", fields: [receiverId], references: [id])
+  sender   User   @relation("GiftSender", fields: [senderId], references: [id])
+  stream   Stream @relation(fields: [streamId], references: [id])
+  wallet   Wallet @relation(fields: [walletId], references: [id])
+
+  pkBattle PKBattle? @relation(fields: [pkBattleId], references: [id])
+
+  @@index([streamId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([walletId])
+  @@index([giftId])
+  @@index([createdAt])
+  @@index([pkBattleId])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  followerId  String
+  followingId String
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id])
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userAId   String
+  userBId   String
+  userA     User     @relation("FriendA", fields: [userAId], references: [id])
+  userB     User     @relation("FriendB", fields: [userBId], references: [id])
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+}
+
+model ProfileVisit {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  visitorId String
+  visitedId String
+  visited   User     @relation("Visited", fields: [visitedId], references: [id])
+  visitor   User     @relation("Visitor", fields: [visitorId], references: [id])
+
+  @@index([visitorId])
+  @@index([visitedId])
+}
+
+model UserPointLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  delta     Int
+  reason    String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model UserSettings {
+  id                 String  @id @default(cuid())
+  userId             String  @unique
+  language           String  @default("system")
+  notifyLiveAlerts   Boolean @default(true)
+  notifyMessages     Boolean @default(true)
+  notifySound        Boolean @default(true)
+  notifyVibrate      Boolean @default(true)
+  allowFromMutual    Boolean @default(true)
+  allowFromFollowing Boolean @default(true)
+  allowFromStrangers Boolean @default(true)
+  invisibleVisitor   Boolean @default(false)
+  mysteryLive        Boolean @default(false)
+  mysteryRank        Boolean @default(false)
+  invisibleOnline    Boolean @default(false)
+  exclusiveEmail     Boolean @default(false)
+  hideLiveLevel      Boolean @default(false)
+  hideMicStatus      Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model UserBlock {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  userId      String
+  blockedId   String
+  blockedUser User     @relation("UserBlocked", fields: [blockedId], references: [id])
+  user        User     @relation("UserBlocker", fields: [userId], references: [id])
+
+  @@unique([userId, blockedId])
+  @@index([userId])
+  @@index([blockedId])
+}
+
+model HonorItem {
+  id          String        @id @default(cuid())
+  type        HonorItemType
+  name        String
+  description String?
+  iconUrl     String?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  userHonors  UserHonor[]
+}
+
+model UserHonor {
+  id         String    @id @default(cuid())
+  userId     String
+  itemId     String
+  obtainedAt DateTime  @default(now())
+
+  item HonorItem @relation(fields: [itemId], references: [id])
+  user User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, itemId])
+  @@index([userId])
+  @@index([itemId])
+}
+
+model Moment {
+  id           String          @id @default(cuid())
+  userId       String
+  text         String?
+  imageUrl     String?
+  createdAt    DateTime        @default(now())
+  commentCount Int             @default(0)
+  likeCount    Int             @default(0)
+  saveCount    Int             @default(0)
+  shareCount   Int             @default(0)
+  thumbnailUrl String?
+  topicId      String?
+  type         MomentType      @default(TEXT)
+  videoUrl     String?
+
+  topic Topic? @relation(fields: [topicId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
+
+  comments MomentComment[]
+  likes    MomentLike[]
+  saves    MomentSave[]
+
+  @@index([userId, createdAt])
+  @@index([topicId])
+}
+
+model FanClub {
+  id          String          @id @default(cuid())
+  ownerId     String          @unique
+  name        String
+  description String?
+  createdAt   DateTime        @default(now())
+
+  owner   User            @relation(fields: [ownerId], references: [id])
+  members FanClubMember[]
+
+  @@index([ownerId])
+}
+
+model FanClubMember {
+  id        String   @id @default(cuid())
+  fanClubId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  fanClub FanClub @relation(fields: [fanClubId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([fanClubId, userId])
+  @@index([userId])
+}
+
+model LiveApplication {
+  id              String                @id @default(cuid())
+  userId          String
+  status          LiveApplicationStatus @default(PENDING)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  faceImageBase64 String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status, createdAt])
+}
+
+model PKBattle {
+  id          String         @id @default(cuid())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  type        PKType
+  status      PKBattleStatus @default(PENDING)
+  startedAt   DateTime?
+  endedAt     DateTime?
+  durationSec Int?
+
+  hostId     String
+  opponentId String?
+  streamId   String?
+
+  hostScore     Int @default(0)
+  opponentScore Int @default(0)
+
+  // backward compatibility
+  hostWon Boolean?
+
+  // winner info
+  winnerSide PKSide?
+
+  host     User    @relation("PKHost", fields: [hostId], references: [id])
+  opponent User?   @relation("PKOpponent", fields: [opponentId], references: [id])
+  stream   Stream? @relation(fields: [streamId], references: [id])
+
+  gifts GiftTransaction[]
+
+  @@index([hostId])
+  @@index([opponentId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ChatThread {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  userAId         String
+  userBId         String
+  lastMessageText String?
+  lastMessageAt   DateTime?
+
+  messages ChatMessage[]
+  userA    User @relation("ChatThreadUserA", fields: [userAId], references: [id])
+  userB    User @relation("ChatThreadUserB", fields: [userBId], references: [id])
+
+  @@unique([userAId, userBId], name: "userAId_userBId")
+  @@index([userAId])
+  @@index([userBId])
+  @@index([lastMessageAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  threadId  String
+  senderId  String
+  content   String
+  isRead    Boolean  @default(false)
+
+  sender User       @relation(fields: [senderId], references: [id])
+  thread ChatThread @relation(fields: [threadId], references: [id])
+
+  @@index([threadId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model AdminNotification {
+  id            String               @id @default(cuid())
+  createdAt     DateTime             @default(now())
+  createdById   String
+  audience      NotificationAudience @default(ALL_USERS)
+  targetUserIds String[]             @default([])
+  type          String               @default("ADMIN")
+  title         String
+  body          String
+  metaJson      Json?
+
+  createdBy     User            @relation("AdminNotificationCreator", fields: [createdById], references: [id])
+  notifications Notification[]
+
+  @@index([createdById, createdAt])
+  @@index([audience, createdAt])
+}
+
+model Notification {
+  id                  String   @id @default(cuid())
+  userId              String
+  type                String   @default("SYSTEM")
+  title               String
+  body                String
+  createdAt           DateTime @default(now())
+  readAt              DateTime?
+  metaJson            Json?
+  adminNotificationId String?
+
+  adminNotification AdminNotification? @relation(fields: [adminNotificationId], references: [id])
+  user              User               @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@index([adminNotificationId])
+}
+
+model Topic {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  isTrending  Boolean       @default(false)
+  isActive    Boolean       @default(true)
+  sortOrder   Int           @default(0)
+  hotScore    Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  category    TopicCategory @default(NORMAL)
+
+  moments Moment[]
+
+  @@index([isTrending, sortOrder])
+}
+
+model MomentLike {
+  id        String   @id @default(cuid())
+  momentId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  moment Moment @relation(fields: [momentId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([momentId, userId])
+  @@index([momentId])
+  @@index([userId])
+}
+
+model MomentComment {
+  id        String   @id @default(cuid())
+  momentId  String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  moment Moment @relation(fields: [momentId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([momentId])
+  @@index([userId, createdAt])
+}
+
+model MomentSave {
+  id        String   @id @default(cuid())
+  momentId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  moment Moment @relation(fields: [momentId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([momentId, userId])
+  @@index([momentId])
+  @@index([userId])
+}
+
+model UserDevice {
+  id           String   @id @default(cuid())
+  userId       String
+  deviceId     String
+  deviceName   String?
+  platform     String?
+  isTrusted    Boolean  @default(true)
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, deviceId])
+  @@index([userId, lastActiveAt])
+}
+
+// ===== Currency Trading + Salary Approval + Reseller Approval =====
+
+model CurrencyTrade {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId       String
+  fromCurrency String
+  toCurrency   String
+  fromAmount   Int
+  rate         Float
+  toAmount     Int
+  status       CurrencyTradeStatus @default(PENDING)
+
+  reviewedAt   DateTime?
+  reviewedById String?
+  note         String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model ResellerApplication {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String                    @unique
+  status ResellerApplicationStatus @default(PENDING)
+
+  reviewedAt   DateTime?
+  reviewedById String?
+  note         String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([status, createdAt])
+}
+
+model BaseSalaryRequest {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId   String
+  amount   Int
+  currency String                  @default("USD")
+  status   BaseSalaryRequestStatus @default(PENDING)
+
+  reviewedAt   DateTime?
+  reviewedById String?
+  note         String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model InviteCode {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  code   String @unique
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+}
+
+model Invite {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  inviterId String
+  inviteeId String? // optional until account created
+  code      String
+
+  // status can evolve later (installed, registered, qualified, etc.)
+  status InviteStatus @default(REGISTERED)
+
+  inviter User  @relation("Inviter", fields: [inviterId], references: [id])
+  invitee User? @relation("Invitee", fields: [inviteeId], references: [id])
+
+  @@index([inviterId, createdAt])
+  @@index([code, createdAt])
+  @@unique([inviterId, inviteeId])
+}
+
+//
+// Admin-configurable Reward Tasks (used by /api/profile/rewards and admin CRUD)
+//
+model RewardTask {
+  id           String         @id @default(cuid())
+  category     RewardCategory
+  title        String
+  subtitle     String?
+  rewardPoints Int
+  target       Int
+  goToScreen   String?
+  isActive     Boolean        @default(true)
+  sortOrder    Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([category, isActive, sortOrder])
+  @@index([createdAt])
+}
+
+model VipPlan {
+  id          String   @id @default(cuid())
+  tier        VipTier  @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  packages       VipPlanPackage[]
+  planPrivileges VipPlanPrivilege[]
+
+  @@index([isActive, sortOrder])
+}
+
+model VipPlanPackage {
+  id            String   @id @default(cuid())
+  planId        String
+  label         String   // "Monthly", "3 Months", "6 Months", "Yearly"
+  durationMonths Int     // 1,3,6,12
+  priceCoins    Int
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  plan VipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, isActive, sortOrder])
+}
+
+model VipPrivilege {
+  id           String   @id @default(cuid())
+  key          String   @unique // e.g. "daily_coins", "live_tag"
+  label        String
+  defaultValue String?
+  icon         String?  // store Ionicons name (optional)
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  planLinks VipPlanPrivilege[]
+
+  @@index([isActive, sortOrder])
+}
+
+model VipPlanPrivilege {
+  id          String   @id @default(cuid())
+  planId      String
+  privilegeId String
+
+  valueOverride String?
+  locked        Boolean @default(false)
+  sortOrder     Int     @default(0)
+
+  plan      VipPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  privilege VipPrivilege @relation(fields: [privilegeId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, privilegeId])
+  @@index([planId, sortOrder])
+}
+model GuardianPlan {
+  id          String       @id @default(cuid())
+  tier        GuardianTier @unique
+  name        String
+  description String?
+  isActive    Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  packages       GuardianPlanPackage[]
+  planPrivileges GuardianPlanPrivilege[]
+
+  bonds GuardianBond[]
+
+  @@index([isActive, sortOrder])
+}
+
+model GuardianPlanPackage {
+  id             String   @id @default(cuid())
+  planId         String
+  label          String   // "1 Month", "3 Months", "6 Months", "12 Months"
+  durationMonths Int      // 1,3,6,12
+  priceCoins     Int
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  plan GuardianPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  bonds GuardianBond[]
+
+  @@index([planId, isActive, sortOrder])
+  @@index([durationMonths])
+}
+
+model GuardianPrivilege {
+  id           String   @id @default(cuid())
+  key          String   @unique // e.g. "higher_rank", "entry_effect"
+  label        String
+  defaultValue String?
+  icon         String?  // Ionicons name (optional)
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  planLinks GuardianPlanPrivilege[]
+
+  @@index([isActive, sortOrder])
+}
+
+model GuardianPlanPrivilege {
+  id           String   @id @default(cuid())
+  planId       String
+  privilegeId  String
+  valueOverride String?
+  locked        Boolean @default(false)
+  sortOrder     Int     @default(0)
+
+  plan      GuardianPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  privilege GuardianPrivilege @relation(fields: [privilegeId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, privilegeId])
+  @@index([planId, sortOrder])
+}
+
+model GuardianBond {
+  id        String            @id @default(cuid())
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  guardianId String
+  guardedId  String
+
+  planId     String
+  packageId  String
+
+  tier       GuardianTier
+  status     GuardianBondStatus @default(ACTIVE)
+
+  startedAt  DateTime          @default(now())
+  endsAt     DateTime
+
+  priceCoins Int
+
+  guardian User @relation("GuardianGiver", fields: [guardianId], references: [id])
+  guarded  User @relation("GuardianReceiver", fields: [guardedId], references: [id])
+
+  plan    GuardianPlan        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  package GuardianPlanPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  @@index([guardianId, status, endsAt])
+  @@index([guardedId, status, endsAt])
+  @@index([planId])
+  @@index([packageId])
+}
+enum StoreItemType {
+  HONOR
+  PREMIUM_ID
+  RIDE
+  PROFILE_CARD
+  AVATAR_FRAME
+  PARTY_THEME
+  CHAT_BUBBLE
+  OTHER
+}
+
+enum StoreMediaType {
+  IMAGE
+  GIF
+  VIDEO
+}
+
+model StoreCategory {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  icon      String?  // Ionicons name optional
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items StoreItem[]
+
+  @@index([isActive, sortOrder])
+}
+
+model StoreItem {
+  id              String        @id @default(cuid())
+  categoryId       String
+  type            StoreItemType @default(OTHER)
+
+  title           String
+  description     String?
+  priceCoins      Int
+
+  // grouping like your UI sections: "New This Month", "Avatar Frame", etc.
+  section         String?
+  sectionSortOrder Int          @default(0)
+
+  mediaType       StoreMediaType @default(IMAGE)
+  mediaUrl        String?
+  thumbnailUrl    String?
+
+  isActive        Boolean       @default(true)
+  isFeatured      Boolean       @default(false) // used for "Popular"
+  sortOrder       Int           @default(0)
+
+  // null = permanent, else item is time-limited (e.g. 7 days)
+  durationDays    Int?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  category  StoreCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  purchases StorePurchase[]
+  userItems UserStoreItem[]
+
+  @@index([categoryId, isActive, sortOrder])
+  @@index([isFeatured, isActive, sortOrder])
+  @@index([section, sectionSortOrder])
+}
+
+model StorePurchase {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId   String
+  itemId   String
+
+  quantity   Int @default(1)
+  unitPrice  Int
+  totalPrice Int
+  metaJson   Json?
+
+  user User      @relation(fields: [userId], references: [id])
+  item StoreItem @relation(fields: [itemId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([itemId, createdAt])
+}
+
+model UserStoreItem {
+  id        String   @id @default(cuid())
+  userId    String
+  itemId    String
+
+  obtainedAt       DateTime @default(now())
+  lastPurchasedAt  DateTime @default(now())
+  expiresAt        DateTime? // null = permanent
+
+  user User      @relation(fields: [userId], references: [id])
+  item StoreItem @relation(fields: [itemId], references: [id])
+
+  @@unique([userId, itemId])
+  @@index([userId, expiresAt])
+}
+
+
+
+
+// ===== Enums =====
+
+enum InviteStatus {
+  REGISTERED
+  QUALIFIED
+  REWARDED
 }
 
 enum Role {
@@ -20,21 +1009,23 @@ enum Gender {
   OTHER
 }
 
-// ⭐ stream mode for stats (solo, party, pk battles)
 enum StreamMode {
   SOLO
   PARTY
   PK
 }
 
-// ⭐ PK battle type (for PK data screen)
 enum PKType {
   RANDOM
   FRIEND
   TEAM
 }
 
-// ⭐ honor wall item types
+enum StreamProtocol {
+  LIVEKIT
+  AGORA
+}
+
 enum HonorItemType {
   TAG
   MEDAL
@@ -42,7 +1033,6 @@ enum HonorItemType {
   VEHICLE
 }
 
-// ⭐ VIP tier for subscription
 enum VipTier {
   NONE
   NORMAL
@@ -57,164 +1047,37 @@ enum LiveApplicationStatus {
   REJECTED
 }
 
-// ⭐ Moments / posts can be text, image or video
 enum MomentType {
   TEXT
   IMAGE
   VIDEO
 }
 
-// ⭐ Topic category for Square topics (Daily, Official, etc.)
 enum TopicCategory {
   DAILY
   OFFICIAL
   NORMAL
 }
 
-// ✅ NEW: audience targeting for admin notifications
 enum NotificationAudience {
   ALL_USERS
   ALL_HOSTS
   SPECIFIC_USERS
 }
 
-model Country {
-  id        Int     @id @default(autoincrement())
-  code      String  @unique // e.g. "PK", "PH"
-  name      String  // e.g. "Pakistan"
-  flagEmoji String? // e.g. "🇵🇰"
-  isActive  Boolean @default(true)
-  sortOrder Int     @default(0) // for custom ordering in lists
-
-  users User[]
-
-  @@index([sortOrder])
+enum CurrencyTradeStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
-model User {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  email        String? @unique
-  username     String  @unique
-  passwordHash String?
-  role         Role    @default(USER)
-  avatarUrl    String?
-  bio          String?
-
-  // Profile fields from complete-profile screen
-  nickname    String?
-  dateOfBirth DateTime?
-  gender      Gender?
-  inviterCode String?
-
-  countryId Int?
-  country   Country? @relation(fields: [countryId], references: [id])
-
-  // 🔐 security & bindings
-  phoneNumber String? @unique
-  googleId    String? @unique
-  facebookId  String? @unique
-  instagramId String? @unique
-  tiktokId    String? @unique
-
-  // ⚙️ per-user settings
-  settings  UserSettings?
-  blocks    UserBlock[] @relation("UserBlocker")
-  blockedBy UserBlock[] @relation("UserBlocked")
-
-  // honor items
-  honors UserHonor[]
-
-  // profile extras
-  interestTags  String[] @default([])
-  profilePhotos String[] @default([])
-
-  // live streams & stream chat
-  streams  Stream[]  @relation("UserStreams")
-  messages Message[]
-  wallet   Wallet?
-
-  sentGifts     GiftTransaction[] @relation("GiftSender")
-  receivedGifts GiftTransaction[] @relation("GiftReceiver")
-
-  // ⭐ social graph + visits + points
-  friendshipsA Friendship[] @relation("FriendA")
-  friendshipsB Friendship[] @relation("FriendB")
-
-  following Follow[] @relation("UserFollowing")
-  followers Follow[] @relation("UserFollowers")
-
-  profileVisitsMade     ProfileVisit[] @relation("Visitor")
-  profileVisitsReceived ProfileVisit[] @relation("Visited")
-
-  pointsLedger UserPointLedger[]
-
-  // ⭐ basic progression fields
-  level     Int @default(1) // wealth level
-  liveLevel Int @default(1) // livestream level
-  vipLevel  Int @default(0)
-  exp       Int @default(0)
-
-  // ⭐ VIP subscription status
-  vipTier      VipTier   @default(NONE)
-  vipExpiresAt DateTime?
-
-  // ⭐ Live application / auth
-  liveApplications LiveApplication[]
-  faceVerifiedAt   DateTime?
-  liveCoverUrl     String?
-
-  // ⭐ Notifications (system / admin / message)
-  notifications Notification[]
-
-  // ✅ NEW: campaigns created by this admin
-  adminNotificationsCreated AdminNotification[] @relation("AdminNotificationCreator")
-
-  // ⭐ Direct chat (1-1 messages)
-  chatThreadsA ChatThread[] @relation("ChatThreadUserA")
-  chatThreadsB ChatThread[] @relation("ChatThreadUserB")
-  chatMessages ChatMessage[]
-
-  // moments / posts feed (Square + Video)
-  moments Moment[]
-
-  // ⬇⬇⬇ NEW back-relations for like / comment / save
-  momentLikes    MomentLike[]
-  momentComments MomentComment[]
-  momentSaves    MomentSave[]
-  // ⬆⬆⬆
-
-  // ⭐ Fan club (each host can own one fan club)
-  fanClubOwned       FanClub?
-  fanClubMemberships FanClubMember[]
-
-  // ⭐ PK battles
-  pkBattlesAsHost     PKBattle[] @relation("PKHost")
-  pkBattlesAsOpponent PKBattle[] @relation("PKOpponent")
-
-  // ⭐ FEED / RANKING STATS (for Explore, Host/Rich boards, etc.)
-  followersCount     Int      @default(0) // number of followers
-  followingCount     Int      @default(0) // number of people this user follows
-  totalCoinsReceived Int      @default(0) // gifts received (for host / gift ranking)
-  totalCoinsSpent    Int      @default(0) // coins spent (for rich ranking)
-
-  // current live status snapshot (mirrors their active Stream)
-  isLive      Boolean  @default(false)
-  liveViewers Int      @default(0)
-  lastLiveAt  DateTime?
-
-  // ⭐ Device management – all devices used by this user
-  devices UserDevice[]
-
-  @@index([countryId])
-  @@index([createdAt])
-  @@index([isLive, liveViewers])
-  @@index([followersCount])
-  @@index([totalCoinsReceived])
+enum ResellerApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
+<<<<<<< HEAD
 model Stream {
   id          String   @id @default(cuid())
   title       String
@@ -247,474 +1110,61 @@ model Stream {
   @@index([isLive])
   @@index([createdAt])
   @@index([mode])
+=======
+enum BaseSalaryRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+>>>>>>> cf812d9eb3ee9e39e00e7e4039b0c88331be539a
 }
 
-model Message {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  content   String
-
-  streamId String
-  stream   Stream @relation(fields: [streamId], references: [id])
-
-  senderId String?
-  sender   User?   @relation(fields: [senderId], references: [id])
-
-  @@index([streamId])
-  @@index([senderId])
+// new enums for Phase-1 gifts + PK
+enum GiftMediaType {
+  IMAGE
+  GIF
+  VIDEO
 }
 
-model Gift {
-  id        Int      @id @default(autoincrement())
-  name      String
-  iconUrl   String?
-  price     Int      // in coins
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  transactions GiftTransaction[]
+enum WalletLedgerType {
+  TOPUP
+  GIFT_SENT
+  GIFT_RECEIVED
+  ADJUSTMENT
+  VIP_PURCHASE
+  GUARDIAN_PURCHASE
+  STORE_PURCHASE
 }
 
-model Wallet {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-  balance   Int      @default(0) // in coins
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
-
-  transactions GiftTransaction[]
+enum GuardianTier {
+  NONE
+  SILVER
+  GOLD
+  DIAMOND
 }
 
-model GiftTransaction {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  streamId String
-  stream   Stream @relation(fields: [streamId], references: [id])
-
-  giftId Int
-  gift   Gift @relation(fields: [giftId], references: [id])
-
-  senderId String
-  sender   User   @relation("GiftSender", fields: [senderId], references: [id])
-
-  receiverId String
-  receiver   User   @relation("GiftReceiver", fields: [receiverId], references: [id])
-
-  walletId String
-  wallet   Wallet @relation(fields: [walletId], references: [id])
-
-  quantity   Int @default(1)
-  totalPrice Int // coins = gift.price * quantity
-
-  @@index([streamId])
-  @@index([senderId])
-  @@index([receiverId])
-  @@index([walletId])
-  @@index([giftId])
-  @@index([createdAt])
+enum GuardianBondStatus {
+  ACTIVE
+  EXPIRED
+  CANCELED
+}
+enum PKBattleStatus {
+  PENDING
+  ACTIVE
+  ENDED
+  CANCELED
 }
 
-// ⭐ follow (for Following / Followers counts)
-model Follow {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  followerId String
-  follower   User   @relation("UserFollowing", fields: [followerId], references: [id])
-
-  followingId String
-  following   User   @relation("UserFollowers", fields: [followingId], references: [id])
-
-  @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
+enum PKSide {
+  HOST
+  OPPONENT
 }
 
-// ⭐ friendship (for Friends count)
-model Friendship {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  userAId String
-  userA   User   @relation("FriendA", fields: [userAId], references: [id])
-
-  userBId String
-  userB   User   @relation("FriendB", fields: [userBId], references: [id])
-
-  @@unique([userAId, userBId])
-  @@index([userAId])
-  @@index([userBId])
-}
-
-// ⭐ profile visitors (for Visitors count)
-model ProfileVisit {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  visitorId String
-  visitor   User   @relation("Visitor", fields: [visitorId], references: [id])
-
-  visitedId String
-  visited   User   @relation("Visited", fields: [visitedId], references: [id])
-
-  @@index([visitorId])
-  @@index([visitedId])
-}
-
-// ⭐ points ledger (for Points total)
-model UserPointLedger {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  delta     Int
-  reason    String?
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-// ⭐ per-user settings for language, notifications, privacy, privileges
-model UserSettings {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
-
-  // language: "system", "en", "ur", etc.
-  language String @default("system")
-
-  // notifications
-  notifyLiveAlerts   Boolean @default(true)
-  notifyMessages     Boolean @default(true)
-  notifySound        Boolean @default(true)
-  notifyVibrate      Boolean @default(true)
-  allowFromMutual    Boolean @default(true)
-  allowFromFollowing Boolean @default(true)
-  allowFromStrangers Boolean @default(true)
-
-  // privileges
-  invisibleVisitor Boolean @default(false)
-  mysteryLive      Boolean @default(false)
-  mysteryRank      Boolean @default(false)
-  invisibleOnline  Boolean @default(false)
-  exclusiveEmail   Boolean @default(false)
-  hideLiveLevel    Boolean @default(false)
-
-  // privacy
-  hideMicStatus Boolean @default(false)
-}
-
-// ⭐ blacklist (blocked users)
-model UserBlock {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  userId    String
-  blockedId String
-
-  user        User @relation("UserBlocker", fields: [userId], references: [id])
-  blockedUser User @relation("UserBlocked", fields: [blockedId], references: [id])
-
-  @@unique([userId, blockedId])
-  @@index([userId])
-  @@index([blockedId])
-}
-
-// ⭐ Honor items (for Honor Wall)
-model HonorItem {
-  id          String        @id @default(cuid())
-  type        HonorItemType
-  name        String
-  description String?
-  iconUrl     String?
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-
-  userHonors UserHonor[]
-}
-
-model UserHonor {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id])
-  itemId     String
-  item       HonorItem @relation(fields: [itemId], references: [id])
-  obtainedAt DateTime  @default(now())
-
-  @@unique([userId, itemId])
-  @@index([userId])
-  @@index([itemId])
-}
-
-// ⭐ Moments / posts (Square + Video feed)
-model Moment {
-  id        String     @id @default(cuid())
-  userId    String
-  user      User       @relation(fields: [userId], references: [id])
-
-  type         MomentType @default(TEXT)
-  text         String?
-  imageUrl     String?
-  videoUrl     String?
-  thumbnailUrl String?
-
-  topicId String?
-  topic   Topic? @relation(fields: [topicId], references: [id])
-
-  likeCount    Int @default(0)
-  commentCount Int @default(0)
-  shareCount   Int @default(0)
-  saveCount    Int @default(0)
-
-  createdAt DateTime @default(now())
-
-  likes    MomentLike[]
-  comments MomentComment[]
-  saves    MomentSave[]
-
-  @@index([userId, createdAt])
-  @@index([topicId])
-}
-
-// ⭐ Fan Club (for Fan Club screen & live data stats)
-model FanClub {
-  id          String   @id @default(cuid())
-  ownerId     String   @unique
-  owner       User     @relation(fields: [ownerId], references: [id])
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
-
-  members FanClubMember[]
-
-  @@index([ownerId])
-}
-
-model FanClubMember {
-  id        String   @id @default(cuid())
-  fanClubId String
-  fanClub   FanClub  @relation(fields: [fanClubId], references: [id])
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
-
-  @@unique([fanClubId, userId])
-  @@index([userId])
-}
-
-// ⭐ Live applications (host verification / apply)
-model LiveApplication {
-  id        String                @id @default(cuid())
-  userId    String
-  user      User                  @relation(fields: [userId], references: [id])
-  status    LiveApplicationStatus @default(PENDING)
-
-  // 🧑‍💻 Base64-encoded face image captured from mobile
-  faceImageBase64 String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status, createdAt])
-}
-
-// ⭐ PK battles (for PK data tab)
-model PKBattle {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  type PKType
-
-  hostId String
-  host   User @relation("PKHost", fields: [hostId], references: [id])
-
-  opponentId String?
-  opponent   User? @relation("PKOpponent", fields: [opponentId], references: [id])
-
-  streamId String?
-  stream   Stream? @relation(fields: [streamId], references: [id])
-
-  hostScore     Int @default(0)
-  opponentScore Int @default(0)
-
-  // null => draw, true => host won, false => host lost
-  hostWon Boolean?
-
-  @@index([hostId])
-  @@index([opponentId])
-  @@index([type])
-  @@index([createdAt])
-}
-
-// ⭐ Direct chat threads (1-1)
-model ChatThread {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userAId String
-  userA   User @relation("ChatThreadUserA", fields: [userAId], references: [id])
-
-  userBId String
-  userB   User @relation("ChatThreadUserB", fields: [userBId], references: [id])
-
-  lastMessageText String?
-  lastMessageAt   DateTime?
-
-  messages ChatMessage[]
-
-  @@unique([userAId, userBId], name: "userAId_userBId")
-  @@index([userAId])
-  @@index([userBId])
-  @@index([lastMessageAt])
-}
-
-// ⭐ Direct chat messages
-model ChatMessage {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  threadId String
-  thread   ChatThread @relation(fields: [threadId], references: [id])
-
-  senderId String
-  sender   User @relation(fields: [senderId], references: [id])
-
-  content String
-  isRead  Boolean @default(false)
-
-  @@index([threadId])
-  @@index([senderId])
-  @@index([createdAt])
-}
-
-// ✅ NEW: Admin notification campaign (one-to-many into Notification)
-model AdminNotification {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  createdById String
-  createdBy   User @relation("AdminNotificationCreator", fields: [createdById], references: [id])
-
-  audience      NotificationAudience @default(ALL_USERS)
-  targetUserIds String[]            @default([]) // only used when SPECIFIC_USERS
-
-  // e.g. SYSTEM, ADMIN, MESSAGE
-  type    String @default("ADMIN")
-  title   String
-  body    String
-  metaJson Json?
-
-  notifications Notification[]
-
-  @@index([createdById, createdAt])
-  @@index([audience, createdAt])
-}
-
-// ⭐ Notifications (system & admin → user, incl. chat)
-model Notification {
-  id     String   @id @default(cuid())
-  userId String
-  user   User     @relation(fields: [userId], references: [id])
-
-  // ✅ link to campaign (optional)
-  adminNotificationId String?
-  adminNotification   AdminNotification? @relation(fields: [adminNotificationId], references: [id])
-
-  // e.g. SYSTEM, ADMIN, MESSAGE
-  type    String @default("SYSTEM")
-  title   String
-  body    String
-  // extra data like { liveApplicationId, status }
-  metaJson Json?
-
-  createdAt DateTime @default(now())
-  readAt    DateTime?
-
-  @@index([userId, createdAt])
-  @@index([userId, readAt])
-  @@index([adminNotificationId])
-}
-
-// ⭐ Topics for Square feed (admin controlled)
-model Topic {
-  id          String        @id @default(cuid())
-  title       String
-  description String?
-  isTrending  Boolean       @default(false)
-  isActive    Boolean       @default(true)
-  category    TopicCategory @default(NORMAL)
-  sortOrder   Int           @default(0)
-  hotScore    Int           @default(0)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  moments Moment[]
-
-  @@index([isTrending, sortOrder])
-}
-
-// ⭐ Likes on moments (posts / videos)
-model MomentLike {
-  id        String   @id @default(cuid())
-  momentId  String
-  moment    Moment   @relation(fields: [momentId], references: [id])
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
-
-  @@unique([momentId, userId])
-  @@index([momentId])
-  @@index([userId])
-}
-
-// ⭐ Comments on moments
-model MomentComment {
-  id        String   @id @default(cuid())
-  momentId  String
-  moment    Moment   @relation(fields: [momentId], references: [id])
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  content   String
-  createdAt DateTime @default(now())
-
-  @@index([momentId])
-  @@index([userId, createdAt])
-}
-
-// ⭐ Saved moments (bookmarks)
-model MomentSave {
-  id        String   @id @default(cuid())
-  momentId  String
-  moment    Moment   @relation(fields: [momentId], references: [id])
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
-
-  @@unique([momentId, userId])
-  @@index([momentId])
-  @@index([userId])
-}
-
-// ⭐ Device management – devices used to log in
-model UserDevice {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
-
-  /// Random ID stored in AsyncStorage on mobile
-  deviceId     String
-  deviceName   String?
-  platform     String?  // "android", "ios", etc.
-  isTrusted    Boolean  @default(true)
-  lastActiveAt DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([userId, deviceId])
-  @@index([userId, lastActiveAt])
+//
+// 
+//
+enum RewardCategory {
+  PK_MISSION
+  ACTIVITY
+  FAN_CLUB
+  INVITE
 }

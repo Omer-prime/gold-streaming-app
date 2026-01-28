@@ -1,8 +1,8 @@
-// admin-api/src/app/api/feed/explore/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
@@ -16,138 +16,108 @@ export async function GET(req: NextRequest) {
         ? (tabRaw as any)
         : "explore";
 
-    const countryParam = searchParams.get("country") ?? "all";
+    const countryParam = (searchParams.get("country") ?? "popular").toLowerCase();
     const q = (searchParams.get("q") ?? "").trim();
-    const limit = Math.min(
-      50,
-      Math.max(1, Number(searchParams.get("limit")) || 20)
-    );
-    const cursor = searchParams.get("cursor") ?? undefined;
+    const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 20));
 
     if (tab === "following" && !userId) {
       return NextResponse.json({ items: [], nextCursor: null });
     }
 
-    // ---------------- BASE WHERE ----------------
-    const where: Prisma.UserWhereInput = {
-      role: "HOST",
+    const where: Prisma.StreamWhereInput = {
+      isLive: true,
     };
 
-    // 👉 only live hosts for Explore / Following / Near
-    if (tab !== "new") {
-      where.isLive = true;
-    }
-
     // country filter
-    if (
-      countryParam &&
-      countryParam.toLowerCase() !== "all" &&
-      countryParam.toLowerCase() !== "popular"
-    ) {
-      where.country = { code: countryParam };
+    if (countryParam !== "all" && countryParam !== "popular") {
+      where.host = {
+        country: { code: countryParam.toUpperCase() },
+      };
     }
 
     // search filter
     if (q.length > 0) {
-      where.OR = [
-        { username: { contains: q, mode: "insensitive" } },
-        { nickname: { contains: q, mode: "insensitive" } },
-      ];
-    }
-
-    // Following tab
-    if (tab === "following" && userId) {
-      where.followers = {
-        some: {
-          followerId: userId,
-        },
+      where.host = {
+        ...(where.host as any),
+        OR: [
+          { username: { contains: q, mode: "insensitive" } },
+          { nickname: { contains: q, mode: "insensitive" } },
+        ],
       };
     }
 
-    // Near tab
+    // following filter
+    if (tab === "following" && userId) {
+      where.host = {
+        ...(where.host as any),
+        followers: { some: { followerId: userId } },
+      };
+    }
+
+    // near filter = same country as me
     if (tab === "near" && userId) {
       const me = await prisma.user.findUnique({
         where: { id: userId },
         select: { countryId: true },
       });
 
-      if (me?.countryId) {
-        where.countryId = me.countryId;
+      if (typeof me?.countryId === "number") {
+        where.host = {
+          ...(where.host as any),
+          countryId: me.countryId,
+        };
       }
     }
 
-    // ---------------- ORDER / RANKING ----------------
-    let orderBy:
-      | Prisma.UserOrderByWithRelationInput
-      | Prisma.UserOrderByWithRelationInput[];
-
-    if (tab === "new") {
-      orderBy = { createdAt: "desc" };
-    } else {
-      orderBy = [
-        { isLive: "desc" },
-        { liveViewers: "desc" },
-        { followersCount: "desc" },
-        { totalCoinsReceived: "desc" },
-        { lastLiveAt: "desc" },
-      ];
-    }
-
-    const users = await prisma.user.findMany({
+    const streams = await prisma.stream.findMany({
       where,
-      orderBy,
-      take: limit + 1,
-      cursor: cursor ? { id: cursor } : undefined,
-      skip: cursor ? 1 : undefined,
+      orderBy: [{ viewers: "desc" }, { startedAt: "desc" }],
+      take: limit,
       select: {
         id: true,
-        username: true,
-        nickname: true,
-        avatarUrl: true,
-
-        isLive: true,
-        liveViewers: true,
-        followersCount: true,
-        totalCoinsReceived: true,
-        lastLiveAt: true,
-
-        country: {
+        hostId: true,
+        title: true,
+        mode: true,
+        viewers: true,
+        startedAt: true,
+        thumbnailUrl: true,
+        host: {
           select: {
-            code: true,
-            flagEmoji: true,
+            id: true,
+            username: true,
+            nickname: true,
+            avatarUrl: true,
+            liveCoverUrl: true,
+            followersCount: true,
+            totalCoinsReceived: true,
+            country: { select: { code: true, flagEmoji: true } },
           },
         },
       },
     });
 
-    let nextCursor: string | null = null;
-    let data = users;
-
-    if (users.length > limit) {
-      const next = users[users.length - 1];
-      nextCursor = next.id;
-      data = users.slice(0, limit);
-    }
-
-    const items = data.map((u) => ({
-      id: u.id,
-      displayName: u.nickname || u.username,
-      avatarUrl: u.avatarUrl,
-      countryCode: u.country?.code ?? null,
-      countryFlag: u.country?.flagEmoji ?? null,
-      isLive: u.isLive,
-      liveViewers: u.liveViewers,
-      followersCount: u.followersCount,
-      coins: u.totalCoinsReceived,
-      lastLiveAt: u.lastLiveAt,
+    const items = streams.map((s) => ({
+      id: s.host.id,
+      displayName: s.host.nickname || s.host.username,
+      avatarUrl: s.host.avatarUrl,
+      liveCoverUrl: s.host.liveCoverUrl ?? null,
+      countryCode: s.host.country?.code ?? null,
+      countryFlag: s.host.country?.flagEmoji ?? null,
+      isLive: true,
+      liveViewers: s.viewers ?? 0,
+      followersCount: s.host.followersCount ?? 0,
+      coins: s.host.totalCoinsReceived ?? 0,
+      streamId: s.id,
+      activeStreamId: s.id,
+      streamTitle: s.title ?? null,
+      streamMode: s.mode ?? null,
+      thumbnailUrl: s.thumbnailUrl ?? null,
+      startedAt: s.startedAt ?? null,
     }));
 
-    return NextResponse.json({ items, nextCursor });
+    return NextResponse.json({ items, nextCursor: null });
   } catch (error) {
     console.error("[GET /api/feed/explore]", error);
-    return NextResponse.json(
-      { error: "Failed to load explore feed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load explore feed" }, { status: 500 });
   }
 }

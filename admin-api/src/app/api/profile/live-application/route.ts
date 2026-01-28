@@ -4,40 +4,74 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+const REQUIRED_WEALTH_LEVEL = 5;
+
+function getRequirements(user: any) {
+  const faceVerified = !!user?.faceVerifiedAt;
+  const hasLiveCover = !!user?.liveCoverUrl;
+  const wealthLevel = Number(user?.level ?? 0);
+
+  return {
+    faceVerified,
+    hasLiveCover,
+    wealthLevel,
+    requiredWealthLevel: REQUIRED_WEALTH_LEVEL,
+    canApply: faceVerified && hasLiveCover && wealthLevel >= REQUIRED_WEALTH_LEVEL,
+  };
+}
+
 // POST /api/profile/live-application
-// Body: { userId: string }
+// Body: { userId: string, faceImageBase64?: string }
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
+    const userId = (body?.userId as string | undefined)?.trim();
 
-    const userId = body?.userId as string | undefined;
     if (!userId) {
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    if (user.role === "ADMIN") {
+      return NextResponse.json({ error: "Admins cannot apply as host." }, { status: 403 });
+    }
+
+    // If already host, no need to apply
+    if (user.role === "HOST") {
       return NextResponse.json(
-        { error: "userId is required" },
+        {
+          error: "You are already approved as a host.",
+          application: null,
+          hostApproved: true,
+          applicationStatus: "APPROVED",
+          requirements: getRequirements(user),
+        },
+        { status: 200 }
+      );
+    }
+
+    const requirements = getRequirements(user);
+    if (!requirements.canApply) {
+      const missing: string[] = [];
+      if (!requirements.faceVerified) missing.push("FACE_AUTH");
+      if (!requirements.hasLiveCover) missing.push("LIVE_COVER");
+      if (requirements.wealthLevel < requirements.requiredWealthLevel) missing.push("WEALTH_LEVEL");
+
+      return NextResponse.json(
+        {
+          error: "Complete live application conditions first.",
+          missing,
+          requirements,
+        },
         { status: 400 }
       );
     }
 
-    // 1) Make sure user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // 2) Check if user already has active application
     const existing = await prisma.liveApplication.findFirst({
-      where: {
-        userId,
-        status: {
-          in: ["PENDING", "APPROVED"],
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
+      where: { userId, status: { in: ["PENDING", "APPROVED"] } },
+      orderBy: { createdAt: "desc" },
     });
 
     if (existing) {
@@ -45,41 +79,48 @@ export async function POST(req: NextRequest) {
         {
           error: "You already have an active application.",
           application: existing,
+          hostApproved: existing.status === "APPROVED",
+          applicationStatus: existing.status,
+          requirements,
         },
         { status: 409 }
       );
     }
 
-    // 3) Create new application
     const application = await prisma.liveApplication.create({
       data: {
         userId,
         status: "PENDING",
+        faceImageBase64: body?.faceImageBase64 ?? null,
       },
     });
 
-    // 4) 🔔 Create notification: "we received your request"
+    // optional notification
     try {
       await prisma.notification.create({
         data: {
           userId,
           type: "LIVE_APPLICATION_SUBMITTED",
           title: "Verification request submitted",
-          body: "We have received your real-person verification request. Please wait while our team reviews it.",
+          body: "We received your verification request. Please wait for review.",
         },
       });
     } catch (err) {
-      // don't break the flow if notification insertion fails
       console.error("Create submit notification error:", err);
     }
 
-    return NextResponse.json({ application }, { status: 201 });
+    return NextResponse.json(
+      {
+        application,
+        hostApproved: false,
+        applicationStatus: "PENDING",
+        requirements,
+      },
+      { status: 201 }
+    );
   } catch (err) {
     console.error("Create live application error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -87,29 +128,34 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
+    const userId = (searchParams.get("userId") ?? "").trim();
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "userId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const application = await prisma.liveApplication.findFirst({
       where: { userId },
       orderBy: { createdAt: "desc" },
     });
 
+    const applicationStatus = (application?.status as any) ?? "NONE";
+    const hostApproved = user.role === "HOST" || applicationStatus === "APPROVED";
+
     return NextResponse.json(
-      { application: application ?? null },
+      {
+        application: application ?? null,
+        applicationStatus,
+        hostApproved,
+        requirements: getRequirements(user),
+      },
       { status: 200 }
     );
   } catch (err) {
     console.error("Get live application error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -108,6 +108,39 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             onClick={() => setMobileOpen(false)}
           />
 
+          {/* ✅ Rewards */}
+          <NavLink
+            href="/admin/rewards"
+            label="Rewards"
+            icon="🏆"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+           <NavLink
+            href="/admin/vip"
+            label="VIP Plans"
+            icon="👑"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+        
+          <NavLink
+            href="/admin/guardian"
+            label="Guardian Plans"
+            icon="🛡️"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+
+        
+          <NavLink
+            href="/admin/store"
+            label="Store"
+            icon="🛍️"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+
           <NavLink
             href="/admin/notifications"
             label="Notifications"
@@ -155,6 +188,30 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               onClick={() => setMobileOpen(false)}
             />
           </div>
+
+          <NavLink
+            href="/admin/currency-trading"
+            label="Currency trading"
+            icon="💱"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+
+          <NavLink
+            href="/admin/base-salary-approval"
+            label="Base salary approval"
+            icon="💵"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
+
+          <NavLink
+            href="/admin/reseller-approval"
+            label="Reseller approval"
+            icon="✅"
+            pathname={pathname}
+            onClick={() => setMobileOpen(false)}
+          />
         </nav>
 
         {/* footer */}
@@ -173,8 +230,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       {/* Mobile dark overlay behind sidebar */}
       <div
-        className={`fixed inset-0 z-30 bg-black/50 transition-opacity md:hidden ${mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          }`}
+        className={`fixed inset-0 z-30 bg-black/50 transition-opacity md:hidden ${
+          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
         onClick={() => setMobileOpen(false)}
       />
 

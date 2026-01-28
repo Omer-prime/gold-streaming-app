@@ -1,6 +1,6 @@
-// src/app/api/profile/vip/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { VipTier } from "@prisma/client";
 
 type VipTierKey = "NONE" | "NORMAL" | "SUPER" | "DIAMOND" | "SVIP";
 
@@ -15,13 +15,7 @@ export async function GET(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        vipTier: true,
-        vipExpiresAt: true,
-        level: true,
-        liveLevel: true,
-      },
+      select: { id: true, vipTier: true, vipExpiresAt: true, level: true, liveLevel: true },
     });
 
     if (!user) {
@@ -45,69 +39,47 @@ export async function GET(req: NextRequest) {
       daysLeft,
     };
 
-    // Static VIP plans (you can adjust coins, text, privileges easily)
-    const plans = [
-      {
-        tier: "NORMAL" as VipTierKey,
-        name: "Normal VIP",
-        monthlyPriceCoins: 95000,
-        description: "Get VIP & enjoy privileges.",
-        privileges: [
-          { key: "daily_coins", label: "Collect Coins", value: "+3,500/d" },
-          { key: "live_tag", label: "Live Float Tag", value: "+1/d" },
-          { key: "platform_speaker", label: "Platform Speaker", value: "+1/d" },
-          { key: "entry_vehicle", label: "Entry Vehicle", value: "Unlock" },
-          { key: "vip_badge", label: "VIP Badge", value: "Unlock" },
-        ],
+    const plansDb = await prisma.vipPlan.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+      include: {
+        packages: {
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+          select: { id: true, label: true, durationMonths: true, priceCoins: true },
+        },
+        planPrivileges: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            privilege: {
+              select: { key: true, label: true, defaultValue: true, icon: true, isActive: true },
+            },
+          },
+        },
       },
-      {
-        tier: "SUPER" as VipTierKey,
-        name: "Super VIP",
-        monthlyPriceCoins: 295000,
-        description: "Extra privileges for active hosts.",
-        privileges: [
-          { key: "daily_coins", label: "Collect Coins", value: "+7,000/d" },
-          { key: "live_tag", label: "Live Float Tag", value: "+2/d" },
-          { key: "platform_speaker", label: "Platform Speaker", value: "+2/d" },
-          { key: "entry_vehicle", label: "Entry Vehicle", value: "Premium" },
-          { key: "vip_badge", label: "VIP Badge", value: "Super VIP" },
-        ],
-      },
-      {
-        tier: "DIAMOND" as VipTierKey,
-        name: "Diamond VIP",
-        monthlyPriceCoins: 595000,
-        description: "High level VIP for core users.",
-        privileges: [
-          { key: "daily_coins", label: "Collect Coins", value: "+12,000/d" },
-          { key: "live_tag", label: "Live Float Tag", value: "+3/d" },
-          { key: "platform_speaker", label: "Platform Speaker", value: "+3/d" },
-          { key: "entry_vehicle", label: "Entry Vehicle", value: "Diamond" },
-          { key: "vip_badge", label: "VIP Badge", value: "Diamond" },
-        ],
-      },
-      {
-        tier: "SVIP" as VipTierKey,
-        name: "SVIP",
-        monthlyPriceCoins: 995000,
-        description: "Top level VIP with max privileges.",
-        privileges: [
-          { key: "daily_coins", label: "Collect Coins", value: "+20,000/d" },
-          { key: "live_tag", label: "Live Float Tag", value: "Multiple" },
-          { key: "platform_speaker", label: "Platform Speaker", value: "Priority" },
-          { key: "entry_vehicle", label: "Entry Vehicle", value: "SVIP Exclusive" },
-          { key: "vip_badge", label: "VIP Badge", value: "SVIP" },
-        ],
-      },
-    ];
+    });
 
-    return NextResponse.json(
-      {
-        current,
-        plans,
-      },
-      { status: 200 }
-    );
+    const plans = plansDb.map((p) => {
+      const monthly = p.packages.find((x) => x.durationMonths === 1) ?? p.packages[0];
+      return {
+        tier: p.tier as VipTierKey,
+        name: p.name,
+        description: p.description ?? "Get VIP & enjoy privileges.",
+        monthlyPriceCoins: monthly?.priceCoins ?? 0, // backward compat
+        packages: p.packages,
+        privileges: p.planPrivileges
+          .filter((pp) => pp.privilege.isActive)
+          .map((pp) => ({
+            key: pp.privilege.key,
+            label: pp.privilege.label,
+            value: pp.valueOverride ?? pp.privilege.defaultValue ?? undefined,
+            icon: (pp.privilege.icon ?? undefined) as string | undefined,
+            locked: pp.locked,
+          })),
+      };
+    });
+
+    return NextResponse.json({ current, plans }, { status: 200 });
   } catch (err) {
     console.error("vip route error", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

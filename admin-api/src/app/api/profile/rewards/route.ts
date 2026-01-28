@@ -2,16 +2,233 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type RewardItem = {
+// ✅ matches your mobile RewardScreen types (RewardTask + RewardApiResponse)
+// Mobile expects: pkMission/activity/fanClub/invite arrays
+type RewardTaskOut = {
   id: string;
   title: string;
-  subtitle: string;
+  subtitle?: string | null;
   rewardPoints: number;
   current: number;
   target: number;
-  goAction?: string; // tells mobile app which screen to open
+  goToScreen?: "Explore" | "VipCenter" | "Auth" | "LiveApplication" | null;
 };
 
+type RewardApiResponse = {
+  dailyResetNote: string;
+  weeklyResetNote: string;
+  pkRecord: { highestStreak: number; effectiveWins: number };
+  pkMission: RewardTaskOut[];
+  activity: RewardTaskOut[];
+  fanClub: RewardTaskOut[];
+  invite: RewardTaskOut[];
+};
+
+type RewardCategory = "PK_MISSION" | "ACTIVITY" | "FAN_CLUB" | "INVITE";
+
+// ------------------------
+// Helpers
+// ------------------------
+function getTodayWindowUTC() {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  const d = now.getUTCDate();
+  const start = new Date(Date.UTC(y, m, d));
+  const end = new Date(Date.UTC(y, m, d + 1));
+  return { start, end };
+}
+
+// If you store `goToScreen` as string in DB, only allow these values to reach mobile
+const allowedGoTo = new Set([
+  "Explore",
+  "VipCenter",
+  "Auth",
+  "LiveApplication",
+]);
+
+function normalizeGoTo(goToScreen: string | null): RewardTaskOut["goToScreen"] {
+  if (!goToScreen) return null;
+  return allowedGoTo.has(goToScreen) ? (goToScreen as any) : null;
+}
+
+/**
+ * ✅ Real-time "current" values:
+ * - TEAM PK task: if user has at least 1 TEAM PK battle today => current=1
+ * - Upload video tasks etc: not in schema yet => keep 0 (won't crash, still works)
+ * - On-mic minutes: from Stream overlaps today (SOLO+PARTY) => minutes
+ */
+async function computeRealtimeProgressToday(userId: string) {
+  const { start, end } = getTodayWindowUTC();
+
+  // TEAM PK sessions today (as host or opponent)
+  const teamPkCount = await prisma.pKBattle.count({
+    where: {
+      createdAt: { gte: start, lt: end },
+      type: "TEAM",
+      OR: [{ hostId: userId }, { opponentId: userId }],
+    },
+  });
+
+  // On-mic total seconds today (SOLO + PARTY)
+  const streams = await prisma.stream.findMany({
+    where: {
+      hostId: userId,
+      startedAt: { not: null, lte: end },
+      OR: [{ endedAt: null }, { endedAt: { gte: start } }],
+    },
+    select: { startedAt: true, endedAt: true },
+  });
+
+  let onMicSeconds = 0;
+  for (const s of streams) {
+    if (!s.startedAt) continue;
+    const sStart = s.startedAt;
+    const sEnd = s.endedAt ?? end;
+
+    const overlapStart = Math.max(sStart.getTime(), start.getTime());
+    const overlapEnd = Math.min(sEnd.getTime(), end.getTime());
+    if (overlapEnd <= overlapStart) continue;
+
+    onMicSeconds += Math.floor((overlapEnd - overlapStart) / 1000);
+  }
+
+  const onMicMinutes = Math.floor(onMicSeconds / 60);
+
+  return {
+    teamPkCount,
+    onMicMinutes,
+  };
+}
+
+async function getPkRecordToday(userId: string) {
+  const { start, end } = getTodayWindowUTC();
+
+  const battles = await prisma.pKBattle.findMany({
+    where: {
+      createdAt: { gte: start, lt: end },
+      OR: [{ hostId: userId }, { opponentId: userId }],
+    },
+    orderBy: { createdAt: "asc" },
+    select: { hostId: true, hostWon: true },
+  });
+
+  let wins = 0;
+  let currentStreak = 0;
+  let highestStreak = 0;
+
+  for (const b of battles) {
+    const isHost = b.hostId === userId;
+    let result: "win" | "lose" | "draw";
+
+    if (b.hostWon === null) result = "draw";
+    else if (b.hostWon === true && isHost) result = "win";
+    else if (b.hostWon === false && !isHost) result = "win";
+    else result = "lose";
+
+    if (result === "win") {
+      wins += 1;
+      currentStreak += 1;
+      if (currentStreak > highestStreak) highestStreak = currentStreak;
+    } else {
+      currentStreak = 0;
+    }
+  }
+
+  return { highestStreak, effectiveWins: wins };
+}
+
+async function loadTasksFromDb(): Promise<
+  Record<RewardCategory, Array<{
+    id: string;
+    category: RewardCategory;
+    title: string;
+    subtitle: string | null;
+    rewardPoints: number;
+    target: number;
+    goToScreen: string | null;
+    sortOrder: number;
+  }>>
+> {
+  // If you added RewardTask model in Prisma (as we discussed), this will work.
+  // If not migrated yet, you can keep the fallback below.
+  const rows = await prisma.rewardTask.findMany({
+    where: { isActive: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      category: true,
+      title: true,
+      subtitle: true,
+      rewardPoints: true,
+      target: true,
+      goToScreen: true,
+      sortOrder: true,
+    },
+  });
+
+  const grouped: any = {
+    PK_MISSION: [],
+    ACTIVITY: [],
+    FAN_CLUB: [],
+    INVITE: [],
+  };
+
+  for (const r of rows as any[]) {
+    if (!grouped[r.category]) continue;
+    grouped[r.category].push(r);
+  }
+
+  return grouped;
+}
+
+/**
+ * ✅ Safe fallback tasks if DB is empty or rewardTask table not ready.
+ * (Prevents your mobile screen from showing nothing.)
+ */
+function fallbackTasks(): Record<RewardCategory, RewardTaskOut[]> {
+  return {
+    PK_MISSION: [
+      {
+        id: "team-pk-once",
+        title: "Complete a round of Team PK",
+        subtitle: "Can only be achieved once",
+        rewardPoints: 100,
+        current: 0,
+        target: 1,
+        goToScreen: "Explore",
+      },
+    ],
+    ACTIVITY: [],
+    FAN_CLUB: [],
+    INVITE: [],
+  };
+}
+
+function attachRealtimeCurrent(
+  tasks: RewardTaskOut[],
+  realtime: { teamPkCount: number; onMicMinutes: number }
+): RewardTaskOut[] {
+  return tasks.map((t) => {
+    // you can map by id (recommended)
+    if (t.id === "team-pk-once") {
+      return { ...t, current: Math.min(1, realtime.teamPkCount) };
+    }
+    if (t.id === "on-mic-30") {
+      return { ...t, current: Math.min(t.target, realtime.onMicMinutes) };
+    }
+    if (t.id === "on-mic-60") {
+      return { ...t, current: Math.min(t.target, realtime.onMicMinutes) };
+    }
+
+    // default keep whatever current is
+    return t;
+  });
+}
+
+// ------------------------
+// Route
+// ------------------------
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -30,241 +247,66 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // ----- PK record (same as before) -----
-    const { start, end } = getTodayWindow();
-    const battles = await prisma.pKBattle.findMany({
-      where: {
-        createdAt: { gte: start, lt: end },
-        OR: [{ hostId: userId }, { opponentId: userId }],
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    // ✅ Real-time pk record + progress today
+    const [pkRecord, realtime] = await Promise.all([
+      getPkRecordToday(userId),
+      computeRealtimeProgressToday(userId),
+    ]);
 
-    let wins = 0;
-    let currentStreak = 0;
-    let highestStreak = 0;
-
-    for (const b of battles) {
-      const isHost = b.hostId === userId;
-      let result: "win" | "lose" | "draw";
-
-      if (b.hostWon === null) {
-        result = "draw";
-      } else if (b.hostWon === true && isHost) {
-        result = "win";
-      } else if (b.hostWon === false && !isHost) {
-        result = "win";
-      } else {
-        result = "lose";
-      }
-
-      if (result === "win") {
-        wins += 1;
-        currentStreak += 1;
-        if (currentStreak > highestStreak) highestStreak = currentStreak;
-      } else {
-        currentStreak = 0;
-      }
+    // ✅ Load tasks from DB (admin-configurable)
+    let groupedDbTasks: Record<RewardCategory, any> | null = null;
+    try {
+      groupedDbTasks = await loadTasksFromDb();
+    } catch (e) {
+      // If migrate not done / table missing, don't crash API
+      groupedDbTasks = null;
+      console.warn("RewardTask table not ready, using fallback tasks.");
     }
 
-    const pkRecord = {
-      highestStreak,
-      effectiveWins: wins,
+    const groupedFallback = fallbackTasks();
+
+    // Convert DB rows -> mobile shape
+    const toOut = (rows: any[] | undefined, fallback: RewardTaskOut[]) => {
+      const arr = (rows && rows.length > 0
+        ? rows.map((r) => ({
+            id: r.id,
+            title: r.title,
+            subtitle: r.subtitle ?? null,
+            rewardPoints: r.rewardPoints,
+            current: 0, // will be filled real-time where possible
+            target: r.target,
+            goToScreen: normalizeGoTo(r.goToScreen),
+          }))
+        : fallback) as RewardTaskOut[];
+
+      // ensure never undefined
+      return Array.isArray(arr) ? arr : [];
     };
 
-    // ----- Tasks (still static, now with goAction) -----
+    const pkMission = toOut(groupedDbTasks?.PK_MISSION, groupedFallback.PK_MISSION);
+    const activity = toOut(groupedDbTasks?.ACTIVITY, groupedFallback.ACTIVITY);
+    const fanClub = toOut(groupedDbTasks?.FAN_CLUB, groupedFallback.FAN_CLUB);
+    const invite = toOut(groupedDbTasks?.INVITE, groupedFallback.INVITE);
 
-    const pkMission: RewardItem[] = [
-      {
-        id: "team-pk-once",
-        title: "Complete a round of Team PK",
-        subtitle: "Can only be achieved once",
-        rewardPoints: 100,
-        current: 0,
-        target: 1,
-        goAction: "OPEN_PK_AREA", // e.g. navigate to PK rooms
-      },
-      {
-        id: "rocket-host-video",
-        title: "Rocket Host Video Collection",
-        subtitle: "Upload video and pass review",
-        rewardPoints: 10000,
-        current: 0,
-        target: 1,
-        goAction: "OPEN_ROCKET_HOST_EVENT", // open Rocket Host event screen
-      },
-      {
-        id: "daily-fan-power-10",
-        title: "Daily Fan Power Points increased by 10",
-        subtitle: "Increase by 10 points today",
-        rewardPoints: 100,
-        current: 0,
-        target: 10,
-        goAction: "OPEN_ACTIVITY_CENTER",
-      },
-      {
-        id: "daily-fan-power-50",
-        title: "Daily Fan Power Points increased by 50",
-        subtitle: "Increase by 50 points today",
-        rewardPoints: 200,
-        current: 0,
-        target: 50,
-        goAction: "OPEN_ACTIVITY_CENTER",
-      },
-    ];
+    // ✅ Attach real-time "current" values for the few tasks we can compute today
+    const pkMissionRT = attachRealtimeCurrent(pkMission, realtime);
+    const activityRT = attachRealtimeCurrent(activity, realtime);
+    const fanClubRT = attachRealtimeCurrent(fanClub, realtime);
+    const inviteRT = attachRealtimeCurrent(invite, realtime);
 
-    const activity: RewardItem[] = [
-      {
-        id: "activity-video",
-        title: "Upload video and pass review",
-        subtitle: "(0/1)",
-        rewardPoints: 10000,
-        current: 0,
-        target: 1,
-        goAction: "OPEN_ROCKET_HOST_EVENT",
-      },
-      {
-        id: "activity-fan-power-10",
-        title: "Daily Fan Power Points increased by 10",
-        subtitle: "(0/10)",
-        rewardPoints: 100,
-        current: 0,
-        target: 10,
-        goAction: "OPEN_ACTIVITY_CENTER",
-      },
-      {
-        id: "activity-fan-power-50",
-        title: "Daily Fan Power Points increased by 50",
-        subtitle: "(0/50)",
-        rewardPoints: 200,
-        current: 0,
-        target: 50,
-        goAction: "OPEN_ACTIVITY_CENTER",
-      },
-      {
-        id: "activity-fan-power-100",
-        title: "Daily Fan Power Points increased by 100",
-        subtitle: "(0/100)",
-        rewardPoints: 200,
-        current: 0,
-        target: 100,
-        goAction: "OPEN_ACTIVITY_CENTER",
-      },
-    ];
-
-    const fanClub: RewardItem[] = [
-      {
-        id: "fanclub-challenge",
-        title: "Fan Club Challenges",
-        subtitle:
-          "Tips for hosts:\n1. Send Lucky Boxes in LIVE room to grow your Fan Club.\n2. Set Party room seats for Fan Club members only.",
-        rewardPoints: 500,
-        current: 0,
-        target: 1,
-        goAction: "OPEN_FANCLUB_CENTER",
-      },
-      {
-        id: "fanclub-fan-power-10",
-        title: "Daily Fan Power Points increased by 10",
-        subtitle: "(0/10)",
-        rewardPoints: 100,
-        current: 0,
-        target: 10,
-        goAction: "OPEN_FANCLUB_CENTER",
-      },
-      {
-        id: "fanclub-fan-power-50",
-        title: "Daily Fan Power Points increased by 50",
-        subtitle: "(0/50)",
-        rewardPoints: 200,
-        current: 0,
-        target: 50,
-        goAction: "OPEN_FANCLUB_CENTER",
-      },
-      {
-        id: "fanclub-fan-power-100",
-        title: "Daily Fan Power Points increased by 100",
-        subtitle: "(0/100)",
-        rewardPoints: 200,
-        current: 0,
-        target: 100,
-        goAction: "OPEN_FANCLUB_CENTER",
-      },
-    ];
-
-    const invite: RewardItem[] = [
-      {
-        id: "invite-daily-fan-power-100",
-        title: "Daily Fan Power Points increased by 100",
-        subtitle: "(0/100)",
-        rewardPoints: 200,
-        current: 0,
-        target: 100,
-        goAction: "OPEN_INVITE_CENTER",
-      },
-      {
-        id: "invite-one-person",
-        title: "Invite one person can earn up to $22.3",
-        subtitle: "The more you invite, the more rewards you will get",
-        rewardPoints: 223000,
-        current: 0,
-        target: 1,
-        goAction: "OPEN_INVITE_CENTER",
-      },
-      {
-        id: "vip-daily-rewards",
-        title: "VIP daily rewards",
-        subtitle: "Extra daily rewards for VIPs",
-        rewardPoints: 35000,
-        current: 0,
-        target: 1,
-        goAction: "OPEN_VIP_CENTER", // this is your VIP screen
-      },
-      {
-        id: "on-mic-30",
-        title: "On the mic for 30 mins",
-        subtitle: "Time in party and live rooms both count",
-        rewardPoints: 200,
-        current: 0,
-        target: 30,
-        goAction: "OPEN_LIVE_ROOMS",
-      },
-      {
-        id: "on-mic-60",
-        title: "On the mic for 60 mins",
-        subtitle: "Send 5 lucky gifts.",
-        rewardPoints: 300,
-        current: 0,
-        target: 60,
-        goAction: "OPEN_LIVE_ROOMS",
-      },
-    ];
-
-    return NextResponse.json({
-      dailyResetNote:
-        "Daily tasks: Tasks refresh daily at 00:00:00 (UTC+8).",
-      weeklyResetNote:
-        "Weekly tasks: Tasks refresh every Monday at 00:00:00 (UTC+8).",
+    const payload: RewardApiResponse = {
+      dailyResetNote: "Daily tasks: Tasks refresh daily at 00:00:00 (UTC+8).",
+      weeklyResetNote: "Weekly tasks: Tasks refresh every Monday at 00:00:00 (UTC+8).",
       pkRecord,
-      pkMission,
-      activity,
-      fanClub,
-      invite,
-    } as const);
+      pkMission: pkMissionRT,
+      activity: activityRT,
+      fanClub: fanClubRT,
+      invite: inviteRT,
+    };
+
+    return NextResponse.json(payload);
   } catch (err) {
     console.error("rewards route error", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
-
-/* ---------- helpers ---------- */
-
-function getTodayWindow() {
-  const now = new Date();
-  const y = now.getUTCFullYear();
-  const m = now.getUTCMonth();
-  const d = now.getUTCDate();
-  const start = new Date(Date.UTC(y, m, d));
-  const end = new Date(Date.UTC(y, m, d + 1));
-  return { start, end };
 }

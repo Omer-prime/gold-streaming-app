@@ -1,4 +1,3 @@
-// admin-api/src/app/api/profile/face-scan/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -10,6 +9,8 @@ function stripDataUrl(b64: string) {
   return idx >= 0 ? b64.slice(idx + "base64,".length) : b64;
 }
 
+// POST /api/profile/face-scan
+// body: { userId, imageBase64 }
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
@@ -26,20 +27,31 @@ export async function POST(req: NextRequest) {
 
     imageBase64 = stripDataUrl(imageBase64);
 
-    // simple sanity check (optional)
     if (imageBase64.length < 1000) {
       return NextResponse.json({ error: "Invalid image data." }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true },
+      select: { id: true, faceVerifiedAt: true },
     });
 
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    // ✅ If already verified, do NOT create new pending request
+    if (user.faceVerifiedAt) {
+      return NextResponse.json(
+        {
+          ok: true,
+          status: "APPROVED",
+          applicationId: "verified",
+          verifiedAt: user.faceVerifiedAt.toISOString(),
+        },
+        { status: 200 }
+      );
     }
 
+    // Update existing pending OR create a new one
     const existingPending = await prisma.liveApplication.findFirst({
       where: { userId, status: "PENDING" },
       orderBy: { createdAt: "desc" },
@@ -54,15 +66,12 @@ export async function POST(req: NextRequest) {
           data: { userId, status: "PENDING", faceImageBase64: imageBase64 },
         });
 
-    // ✅ MARK user as face-verified (your requirements check uses faceVerifiedAt)
-    await prisma.user.update({
-      where: { id: userId },
-      data: { faceVerifiedAt: new Date() },
-    });
-
-    return NextResponse.json({ ok: true, application }, { status: 200 });
+    return NextResponse.json(
+      { ok: true, status: application.status, applicationId: application.id },
+      { status: 200 }
+    );
   } catch (err) {
-    console.error("Face scan API error:", err);
+    console.error("Face scan upload API error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

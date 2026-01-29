@@ -1,4 +1,3 @@
-// admin-api/src/app/api/admin/live-applications/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -14,49 +13,38 @@ type RouteContext = {
 async function getIdFromContext(ctx: RouteContext): Promise<string | null> {
   const paramsAny: any = ctx.params;
   const resolved =
-    paramsAny && typeof paramsAny.then === "function"
-      ? await paramsAny
-      : paramsAny;
+    paramsAny && typeof paramsAny.then === "function" ? await paramsAny : paramsAny;
 
   return resolved?.id ?? null;
 }
 
 // PATCH /api/admin/live-applications/[id]
-// Body: { status: "APPROVED" | "REJECTED" }
+// Body: { status: "APPROVED" | "REJECTED" | "PENDING" }
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
   try {
     const id = await getIdFromContext(ctx);
 
     if (!id) {
-      return NextResponse.json(
-        { error: "Missing application id" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing application id" }, { status: 400 });
     }
 
     const body = await req.json().catch(() => null);
     const status = body?.status as LiveApplicationStatus | undefined;
 
     if (status !== "APPROVED" && status !== "REJECTED" && status !== "PENDING") {
-      return NextResponse.json(
-        { error: "Invalid status" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    // Get existing application (so we can notify the right user)
     const existing = await prisma.liveApplication.findUnique({
       where: { id },
-      include: { user: true },
+      select: { id: true, userId: true, status: true },
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Application not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
 
+    // Update application status
     const application = await prisma.liveApplication.update({
       where: { id },
       data: { status },
@@ -64,6 +52,27 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
         user: { include: { country: true } },
       },
     });
+
+    // ✅ Sync faceVerifiedAt ONLY when APPROVED
+    // - APPROVED => set faceVerifiedAt = now
+    // - REJECTED => clear faceVerifiedAt
+    // - PENDING  => do nothing
+    try {
+      if (status === "APPROVED") {
+        await prisma.user.update({
+          where: { id: application.userId },
+          data: { faceVerifiedAt: new Date() },
+        });
+      } else if (status === "REJECTED") {
+        await prisma.user.update({
+          where: { id: application.userId },
+          data: { faceVerifiedAt: null },
+        });
+      }
+    } catch (err) {
+      console.error("faceVerifiedAt sync error:", err);
+      // don't fail PATCH if sync fails
+    }
 
     // 🔔 Create notification for APPROVED / REJECTED
     try {
@@ -88,16 +97,12 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       }
     } catch (err) {
       console.error("Notification create error:", err);
-      // don't fail PATCH if notification fails
     }
 
     return NextResponse.json({ application }, { status: 200 });
   } catch (error) {
     console.error("Update live application error:", error);
-    return NextResponse.json(
-      { error: "Failed to update live application" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update live application" }, { status: 500 });
   }
 }
 
@@ -107,33 +112,23 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
     const id = await getIdFromContext(ctx);
 
     if (!id) {
-      return NextResponse.json(
-        { error: "Missing application id" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing application id" }, { status: 400 });
     }
 
     const existing = await prisma.liveApplication.findUnique({
       where: { id },
+      select: { id: true },
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Application not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
 
-    await prisma.liveApplication.delete({
-      where: { id },
-    });
+    await prisma.liveApplication.delete({ where: { id } });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Delete live application error:", error);
-    return NextResponse.json(
-      { error: "Failed to delete live application" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to delete application" }, { status: 500 });
   }
 }

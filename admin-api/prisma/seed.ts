@@ -1,5 +1,5 @@
 // prisma/seed.ts
-import { PrismaClient, VipTier } from "@prisma/client";
+import { PrismaClient, VipTier, AppLanguage, HelpCategoryKey } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -46,7 +46,7 @@ async function main() {
   console.log("Seeded countries ✅");
 
   // =========================================================
-  // 2) Seed admin user
+  // 2) Seed admin user (MUST be before Help module seeding)
   // =========================================================
   const adminPassword = "admin123";
   const passwordHash = await bcrypt.hash(adminPassword, 10);
@@ -75,13 +75,141 @@ async function main() {
     include: { wallet: true },
   });
 
+  const adminId = admin.id;
+
   console.log("Admin user ready ✅");
   console.log("  username:", admin.username);
   console.log("  password:", adminPassword);
   console.log("  id:", admin.id);
 
   // =========================================================
-  // 3) Seed VIP privileges (global definitions)
+  // 3) Seed HELP: Categories + FAQ (EN)
+  // =========================================================
+  const HELP_LANG: AppLanguage = AppLanguage.EN;
+
+  const helpCategories: Array<{
+    key: HelpCategoryKey;
+    title: string;
+    sortOrder: number;
+  }> = [
+    { key: HelpCategoryKey.FREQUENT, title: "Frequent", sortOrder: 1 },
+    { key: HelpCategoryKey.LIVESTREAM, title: "Livestream", sortOrder: 2 },
+    { key: HelpCategoryKey.RECHARGE, title: "Recharge", sortOrder: 3 },
+    { key: HelpCategoryKey.REPORT, title: "Report", sortOrder: 4 },
+    { key: HelpCategoryKey.ACCOUNT, title: "Account", sortOrder: 5 },
+  ];
+
+  for (const c of helpCategories) {
+    const cat = await prisma.helpCategory.upsert({
+      where: { key: c.key },
+      update: { isActive: true, sortOrder: c.sortOrder },
+      create: { key: c.key, isActive: true, sortOrder: c.sortOrder },
+    });
+
+    await prisma.helpCategoryTranslation.upsert({
+      where: { categoryId_language: { categoryId: cat.id, language: HELP_LANG } },
+      update: { title: c.title },
+      create: { categoryId: cat.id, language: HELP_LANG, title: c.title },
+    });
+  }
+
+  const cats = await prisma.helpCategory.findMany({ select: { id: true, key: true } });
+  const catIdByKey = new Map(cats.map((x) => [x.key, x.id] as const));
+
+  const faqs = [
+    {
+      cat: HelpCategoryKey.ACCOUNT,
+      q: "Why did my face authentication fail?",
+      a: "Common reasons: low light, face not centered, blurry camera, or weak internet. Try good lighting, keep face in frame, remove mask/hat, and retry. If it keeps failing, update the app and contact support with a screenshot.",
+      sortOrder: 1,
+    },
+    {
+      cat: HelpCategoryKey.ACCOUNT,
+      q: "How to become an agent?",
+      a: "Go to the Agent/Agency section in your profile and submit an application. You may need ID verification. After review, you will get approval or rejection in the app.",
+      sortOrder: 2,
+    },
+    {
+      cat: HelpCategoryKey.RECHARGE,
+      q: `Why can't the "Points to be confirmed" be withdrawn?`,
+      a: `“Points to be confirmed” are pending verification. They become withdrawable after the system confirms them. Wait for confirmation, then try again.`,
+      sortOrder: 3,
+    },
+    {
+      cat: HelpCategoryKey.RECHARGE,
+      q: "I didn't receive salary after making withdrawal. What should I do?",
+      a: "Check withdrawal status in wallet history. Some payouts take time. If status is completed but you didn’t receive it, contact support and share withdrawal ID, amount, and date.",
+      sortOrder: 4,
+    },
+    {
+      cat: HelpCategoryKey.RECHARGE,
+      q: "How to become a coinseller?",
+      a: "Open the Coinseller section in the app and apply. Usually you need verified identity and admin approval. After approval, you can start selling coins according to platform rules.",
+      sortOrder: 5,
+    },
+    {
+      cat: HelpCategoryKey.RECHARGE,
+      q: "I didn't receive coins after topping up. What should I do?",
+      a: "Confirm payment success and keep transaction receipt. Restart the app and check wallet balance. If still missing, contact support with transaction ID and screenshot so coins can be credited.",
+      sortOrder: 6,
+    },
+    {
+      cat: HelpCategoryKey.ACCOUNT,
+      q: "How to quit an agency?",
+      a: "Go to your Agency page and select Quit/Leave. Some agencies have conditions or lock periods. If you don’t see the option, contact support.",
+      sortOrder: 7,
+    },
+    {
+      cat: HelpCategoryKey.LIVESTREAM,
+      q: "Why is my livestream task missing?",
+      a: "Tasks refresh daily and some depend on level/region. Update the app, reopen the task page, and check eligibility. If it’s still missing, contact support with your user ID.",
+      sortOrder: 8,
+    },
+  ];
+
+  for (const item of faqs) {
+    const categoryId = catIdByKey.get(item.cat);
+    if (!categoryId) continue;
+
+    // Find existing FAQ by EN translation question
+    const existing = await prisma.helpFaq.findFirst({
+      where: {
+        categoryId,
+        translations: { some: { language: HELP_LANG, question: item.q } },
+      },
+      select: { id: true },
+    });
+
+    const faqRow = existing
+      ? await prisma.helpFaq.update({
+          where: { id: existing.id },
+          data: {
+            isActive: true,
+            sortOrder: item.sortOrder,
+            updatedById: adminId,
+          },
+        })
+      : await prisma.helpFaq.create({
+          data: {
+            categoryId,
+            isActive: true,
+            sortOrder: item.sortOrder,
+            createdById: adminId,
+            updatedById: adminId,
+          },
+        });
+
+    await prisma.helpFaqTranslation.upsert({
+      where: { faqId_language: { faqId: faqRow.id, language: HELP_LANG } },
+      update: { question: item.q, answer: item.a },
+      create: { faqId: faqRow.id, language: HELP_LANG, question: item.q, answer: item.a },
+    });
+  }
+
+  console.log("Help categories + FAQs seeded ✅");
+
+  // =========================================================
+  // 4) Seed VIP privileges (global definitions)
   // =========================================================
   const vipPrivileges = [
     { key: "daily_coins", label: "Collect Coins", defaultValue: "+3,500/d", icon: "star-outline", sortOrder: 1 },
@@ -121,9 +249,6 @@ async function main() {
   });
   const privIdByKey = new Map(allPrivileges.map((p) => [p.key, p.id] as const));
 
-  // =========================================================
-  // Helpers for VIP plans
-  // =========================================================
   async function upsertPlan(input: {
     tier: VipTier;
     name: string;
@@ -131,7 +256,7 @@ async function main() {
     sortOrder: number;
     packages: Array<{
       label: string;
-      durationMonths: number; // 1,3,6,12
+      durationMonths: number;
       priceCoins: number;
       sortOrder: number;
     }>;
@@ -226,7 +351,7 @@ async function main() {
   }
 
   // =========================================================
-  // 4) Seed VIP plans + packages + privileges
+  // 5) Seed VIP plans + packages + privileges
   // =========================================================
   await upsertPlan({
     tier: "NORMAL",
@@ -318,17 +443,15 @@ async function main() {
 
   console.log("VIP plans + packages + privileges seeded ✅");
 
-  // Optional: if you want admin to start with VIP for testing (comment out if not needed)
+  // Optional test VIP enable
   // await prisma.user.update({
-  //   where: { id: admin.id },
+  //   where: { id: adminId },
   //   data: {
   //     vipTier: "NORMAL",
   //     vipLevel: vipLevelFromTier("NORMAL"),
   //     vipExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   //   },
   // });
-
-  // console.log("Admin VIP enabled for testing ✅");
 }
 
 main()

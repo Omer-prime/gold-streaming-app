@@ -74,8 +74,8 @@ model User {
   moments                   Moment[]
   momentComments            MomentComment[]
   momentLikes               MomentLike[]
-  storePurchases            StorePurchase[]
-  storeItems                UserStoreItem[]
+  storePurchases StorePurchase[]
+  storeItems     UserStoreItem[]
   momentSaves               MomentSave[]
   notifications             Notification[]
   pkBattlesAsHost           PKBattle[]          @relation("PKHost")
@@ -91,25 +91,21 @@ model User {
   pointsLedger              UserPointLedger[]
   settings                  UserSettings?
   wallet                    Wallet?
-  guardianGiven             GuardianBond[]      @relation("GuardianGiver")
-  guardianReceived          GuardianBond[]      @relation("GuardianReceiver")
+  guardianGiven    GuardianBond[] @relation("GuardianGiver")
+  guardianReceived GuardianBond[] @relation("GuardianReceiver")
+  
 
   inviteCode  InviteCode?
-  invitesSent Invite[]    @relation("Inviter")
-  invitedBy   Invite[]    @relation("Invitee")
+  invitesSent Invite[] @relation("Inviter")
+  invitedBy   Invite[] @relation("Invitee")
 
   // ===== Currency/Reseller/Salary (existing) =====
   currencyTrades      CurrencyTrade[]
   resellerApplication ResellerApplication?
   baseSalaryRequests  BaseSalaryRequest[]
 
-  // ===== Help / FAQ / Feedback =====
-  helpFaqsCreated     HelpFaq[]      @relation("HelpFaqCreatedBy")
-  helpFaqsUpdated     HelpFaq[]      @relation("HelpFaqUpdatedBy")
-  helpFeedbacks       HelpFeedback[] @relation("HelpFeedbackUser")
-  helpFeedbackReplies HelpFeedback[] @relation("HelpFeedbackRepliedBy")
   // ===== Wallet Ledger (coins history) =====
-  walletLedgers       WalletLedger[]
+  walletLedgers WalletLedger[]
 
   @@index([countryId])
   @@index([createdAt])
@@ -198,11 +194,11 @@ model Wallet {
 }
 
 model WalletLedger {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
+  id           String           @id @default(cuid())
+  createdAt    DateTime         @default(now())
 
-  userId   String
-  walletId String
+  userId       String
+  walletId     String
 
   type         WalletLedgerType
   delta        Int
@@ -303,23 +299,23 @@ model UserPointLedger {
 }
 
 model UserSettings {
-  id                 String      @id @default(cuid())
-  userId             String      @unique
-  language           AppLanguage @default(SYSTEM)
-  notifyLiveAlerts   Boolean     @default(true)
-  notifyMessages     Boolean     @default(true)
-  notifySound        Boolean     @default(true)
-  notifyVibrate      Boolean     @default(true)
-  allowFromMutual    Boolean     @default(true)
-  allowFromFollowing Boolean     @default(true)
-  allowFromStrangers Boolean     @default(true)
-  invisibleVisitor   Boolean     @default(false)
-  mysteryLive        Boolean     @default(false)
-  mysteryRank        Boolean     @default(false)
-  invisibleOnline    Boolean     @default(false)
-  exclusiveEmail     Boolean     @default(false)
-  hideLiveLevel      Boolean     @default(false)
-  hideMicStatus      Boolean     @default(false)
+  id                 String  @id @default(cuid())
+  userId             String  @unique
+  language           String  @default("system")
+  notifyLiveAlerts   Boolean @default(true)
+  notifyMessages     Boolean @default(true)
+  notifySound        Boolean @default(true)
+  notifyVibrate      Boolean @default(true)
+  allowFromMutual    Boolean @default(true)
+  allowFromFollowing Boolean @default(true)
+  allowFromStrangers Boolean @default(true)
+  invisibleVisitor   Boolean @default(false)
+  mysteryLive        Boolean @default(false)
+  mysteryRank        Boolean @default(false)
+  invisibleOnline    Boolean @default(false)
+  exclusiveEmail     Boolean @default(false)
+  hideLiveLevel      Boolean @default(false)
+  hideMicStatus      Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id])
 }
@@ -349,10 +345,10 @@ model HonorItem {
 }
 
 model UserHonor {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
   itemId     String
-  obtainedAt DateTime @default(now())
+  obtainedAt DateTime  @default(now())
 
   item HonorItem @relation(fields: [itemId], references: [id])
   user User      @relation(fields: [userId], references: [id])
@@ -363,18 +359,18 @@ model UserHonor {
 }
 
 model Moment {
-  id           String     @id @default(cuid())
+  id           String          @id @default(cuid())
   userId       String
   text         String?
   imageUrl     String?
-  createdAt    DateTime   @default(now())
-  commentCount Int        @default(0)
-  likeCount    Int        @default(0)
-  saveCount    Int        @default(0)
-  shareCount   Int        @default(0)
+  createdAt    DateTime        @default(now())
+  commentCount Int             @default(0)
+  likeCount    Int             @default(0)
+  saveCount    Int             @default(0)
+  shareCount   Int             @default(0)
   thumbnailUrl String?
   topicId      String?
-  type         MomentType @default(TEXT)
+  type         MomentType      @default(TEXT)
   videoUrl     String?
 
   topic Topic? @relation(fields: [topicId], references: [id])
@@ -389,11 +385,11 @@ model Moment {
 }
 
 model FanClub {
-  id          String   @id @default(cuid())
-  ownerId     String   @unique
+  id          String          @id @default(cuid())
+  ownerId     String          @unique
   name        String
   description String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime        @default(now())
 
   owner   User            @relation(fields: [ownerId], references: [id])
   members FanClubMember[]
@@ -418,8 +414,8 @@ model LiveApplication {
   id              String                @id @default(cuid())
   userId          String
   status          LiveApplicationStatus @default(PENDING)
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
   faceImageBase64 String?
 
   user User @relation(fields: [userId], references: [id])
@@ -429,9 +425,9 @@ model LiveApplication {
 }
 
 model PKBattle {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String         @id @default(cuid())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   type        PKType
   status      PKBattleStatus @default(PENDING)
@@ -466,17 +462,17 @@ model PKBattle {
 }
 
 model ChatThread {
-  id              String    @id @default(cuid())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   userAId         String
   userBId         String
   lastMessageText String?
   lastMessageAt   DateTime?
 
   messages ChatMessage[]
-  userA    User          @relation("ChatThreadUserA", fields: [userAId], references: [id])
-  userB    User          @relation("ChatThreadUserB", fields: [userBId], references: [id])
+  userA    User @relation("ChatThreadUserA", fields: [userAId], references: [id])
+  userB    User @relation("ChatThreadUserB", fields: [userBId], references: [id])
 
   @@unique([userAId, userBId], name: "userAId_userBId")
   @@index([userAId])
@@ -511,7 +507,7 @@ model AdminNotification {
   body          String
   metaJson      Json?
 
-  createdBy     User           @relation("AdminNotificationCreator", fields: [createdById], references: [id])
+  createdBy     User            @relation("AdminNotificationCreator", fields: [createdById], references: [id])
   notifications Notification[]
 
   @@index([createdById, createdAt])
@@ -519,12 +515,12 @@ model AdminNotification {
 }
 
 model Notification {
-  id                  String    @id @default(cuid())
+  id                  String   @id @default(cuid())
   userId              String
-  type                String    @default("SYSTEM")
+  type                String   @default("SYSTEM")
   title               String
   body                String
-  createdAt           DateTime  @default(now())
+  createdAt           DateTime @default(now())
   readAt              DateTime?
   metaJson            Json?
   adminNotificationId String?
@@ -701,11 +697,14 @@ model Invite {
   inviter User  @relation("Inviter", fields: [inviterId], references: [id])
   invitee User? @relation("Invitee", fields: [inviteeId], references: [id])
 
-  @@unique([inviterId, inviteeId])
   @@index([inviterId, createdAt])
   @@index([code, createdAt])
+  @@unique([inviterId, inviteeId])
 }
 
+//
+// Admin-configurable Reward Tasks (used by /api/profile/rewards and admin CRUD)
+//
 model RewardTask {
   id           String         @id @default(cuid())
   category     RewardCategory
@@ -740,15 +739,15 @@ model VipPlan {
 }
 
 model VipPlanPackage {
-  id             String   @id @default(cuid())
-  planId         String
-  label          String // "Monthly", "3 Months", "6 Months", "Yearly"
-  durationMonths Int // 1,3,6,12
-  priceCoins     Int
-  isActive       Boolean  @default(true)
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(cuid())
+  planId        String
+  label         String   // "Monthly", "3 Months", "6 Months", "Yearly"
+  durationMonths Int     // 1,3,6,12
+  priceCoins    Int
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   plan VipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
@@ -760,7 +759,7 @@ model VipPrivilege {
   key          String   @unique // e.g. "daily_coins", "live_tag"
   label        String
   defaultValue String?
-  icon         String? // store Ionicons name (optional)
+  icon         String?  // store Ionicons name (optional)
   isActive     Boolean  @default(true)
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
@@ -772,9 +771,10 @@ model VipPrivilege {
 }
 
 model VipPlanPrivilege {
-  id            String  @id @default(cuid())
-  planId        String
-  privilegeId   String
+  id          String   @id @default(cuid())
+  planId      String
+  privilegeId String
+
   valueOverride String?
   locked        Boolean @default(false)
   sortOrder     Int     @default(0)
@@ -785,7 +785,6 @@ model VipPlanPrivilege {
   @@unique([planId, privilegeId])
   @@index([planId, sortOrder])
 }
-
 model GuardianPlan {
   id          String       @id @default(cuid())
   tier        GuardianTier @unique
@@ -807,8 +806,8 @@ model GuardianPlan {
 model GuardianPlanPackage {
   id             String   @id @default(cuid())
   planId         String
-  label          String // "1 Month", "3 Months", "6 Months", "12 Months"
-  durationMonths Int // 1,3,6,12
+  label          String   // "1 Month", "3 Months", "6 Months", "12 Months"
+  durationMonths Int      // 1,3,6,12
   priceCoins     Int
   isActive       Boolean  @default(true)
   sortOrder      Int      @default(0)
@@ -828,7 +827,7 @@ model GuardianPrivilege {
   key          String   @unique // e.g. "higher_rank", "entry_effect"
   label        String
   defaultValue String?
-  icon         String? // Ionicons name (optional)
+  icon         String?  // Ionicons name (optional)
   isActive     Boolean  @default(true)
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
@@ -840,9 +839,9 @@ model GuardianPrivilege {
 }
 
 model GuardianPlanPrivilege {
-  id            String  @id @default(cuid())
-  planId        String
-  privilegeId   String
+  id           String   @id @default(cuid())
+  planId       String
+  privilegeId  String
   valueOverride String?
   locked        Boolean @default(false)
   sortOrder     Int     @default(0)
@@ -855,21 +854,21 @@ model GuardianPlanPrivilege {
 }
 
 model GuardianBond {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String            @id @default(cuid())
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   guardianId String
   guardedId  String
 
-  planId    String
-  packageId String
+  planId     String
+  packageId  String
 
-  tier   GuardianTier
-  status GuardianBondStatus @default(ACTIVE)
+  tier       GuardianTier
+  status     GuardianBondStatus @default(ACTIVE)
 
-  startedAt DateTime @default(now())
-  endsAt    DateTime
+  startedAt  DateTime          @default(now())
+  endsAt     DateTime
 
   priceCoins Int
 
@@ -884,12 +883,28 @@ model GuardianBond {
   @@index([planId])
   @@index([packageId])
 }
+enum StoreItemType {
+  HONOR
+  PREMIUM_ID
+  RIDE
+  PROFILE_CARD
+  AVATAR_FRAME
+  PARTY_THEME
+  CHAT_BUBBLE
+  OTHER
+}
+
+enum StoreMediaType {
+  IMAGE
+  GIF
+  VIDEO
+}
 
 model StoreCategory {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
-  icon      String? // Ionicons name optional
+  icon      String?  // Ionicons name optional
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
@@ -901,33 +916,33 @@ model StoreCategory {
 }
 
 model StoreItem {
-  id         String        @id @default(cuid())
-  categoryId String
-  type       StoreItemType @default(OTHER)
+  id              String        @id @default(cuid())
+  categoryId       String
+  type            StoreItemType @default(OTHER)
 
-  title       String
-  description String?
-  priceCoins  Int
+  title           String
+  description     String?
+  priceCoins      Int
 
   // grouping like your UI sections: "New This Month", "Avatar Frame", etc.
-  section          String?
-  sectionSortOrder Int     @default(0)
+  section         String?
+  sectionSortOrder Int          @default(0)
 
-  mediaType    StoreMediaType @default(IMAGE)
-  mediaUrl     String?
-  thumbnailUrl String?
+  mediaType       StoreMediaType @default(IMAGE)
+  mediaUrl        String?
+  thumbnailUrl    String?
 
-  isActive   Boolean @default(true)
-  isFeatured Boolean @default(false) // used for "Popular"
-  sortOrder  Int     @default(0)
+  isActive        Boolean       @default(true)
+  isFeatured      Boolean       @default(false) // used for "Popular"
+  sortOrder       Int           @default(0)
 
   // null = permanent, else item is time-limited (e.g. 7 days)
-  durationDays Int?
+  durationDays    Int?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  category  StoreCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category  StoreCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   purchases StorePurchase[]
   userItems UserStoreItem[]
 
@@ -940,10 +955,10 @@ model StorePurchase {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  userId String
-  itemId String
+  userId   String
+  itemId   String
 
-  quantity   Int   @default(1)
+  quantity   Int @default(1)
   unitPrice  Int
   totalPrice Int
   metaJson   Json?
@@ -956,13 +971,13 @@ model StorePurchase {
 }
 
 model UserStoreItem {
-  id     String @id @default(cuid())
-  userId String
-  itemId String
+  id        String   @id @default(cuid())
+  userId    String
+  itemId    String
 
-  obtainedAt      DateTime  @default(now())
-  lastPurchasedAt DateTime  @default(now())
-  expiresAt       DateTime? // null = permanent
+  obtainedAt       DateTime @default(now())
+  lastPurchasedAt  DateTime @default(now())
+  expiresAt        DateTime? // null = permanent
 
   user User      @relation(fields: [userId], references: [id])
   item StoreItem @relation(fields: [itemId], references: [id])
@@ -971,90 +986,8 @@ model UserStoreItem {
   @@index([userId, expiresAt])
 }
 
-model HelpCategory {
-  id        String          @id @default(cuid())
-  key       HelpCategoryKey @unique
-  isActive  Boolean         @default(true)
-  sortOrder Int             @default(0)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
 
-  translations HelpCategoryTranslation[]
-  faqs         HelpFaq[]
 
-  @@index([isActive, sortOrder])
-}
-
-model HelpCategoryTranslation {
-  id         String      @id @default(cuid())
-  categoryId String
-  language   AppLanguage
-  title      String
-
-  category HelpCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@unique([categoryId, language])
-  @@index([language])
-}
-
-model HelpFaq {
-  id         String  @id @default(cuid())
-  categoryId String
-  isActive   Boolean @default(true)
-  sortOrder  Int     @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  createdById String?
-  updatedById String?
-
-  category  HelpCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  createdBy User?        @relation("HelpFaqCreatedBy", fields: [createdById], references: [id])
-  updatedBy User?        @relation("HelpFaqUpdatedBy", fields: [updatedById], references: [id])
-
-  translations HelpFaqTranslation[]
-
-  @@index([categoryId, isActive, sortOrder])
-  @@index([createdAt])
-}
-
-model HelpFaqTranslation {
-  id       String      @id @default(cuid())
-  faqId    String
-  language AppLanguage
-  question String
-  answer   String
-
-  faq HelpFaq @relation(fields: [faqId], references: [id], onDelete: Cascade)
-
-  @@unique([faqId, language])
-  @@index([language])
-}
-
-model HelpFeedback {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userId String
-  type   HelpFeedbackType   @default(MY_FEEDBACK)
-  status HelpFeedbackStatus @default(OPEN)
-
-  message     String
-  screenshots String[] @default([])
-
-  repliedById String?
-  replyText   String?
-  repliedAt   DateTime?
-
-  user      User  @relation("HelpFeedbackUser", fields: [userId], references: [id])
-  repliedBy User? @relation("HelpFeedbackRepliedBy", fields: [repliedById], references: [id])
-
-  @@index([userId, createdAt])
-  @@index([status, createdAt])
-  @@index([type, createdAt])
-}
 
 // ===== Enums =====
 
@@ -1144,12 +1077,47 @@ enum ResellerApplicationStatus {
   REJECTED
 }
 
+
+model Stream {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  tag         String?
+
+  hostId String
+  host   User     @relation("UserStreams", fields: [hostId], references: [id])
+
+  mode     StreamMode     @default(SOLO)
+  protocol StreamProtocol @default(CAMERA_ONLY)
+
+  // ✅ for LiveKit rooms
+  roomName String? @unique
+  roomSid  String?
+
+  isLive       Boolean   @default(false)
+  viewers      Int       @default(0)
+  thumbnailUrl String?
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  messages  Message[]
+  gifts     GiftTransaction[]
+  pkBattles PKBattle[]
+
+  @@index([hostId])
+  @@index([isLive])
+  @@index([createdAt])
+  @@index([mode])}
+=======
 enum BaseSalaryRequestStatus {
   PENDING
   APPROVED
   REJECTED
 }
 
+// new enums for Phase-1 gifts + PK
 enum GiftMediaType {
   IMAGE
   GIF
@@ -1178,7 +1146,6 @@ enum GuardianBondStatus {
   EXPIRED
   CANCELED
 }
-
 enum PKBattleStatus {
   PENDING
   ACTIVE
@@ -1191,63 +1158,12 @@ enum PKSide {
   OPPONENT
 }
 
+//
+// 
+//
 enum RewardCategory {
   PK_MISSION
   ACTIVITY
   FAN_CLUB
   INVITE
-}
-
-enum StoreItemType {
-  HONOR
-  PREMIUM_ID
-  RIDE
-  PROFILE_CARD
-  AVATAR_FRAME
-  PARTY_THEME
-  CHAT_BUBBLE
-  OTHER
-}
-
-enum StoreMediaType {
-  IMAGE
-  GIF
-  VIDEO
-}
-
-enum HelpFeedbackType {
-  MY_FEEDBACK
-  MESSAGE_FEEDBACK
-}
-
-enum HelpCategoryKey {
-  FREQUENT
-  LIVESTREAM
-  RECHARGE
-  REPORT
-  ACCOUNT
-}
-
-enum HelpFeedbackStatus {
-  OPEN
-  REPLIED
-  CLOSED
-}
-
-enum AppLanguage {
-  SYSTEM  @map("system")
-  EN      @map("en")
-  ZH_HANT @map("zh-Hant")
-  VI      @map("vi")
-  HI      @map("hi")
-  ID      @map("id")
-  AR      @map("ar")
-  UR      @map("ur")
-  PT      @map("pt")
-  TR      @map("tr")
-  BN      @map("bn")
-  TH      @map("th")
-  NE      @map("ne")
-  FR      @map("fr")
-  ES      @map("es")
 }

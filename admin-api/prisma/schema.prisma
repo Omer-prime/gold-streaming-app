@@ -20,43 +20,43 @@ model Country {
 }
 
 model User {
-  id                 String    @id @default(cuid())
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  email              String?   @unique
-  username           String    @unique
-  passwordHash       String?
-  role               Role      @default(USER)
-  avatarUrl          String?
-  bio                String?
-  nickname           String?
-  inviterCode        String?
-  countryId          Int?
-  dateOfBirth        DateTime?
-  gender             Gender?
-  exp                Int       @default(0)
-  level              Int       @default(1)
-  vipLevel           Int       @default(0)
-  facebookId         String?   @unique
-  googleId           String?   @unique
-  instagramId        String?   @unique
-  phoneNumber        String?   @unique
-  tiktokId           String?   @unique
-  liveLevel          Int       @default(1)
-  interestTags       String[]  @default([])
-  profilePhotos      String[]  @default([])
-  faceVerifiedAt     DateTime?
-  liveCoverUrl       String?
-  vipExpiresAt       DateTime?
-  vipTier            VipTier   @default(NONE)
-  followersCount     Int       @default(0)
-  followingCount     Int       @default(0)
-  isLive             Boolean   @default(false)
-  lastLiveAt         DateTime?
-  liveViewers        Int       @default(0)
-  totalCoinsReceived Int       @default(0)
-  totalCoinsSpent    Int       @default(0)
-
+  id                        String              @id @default(cuid())
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  email                     String?             @unique
+  username                  String              @unique
+  passwordHash              String?
+  role                      Role                @default(USER)
+  avatarUrl                 String?
+  bio                       String?
+  nickname                  String?
+  inviterCode               String?
+  countryId                 Int?
+  dateOfBirth               DateTime?
+  gender                    Gender?
+  exp                       Int                 @default(0)
+  level                     Int                 @default(1)
+  vipLevel                  Int                 @default(0)
+  facebookId                String?             @unique
+  googleId                  String?             @unique
+  instagramId               String?             @unique
+  phoneNumber               String?             @unique
+  tiktokId                  String?             @unique
+  liveLevel                 Int                 @default(1)
+  interestTags              String[]            @default([])
+  profilePhotos             String[]            @default([])
+  faceVerifiedAt            DateTime?
+  liveCoverUrl              String?
+  vipExpiresAt              DateTime?
+  vipTier                   VipTier             @default(NONE)
+  followersCount            Int                 @default(0)
+  followingCount            Int                 @default(0)
+  isLive                    Boolean             @default(false)
+  lastLiveAt                DateTime?
+  liveViewers               Int                 @default(0)
+  totalCoinsReceived        Int                 @default(0)
+  totalCoinsSpent           Int                 @default(0)
+  verificationCodes         VerificationCode[]
   adminNotificationsCreated AdminNotification[] @relation("AdminNotificationCreator")
   chatMessages              ChatMessage[]
   chatThreadsA              ChatThread[]        @relation("ChatThreadUserA")
@@ -1056,6 +1056,23 @@ model HelpFeedback {
   @@index([type, createdAt])
 }
 
+model VerificationCode {
+  id          String              @id @default(cuid())
+  createdAt   DateTime            @default(now())
+  userId      String
+  channel     VerificationChannel
+  destination String
+  codeHash    String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int                 @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel, createdAt])
+  @@index([destination, channel])
+}
+
 // ===== Enums =====
 
 enum InviteStatus {
@@ -1250,4 +1267,9 @@ enum AppLanguage {
   NE      @map("ne")
   FR      @map("fr")
   ES      @map("es")
+}
+
+enum VerificationChannel {
+  EMAIL
+  PHONE
 }

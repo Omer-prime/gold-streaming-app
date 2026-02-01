@@ -94,10 +94,10 @@ model User {
   guardianGiven             GuardianBond[]      @relation("GuardianGiver")
   guardianReceived          GuardianBond[]      @relation("GuardianReceiver")
 
-  inviteCode  InviteCode?
-  invitesSent Invite[]    @relation("Inviter")
-  invitedBy   Invite[]    @relation("Invitee")
-
+  inviteCode          InviteCode?
+  invitesSent         Invite[]             @relation("Inviter")
+  invitedBy           Invite[]             @relation("Invitee")
+  pointWithdrawals    PointWithdrawal[]
   // ===== Currency/Reseller/Salary (existing) =====
   currencyTrades      CurrencyTrade[]
   resellerApplication ResellerApplication?
@@ -298,6 +298,22 @@ model UserPointLedger {
   reason    String?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model PointWithdrawal {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  points  Int
+  method  String
+  account String
+  status  String @default("PENDING")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }

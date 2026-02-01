@@ -15,7 +15,9 @@ const io = new Server(server, {
 const roomName = (streamId) => `stream:${streamId}`;
 
 const viewersByStream = new Map(); // streamId -> count
-const userSocketById = new Map();  // userId -> socket.id
+const userSocketById = new Map();  // userId -> socket.id (last seen)
+
+const pkTimers = new Map(); // battleId -> timeout
 
 async function getStreamHostId(streamId) {
   const s = await prisma.stream.findUnique({
@@ -55,23 +57,30 @@ async function decViewers(streamId) {
   await setViewers(streamId, next);
 }
 
+function clearPkTimer(battleId) {
+  const t = pkTimers.get(battleId);
+  if (t) clearTimeout(t);
+  pkTimers.delete(battleId);
+}
+
 io.on("connection", (socket) => {
+  socket.data.left = false;
+
   socket.on("joinLive", async (payload, cb) => {
     try {
       const { streamId, userId, name, role } = payload || {};
       if (!streamId || !userId) return cb?.({ error: "streamId & userId required" });
 
-      // attach socket data
       socket.data.streamId = streamId;
       socket.data.userId = userId;
       socket.data.name = name || "Guest";
       socket.data.role = role === "host" ? "host" : "viewer";
+      socket.data.left = false;
 
       userSocketById.set(userId, socket.id);
 
       socket.join(roomName(streamId));
 
-      // viewer count (only viewers)
       if (socket.data.role === "viewer") await incViewers(streamId);
 
       cb?.({ ok: true });
@@ -89,15 +98,18 @@ io.on("connection", (socket) => {
   socket.on("leaveLive", async (_, cb) => {
     try {
       const streamId = socket.data?.streamId;
-      if (streamId && socket.data?.role === "viewer") await decViewers(streamId);
-
+      if (streamId && socket.data?.role === "viewer" && !socket.data.left) {
+        socket.data.left = true; // ✅ prevent double decrement on disconnect
+        await decViewers(streamId);
+      }
+      if (streamId) socket.leave(roomName(streamId));
       cb?.({ ok: true });
     } catch {
       cb?.({ ok: true });
     }
   });
 
-  // CHAT (persist to Message table)
+  // CHAT
   socket.on("chat", async (payload, cb) => {
     try {
       const { streamId, userId, text } = payload || {};
@@ -127,7 +139,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // FOLLOW toggle
+  // FOLLOW
   socket.on("toggleFollow", async (payload, cb) => {
     try {
       const { followerId, followingId } = payload || {};
@@ -144,30 +156,17 @@ io.on("connection", (socket) => {
           await tx.follow.delete({
             where: { followerId_followingId: { followerId, followingId } },
           });
-          await tx.user.update({
-            where: { id: followerId },
-            data: { followingCount: { decrement: 1 } },
-          });
-          await tx.user.update({
-            where: { id: followingId },
-            data: { followersCount: { decrement: 1 } },
-          });
+          await tx.user.update({ where: { id: followerId }, data: { followingCount: { decrement: 1 } } });
+          await tx.user.update({ where: { id: followingId }, data: { followersCount: { decrement: 1 } } });
           return { following: false };
         } else {
           await tx.follow.create({ data: { followerId, followingId } });
-          await tx.user.update({
-            where: { id: followerId },
-            data: { followingCount: { increment: 1 } },
-          });
-          await tx.user.update({
-            where: { id: followingId },
-            data: { followersCount: { increment: 1 } },
-          });
+          await tx.user.update({ where: { id: followerId }, data: { followingCount: { increment: 1 } } });
+          await tx.user.update({ where: { id: followingId }, data: { followersCount: { increment: 1 } } });
           return { following: true };
         }
       });
 
-      // notify host (optional)
       const hostSocketId = userSocketById.get(followingId);
       if (hostSocketId) {
         io.to(hostSocketId).emit("followEvent", {
@@ -185,7 +184,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // GIFTS (persist + wallet updates)
+  // GIFTS ✅ now includes mediaType + mediaUrl
   socket.on("sendGift", async (payload, cb) => {
     try {
       const { streamId, senderId, giftId, quantity, targetSide } = payload || {};
@@ -194,7 +193,19 @@ io.on("connection", (socket) => {
       const qty = Math.max(1, Math.min(999, Number(quantity || 1) | 0));
 
       const [gift, hostId] = await Promise.all([
-        prisma.gift.findUnique({ where: { id: Number(giftId) }, select: { id: true, name: true, price: true, thumbnailUrl: true, isActive: true } }),
+        prisma.gift.findUnique({
+          where: { id: Number(giftId) },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            isActive: true,
+            thumbnailUrl: true,
+            mediaType: true,
+            mediaUrl: true,
+            iconUrl: true,
+          },
+        }),
         getStreamHostId(streamId),
       ]);
 
@@ -212,9 +223,7 @@ io.on("connection", (socket) => {
           select: { id: true, balance: true },
         });
 
-        if (senderWallet.balance < total) {
-          throw new Error("INSUFFICIENT_BALANCE");
-        }
+        if (senderWallet.balance < total) throw new Error("INSUFFICIENT_BALANCE");
 
         const receiverWallet = await tx.wallet.upsert({
           where: { userId: hostId },
@@ -228,30 +237,6 @@ io.on("connection", (socket) => {
 
         await tx.wallet.update({ where: { id: senderWallet.id }, data: { balance: senderAfter } });
         await tx.wallet.update({ where: { id: receiverWallet.id }, data: { balance: receiverAfter } });
-
-        await tx.walletLedger.create({
-          data: {
-            userId: senderId,
-            walletId: senderWallet.id,
-            type: "GIFT_SENT",
-            delta: -total,
-            balanceAfter: senderAfter,
-            title: `Sent ${gift.name} x${qty}`,
-            metaJson: { streamId, giftId: gift.id, quantity: qty },
-          },
-        });
-
-        await tx.walletLedger.create({
-          data: {
-            userId: hostId,
-            walletId: receiverWallet.id,
-            type: "GIFT_RECEIVED",
-            delta: total,
-            balanceAfter: receiverAfter,
-            title: `Received ${gift.name} x${qty}`,
-            metaJson: { streamId, giftId: gift.id, quantity: qty },
-          },
-        });
 
         const gt = await tx.giftTransaction.create({
           data: {
@@ -268,14 +253,8 @@ io.on("connection", (socket) => {
           select: { id: true, createdAt: true },
         });
 
-        await tx.user.update({
-          where: { id: senderId },
-          data: { totalCoinsSpent: { increment: total } },
-        });
-        await tx.user.update({
-          where: { id: hostId },
-          data: { totalCoinsReceived: { increment: total } },
-        });
+        await tx.user.update({ where: { id: senderId }, data: { totalCoinsSpent: { increment: total } } });
+        await tx.user.update({ where: { id: hostId }, data: { totalCoinsReceived: { increment: total } } });
 
         return { giftTransactionId: gt.id, at: gt.createdAt.getTime() };
       });
@@ -290,6 +269,9 @@ io.on("connection", (socket) => {
           name: gift.name,
           price: gift.price,
           thumbnailUrl: gift.thumbnailUrl,
+          mediaType: gift.mediaType,
+          mediaUrl: gift.mediaUrl,
+          iconUrl: gift.iconUrl,
         },
         quantity: qty,
         total,
@@ -299,15 +281,13 @@ io.on("connection", (socket) => {
 
       cb?.({ ok: true });
     } catch (e) {
-      if (String(e?.message) === "INSUFFICIENT_BALANCE") {
-        return cb?.({ error: "Insufficient balance" });
-      }
+      if (String(e?.message) === "INSUFFICIENT_BALANCE") return cb?.({ error: "Insufficient balance" });
       console.error("sendGift error", e);
       cb?.({ error: "gift failed" });
     }
   });
 
-  // PK (basic invite/accept)
+  // PK (invite/accept + auto-end)
   socket.on("pkInvite", async (payload, cb) => {
     try {
       const { streamId, hostId, opponentId, durationSec } = payload || {};
@@ -350,7 +330,7 @@ io.on("connection", (socket) => {
 
       const battle = await prisma.pKBattle.findUnique({
         where: { id: battleId },
-        select: { id: true, hostId: true, opponentId: true, streamId: true, status: true, durationSec: true },
+        select: { id: true, streamId: true, status: true, durationSec: true, hostId: true, opponentId: true },
       });
       if (!battle || battle.status !== "PENDING") return cb?.({ error: "invalid battle" });
 
@@ -359,6 +339,7 @@ io.on("connection", (socket) => {
           where: { id: battleId },
           data: { status: "CANCELED", endedAt: new Date() },
         });
+        clearPkTimer(battleId);
         io.to(roomName(battle.streamId)).emit("pkCanceled", { battleId });
         return cb?.({ ok: true });
       }
@@ -377,6 +358,22 @@ io.on("connection", (socket) => {
         durationSec: started.durationSec || 180,
       });
 
+      // ✅ auto-end
+      clearPkTimer(started.id);
+      pkTimers.set(
+        started.id,
+        setTimeout(async () => {
+          try {
+            await prisma.pKBattle.update({
+              where: { id: started.id },
+              data: { status: "ENDED", endedAt: new Date() },
+            });
+          } catch {}
+          io.to(roomName(started.streamId)).emit("pkEnded", { battleId: started.id });
+          clearPkTimer(started.id);
+        }, (started.durationSec || 180) * 1000)
+      );
+
       cb?.({ ok: true });
     } catch (e) {
       console.error("pkRespond error", e);
@@ -391,7 +388,9 @@ io.on("connection", (socket) => {
     if (userId && userSocketById.get(userId) === socket.id) {
       userSocketById.delete(userId);
     }
-    if (streamId && socket.data?.role === "viewer") {
+
+    if (streamId && socket.data?.role === "viewer" && !socket.data.left) {
+      socket.data.left = true;
       await decViewers(streamId);
     }
   });

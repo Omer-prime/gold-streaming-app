@@ -47,21 +47,8 @@ function cx(...classes: Array<string | false | null | undefined>) {
 }
 
 /* =========================================================
-     Upload helpers
+   Upload helpers
    ========================================================= */
-
-async function uploadStoreFile(file: File) {
-  const fd = new FormData();
-  fd.append("file", file);
-
-  const res = await fetch("/api/admin/store/upload", { method: "POST", body: fd });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(json?.error || "Upload failed");
-
-  // Prefer relative path (better for DB + mobile)
-  return String(json?.path || json?.url);
-}
-
 
 function inferMediaTypeFromFile(file: File): "IMAGE" | "GIF" | "VIDEO" {
   const t = (file.type || "").toLowerCase();
@@ -82,6 +69,66 @@ function prettyBytes(bytes: number) {
   return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+function isAbsoluteUrl(v: string) {
+  return /^https?:\/\//i.test(v);
+}
+
+/**
+ * We want to store a "DB friendly" value:
+ * - If it’s same-origin full url => store only the pathname (/uploads/..)
+ * - If it’s already relative (/uploads/..) => keep it
+ * - If it’s external CDN url => keep the full url
+ */
+function normalizeForDb(v: string) {
+  const raw = (v || "").trim();
+  if (!raw) return raw;
+
+  // already relative
+  if (raw.startsWith("/")) return raw;
+
+  // absolute - try to strip origin
+  if (isAbsoluteUrl(raw)) {
+    try {
+      const u = new URL(raw);
+      // store only path+search (usually you only need pathname)
+      return u.pathname + (u.search || "");
+    } catch {
+      return raw;
+    }
+  }
+
+  // fallback (rare)
+  return raw;
+}
+
+/**
+ * For preview in the admin UI:
+ * - relative path => use as-is (browser will resolve on same origin)
+ * - absolute url => use as-is
+ */
+function toPreviewSrc(v?: string | null) {
+  const raw = (v || "").trim();
+  if (!raw) return "";
+  return raw.startsWith("/") || isAbsoluteUrl(raw) ? raw : `/${raw}`;
+}
+
+async function uploadStoreFile(file: File) {
+  const fd = new FormData();
+  fd.append("file", file);
+
+  // ✅ use the singular endpoint
+  const res = await fetch("/api/admin/store/upload", { method: "POST", body: fd });
+  const json = await res.json().catch(() => null);
+
+  if (!res.ok) throw new Error(json?.error || "Upload failed");
+
+  // supports { path } or { url }
+  const candidate = String(json?.path || json?.url || "");
+  if (!candidate) throw new Error("Upload succeeded but no path/url returned");
+
+  return normalizeForDb(candidate);
+}
+
 /* =========================================================
    Page
    ========================================================= */
@@ -97,10 +144,11 @@ export default function AdminStorePage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const selectedItem = useMemo(
-    () => items.find((x) => x.id === selectedItemId) ?? null,
-    [items, selectedItemId]
-  );
+
+  const selectedItem = useMemo(() => {
+    if (!selectedItemId) return null;
+    return items.find((x) => x.id === selectedItemId) ?? null;
+  }, [items, selectedItemId]);
 
   const [draft, setDraft] = useState<StoreItem | null>(null);
 
@@ -132,8 +180,11 @@ export default function AdminStorePage() {
     const res = await fetch("/api/admin/store/categories", { cache: "no-store" });
     const json = await res.json().catch(() => null);
     if (!res.ok) throw new Error(json?.error || "Failed to load categories");
+
     const list: Category[] = Array.isArray(json?.categories) ? json.categories : [];
     setCategories(list);
+
+    // pick first category if none selected
     if (!selectedCategoryId && list[0]?.id) setSelectedCategoryId(list[0].id);
   }
 
@@ -141,16 +192,32 @@ export default function AdminStorePage() {
     const id = catId ?? selectedCategoryId;
     if (!id) {
       setItems([]);
+      setSelectedItemId(null);
       return;
     }
+
     const res = await fetch(`/api/admin/store/items?categoryId=${encodeURIComponent(id)}`, {
       cache: "no-store",
     });
     const json = await res.json().catch(() => null);
     if (!res.ok) throw new Error(json?.error || "Failed to load items");
+
     const list: StoreItem[] = Array.isArray(json?.items) ? json.items : [];
     setItems(list);
-    if (!selectedItemId && list[0]?.id) setSelectedItemId(list[0].id);
+
+    // if current selected item no longer exists, select first
+    if (list.length === 0) {
+      setSelectedItemId(null);
+      return;
+    }
+
+    if (!selectedItemId) {
+      setSelectedItemId(list[0].id);
+      return;
+    }
+
+    const stillExists = list.some((x) => x.id === selectedItemId);
+    if (!stillExists) setSelectedItemId(list[0].id);
   }
 
   async function loadAll() {
@@ -159,7 +226,6 @@ export default function AdminStorePage() {
     setNotice(null);
     try {
       await loadCategories();
-      // items are loaded by effect below
     } catch (e: any) {
       setErr(e?.message || "Error");
     } finally {
@@ -184,11 +250,14 @@ export default function AdminStorePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategoryId]);
 
+  // ✅ keep draft synced with current selected item
   useEffect(() => {
-  if (selectedItem) setDraft(JSON.parse(JSON.stringify(selectedItem)));
-  else setDraft(null);
-}, [selectedItem]);
-
+    if (!selectedItem) {
+      setDraft(null);
+      return;
+    }
+    setDraft(JSON.parse(JSON.stringify(selectedItem)));
+  }, [selectedItem?.id]); // stable
 
   const dirty = useMemo(() => {
     if (!draft || !selectedItem) return false;
@@ -222,6 +291,7 @@ export default function AdminStorePage() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || "Create category failed");
+
       setNotice("Category created ✅");
       setNewCatName("");
       setNewCatSlug("");
@@ -264,6 +334,7 @@ export default function AdminStorePage() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || "Create item failed");
+
       setNotice("Item created ✅");
       setNewItemTitle("");
       setNewItemPrice(0);
@@ -277,10 +348,10 @@ export default function AdminStorePage() {
 
   async function saveItem() {
     if (!draft?.id) {
-  setErr("Missing item id. Re-select the item and try again.");
-  return;
-}
-    if (!draft) return;
+      setErr("Missing item id. Re-select the item and try again.");
+      return;
+    }
+
     setSaving(true);
     setErr(null);
     setNotice(null);
@@ -293,6 +364,7 @@ export default function AdminStorePage() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || "Save failed");
+
       setNotice("Item saved ✅");
       await loadItems(selectedCategoryId);
     } catch (e: any) {
@@ -310,6 +382,7 @@ export default function AdminStorePage() {
       const res = await fetch(`/api/admin/store/items/${id}`, { method: "DELETE" });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || "Delete failed");
+
       setNotice("Item deleted ✅");
       setSelectedItemId(null);
       await loadItems(selectedCategoryId);
@@ -332,22 +405,29 @@ export default function AdminStorePage() {
     try {
       setUploadingMedia(true);
 
-      const url = await uploadStoreFile(file);
+      const pathOrUrl = await uploadStoreFile(file);
       const mt = inferMediaTypeFromFile(file);
 
       setDraft((prev) => {
         if (!prev) return prev;
-        const next: StoreItem = { ...prev, mediaUrl: url, mediaType: mt };
+        const next: StoreItem = { ...prev, mediaUrl: pathOrUrl, mediaType: mt };
 
-        // nice UX: if image/gif and no thumbnail, we can reuse media as thumbnail
+        // nice UX: if image/gif and no thumbnail, reuse media as thumbnail
         if ((mt === "IMAGE" || mt === "GIF") && !next.thumbnailUrl) {
-          next.thumbnailUrl = url;
+          next.thumbnailUrl = pathOrUrl;
+        }
+
+        // if video and thumbnail equals media (from previous), clear it
+        if (mt === "VIDEO" && next.thumbnailUrl && next.thumbnailUrl === next.mediaUrl) {
+          next.thumbnailUrl = null;
         }
 
         return next;
       });
 
-      setNotice(`Media uploaded ✅ (${file.name}${file.size ? ` • ${prettyBytes(file.size)}` : ""})`);
+      setNotice(
+        `Media uploaded ✅ (${file.name}${file.size ? ` • ${prettyBytes(file.size)}` : ""})`
+      );
     } catch (e: any) {
       setErr(e?.message || "Upload error");
     } finally {
@@ -363,9 +443,12 @@ export default function AdminStorePage() {
 
     try {
       setUploadingThumb(true);
-      const url = await uploadStoreFile(file);
-      setDraft((prev) => (prev ? { ...prev, thumbnailUrl: url } : prev));
-      setNotice(`Thumbnail uploaded ✅ (${file.name}${file.size ? ` • ${prettyBytes(file.size)}` : ""})`);
+      const pathOrUrl = await uploadStoreFile(file);
+
+      setDraft((prev) => (prev ? { ...prev, thumbnailUrl: pathOrUrl } : prev));
+      setNotice(
+        `Thumbnail uploaded ✅ (${file.name}${file.size ? ` • ${prettyBytes(file.size)}` : ""})`
+      );
     } catch (e: any) {
       setErr(e?.message || "Upload error");
     } finally {
@@ -498,7 +581,8 @@ export default function AdminStorePage() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-[13px] font-semibold text-slate-100 truncate">
-                          {c.name} <span className="text-slate-400 font-normal">({c.slug})</span>
+                          {c.name}{" "}
+                          <span className="text-slate-400 font-normal">({c.slug})</span>
                         </div>
                         <span
                           className={cx(
@@ -517,7 +601,9 @@ export default function AdminStorePage() {
                     </button>
                   );
                 })}
-                {categories.length === 0 && <div className="text-[13px] text-slate-400">No categories.</div>}
+                {categories.length === 0 && (
+                  <div className="text-[13px] text-slate-400">No categories.</div>
+                )}
               </div>
             </div>
 
@@ -548,7 +634,8 @@ export default function AdminStorePage() {
                   className={cx(
                     "h-10 rounded-xl px-4 text-[13px] font-semibold transition",
                     "bg-yellow-400 text-black hover:bg-yellow-300",
-                    (!selectedCategoryId || !newItemTitle.trim() || saving) && "opacity-60 cursor-not-allowed"
+                    (!selectedCategoryId || !newItemTitle.trim() || saving) &&
+                      "opacity-60 cursor-not-allowed"
                   )}
                 >
                   Create item
@@ -580,7 +667,13 @@ export default function AdminStorePage() {
                   )}
                   title={busyUploads ? "Wait for upload to finish" : undefined}
                 >
-                  {busyUploads ? "Uploading..." : saving ? "Saving..." : dirty ? "Save changes" : "Saved"}
+                  {busyUploads
+                    ? "Uploading..."
+                    : saving
+                    ? "Saving..."
+                    : dirty
+                    ? "Save changes"
+                    : "Saved"}
                 </button>
               </div>
 
@@ -589,6 +682,7 @@ export default function AdminStorePage() {
                 {items.map((it) => {
                   const active = it.id === selectedItemId;
                   const hasMedia = !!it.mediaUrl || !!it.thumbnailUrl;
+
                   return (
                     <button
                       key={it.id}
@@ -603,7 +697,9 @@ export default function AdminStorePage() {
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-[13px] font-semibold text-slate-100 truncate">
                           {it.title}
-                          {hasMedia ? <span className="ml-2 text-[11px] text-slate-400">• media</span> : null}
+                          {hasMedia ? (
+                            <span className="ml-2 text-[11px] text-slate-400">• media</span>
+                          ) : null}
                         </div>
                         <div className="text-[12px] text-yellow-300 whitespace-nowrap">
                           {it.priceCoins.toLocaleString()} coins
@@ -616,7 +712,9 @@ export default function AdminStorePage() {
                     </button>
                   );
                 })}
-                {items.length === 0 && <div className="text-[13px] text-slate-400">No items in this category.</div>}
+                {items.length === 0 && (
+                  <div className="text-[13px] text-slate-400">No items in this category.</div>
+                )}
               </div>
 
               {/* Editor */}
@@ -635,7 +733,7 @@ export default function AdminStorePage() {
                     </button>
                   </div>
 
-                  {/* ✅ Media Preview + Upload */}
+                  {/* Media Preview + Upload */}
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <div className="md:col-span-2">
                       <div className="flex items-center justify-between mb-2">
@@ -651,6 +749,7 @@ export default function AdminStorePage() {
                               if (f) onPickMediaFile(f);
                             }}
                           />
+
                           <button
                             type="button"
                             onClick={() => mediaInputRef.current?.click()}
@@ -671,7 +770,8 @@ export default function AdminStorePage() {
                             className={cx(
                               "h-9 rounded-xl px-3 text-[12px] font-semibold border transition",
                               "border-slate-700 bg-slate-950/40 text-slate-200 hover:bg-slate-950/60",
-                              (!draft.mediaUrl || uploadingMedia || saving) && "opacity-60 cursor-not-allowed"
+                              (!draft.mediaUrl || uploadingMedia || saving) &&
+                                "opacity-60 cursor-not-allowed"
                             )}
                           >
                             Remove
@@ -680,13 +780,19 @@ export default function AdminStorePage() {
                       </div>
 
                       <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-3">
-                        <MediaPreview mediaType={draft.mediaType} mediaUrl={draft.mediaUrl} />
+                        <MediaPreview
+                          mediaType={draft.mediaType}
+                          mediaUrl={toPreviewSrc(draft.mediaUrl)}
+                        />
+
                         <div className="mt-2 grid gap-2 md:grid-cols-2">
                           <Field label="Media Type">
                             <select
                               className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
                               value={draft.mediaType}
-                              onChange={(e) => setDraft({ ...draft, mediaType: e.target.value as any })}
+                              onChange={(e) =>
+                                setDraft({ ...draft, mediaType: e.target.value as any })
+                              }
                             >
                               <option value="IMAGE">IMAGE</option>
                               <option value="GIF">GIF</option>
@@ -698,9 +804,18 @@ export default function AdminStorePage() {
                             <input
                               className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
                               value={draft.mediaUrl ?? ""}
-                              onChange={(e) => setDraft({ ...draft, mediaUrl: e.target.value || null })}
+                              onChange={(e) =>
+                                setDraft({ ...draft, mediaUrl: e.target.value || null })
+                              }
                             />
                           </Field>
+                        </div>
+
+                        <div className="mt-2 text-[11px] text-slate-500">
+                          Stored in DB:{" "}
+                          <code className="text-slate-300">
+                            {draft.mediaUrl || "(empty)"}
+                          </code>
                         </div>
                       </div>
 
@@ -711,7 +826,7 @@ export default function AdminStorePage() {
                       ) : null}
                     </div>
 
-                    {/* ✅ Thumbnail Preview + Upload */}
+                    {/* Thumbnail Preview + Upload */}
                     <div className="md:col-span-2">
                       <div className="flex items-center justify-between mb-2 mt-1">
                         <div className="text-[12px] font-semibold text-slate-200">Thumbnail</div>
@@ -746,7 +861,8 @@ export default function AdminStorePage() {
                             className={cx(
                               "h-9 rounded-xl px-3 text-[12px] font-semibold border transition",
                               "border-slate-700 bg-slate-950/40 text-slate-200 hover:bg-slate-950/60",
-                              (!draft.thumbnailUrl || uploadingThumb || saving) && "opacity-60 cursor-not-allowed"
+                              (!draft.thumbnailUrl || uploadingThumb || saving) &&
+                                "opacity-60 cursor-not-allowed"
                             )}
                           >
                             Remove
@@ -755,15 +871,27 @@ export default function AdminStorePage() {
                       </div>
 
                       <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-3">
-                        <ThumbPreview thumbnailUrl={draft.thumbnailUrl} />
+                        <ThumbPreview thumbnailUrl={toPreviewSrc(draft.thumbnailUrl)} />
                         <div className="mt-2">
                           <Field label="Thumbnail URL (optional)">
                             <input
                               className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
                               value={draft.thumbnailUrl ?? ""}
-                              onChange={(e) => setDraft({ ...draft, thumbnailUrl: e.target.value || null })}
+                              onChange={(e) =>
+                                setDraft({
+                                  ...draft,
+                                  thumbnailUrl: e.target.value || null,
+                                })
+                              }
                             />
                           </Field>
+
+                          <div className="mt-2 text-[11px] text-slate-500">
+                            Stored in DB:{" "}
+                            <code className="text-slate-300">
+                              {draft.thumbnailUrl || "(empty)"}
+                            </code>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -784,7 +912,9 @@ export default function AdminStorePage() {
                         type="number"
                         className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
                         value={draft.priceCoins}
-                        onChange={(e) => setDraft({ ...draft, priceCoins: Number(e.target.value) || 0 })}
+                        onChange={(e) =>
+                          setDraft({ ...draft, priceCoins: Number(e.target.value) || 0 })
+                        }
                       />
                     </Field>
 
@@ -801,7 +931,12 @@ export default function AdminStorePage() {
                         type="number"
                         className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
                         value={draft.sectionSortOrder ?? 0}
-                        onChange={(e) => setDraft({ ...draft, sectionSortOrder: Number(e.target.value) || 0 })}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            sectionSortOrder: Number(e.target.value) || 0,
+                          })
+                        }
                       />
                     </Field>
 
@@ -835,7 +970,10 @@ export default function AdminStorePage() {
                         value={draft.durationDays ?? ""}
                         onChange={(e) => {
                           const v = e.target.value.trim();
-                          setDraft({ ...draft, durationDays: v === "" ? null : Number(v) || 0 });
+                          setDraft({
+                            ...draft,
+                            durationDays: v === "" ? null : Number(v) || 0,
+                          });
                         }}
                       />
                     </Field>
@@ -844,7 +982,9 @@ export default function AdminStorePage() {
                       <input
                         className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
                         value={draft.description ?? ""}
-                        onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                        onChange={(e) =>
+                          setDraft({ ...draft, description: e.target.value })
+                        }
                       />
                     </Field>
 
@@ -853,7 +993,9 @@ export default function AdminStorePage() {
                         type="number"
                         className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
                         value={draft.sortOrder}
-                        onChange={(e) => setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })}
+                        onChange={(e) =>
+                          setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })
+                        }
                       />
                     </Field>
 
@@ -881,9 +1023,7 @@ export default function AdminStorePage() {
 
             <div className="mt-3 text-[11px] text-slate-500">
               Mobile endpoint:{" "}
-              <code className="text-slate-300">
-                /api/profile/store?userId=...&category=popular
-              </code>
+              <code className="text-slate-300">/api/profile/store?userId=...&category=popular</code>
             </div>
           </div>
         </div>
@@ -896,7 +1036,15 @@ export default function AdminStorePage() {
    UI helpers
    ========================================================= */
 
-function Field({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className={cx("min-w-0", className)}>
       <div className="text-[11px] font-medium text-slate-400 mb-1">{label}</div>
@@ -913,7 +1061,15 @@ function Pill({ label }: { label: string }) {
   );
 }
 
-function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <button
       type="button"
@@ -936,7 +1092,13 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
    Preview components
    ========================================================= */
 
-function MediaPreview({ mediaType, mediaUrl }: { mediaType: "IMAGE" | "GIF" | "VIDEO"; mediaUrl?: string | null }) {
+function MediaPreview({
+  mediaType,
+  mediaUrl,
+}: {
+  mediaType: "IMAGE" | "GIF" | "VIDEO";
+  mediaUrl?: string | null;
+}) {
   if (!mediaUrl) {
     return (
       <div className="h-44 w-full rounded-2xl border border-slate-800 bg-slate-950/50 flex items-center justify-center">
@@ -953,7 +1115,6 @@ function MediaPreview({ mediaType, mediaUrl }: { mediaType: "IMAGE" | "GIF" | "V
     );
   }
 
-  // IMAGE / GIF
   return (
     <div className="w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/40">
       {/* eslint-disable-next-line @next/next/no-img-element */}

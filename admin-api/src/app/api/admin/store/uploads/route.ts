@@ -1,3 +1,4 @@
+// src/app/api/admin/store/uploads/route.ts
 import { NextRequest } from "next/server";
 import { handleStoreUpload } from "../../../../lib/storeUpload";
 

@@ -1,15 +1,11 @@
+// src/lib/storeUpload.ts
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir } from "fs/promises";
-import { createWriteStream } from "fs";
 import path from "path";
+import fs from "fs/promises";
 import crypto from "crypto";
-import { pipeline } from "stream/promises";
-import { Readable } from "stream";
 
-
-
-const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15MB
-const MAX_VIDEO_BYTES = 150 * 1024 * 1024; // 150MB
+const DEFAULT_MAX_IMAGE_MB = 15;
+const DEFAULT_MAX_VIDEO_MB = 150;
 
 function getOrigin(req: NextRequest) {
   const proto =
@@ -20,23 +16,16 @@ function getOrigin(req: NextRequest) {
   return host ? `${proto}://${host}` : new URL(req.url).origin;
 }
 
-function safeExtFrom(mime: string, name?: string) {
+function safeExtFromMime(mime: string) {
   const m = (mime || "").toLowerCase();
-
-  if (m === "image/jpeg") return ".jpg";
-  if (m === "image/png") return ".png";
-  if (m === "image/webp") return ".webp";
-  if (m === "image/gif") return ".gif";
-
-  if (m === "video/mp4") return ".mp4";
-  if (m === "video/webm") return ".webm";
-  if (m === "video/quicktime") return ".mov";
-
-  if (name && name.includes(".")) {
-    const ext = "." + name.split(".").pop()!.toLowerCase();
-    if (ext.length <= 6) return ext;
-  }
-  return ".bin";
+  if (m === "image/jpeg") return "jpg";
+  if (m === "image/png") return "png";
+  if (m === "image/webp") return "webp";
+  if (m === "image/gif") return "gif";
+  if (m === "video/mp4") return "mp4";
+  if (m === "video/webm") return "webm";
+  if (m === "video/quicktime") return "mov";
+  return "bin";
 }
 
 function isAllowed(mime: string) {
@@ -45,58 +34,67 @@ function isAllowed(mime: string) {
 }
 
 export async function handleStoreUpload(req: NextRequest) {
-  const form = await req.formData();
-  const file = form.get("file");
+  try {
+    const form = await req.formData();
+    const fileAny = form.get("file");
 
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "file is required" }, { status: 400 });
-  }
+    if (!fileAny || typeof (fileAny as any)?.arrayBuffer !== "function") {
+      return NextResponse.json({ error: "file is required" }, { status: 400 });
+    }
 
-  const mime = (file.type || "").toLowerCase();
-  if (!isAllowed(mime)) {
+    const file = fileAny as unknown as File;
+    const mime = (file.type || "").toLowerCase();
+
+    if (!isAllowed(mime)) {
+      return NextResponse.json(
+        { error: "Only image/video files are allowed" },
+        { status: 415 }
+      );
+    }
+
+    const maxImageMB = Number(process.env.STORE_MAX_IMAGE_MB ?? DEFAULT_MAX_IMAGE_MB);
+    const maxVideoMB = Number(process.env.STORE_MAX_VIDEO_MB ?? DEFAULT_MAX_VIDEO_MB);
+    const limitBytes =
+      (mime.startsWith("video/") ? maxVideoMB : maxImageMB) * 1024 * 1024;
+
+    const bytes = Buffer.from(await file.arrayBuffer());
+    if (bytes.length > limitBytes) {
+      return NextResponse.json(
+        { error: `File too large. Max ${mime.startsWith("video/") ? maxVideoMB : maxImageMB}MB` },
+        { status: 413 }
+      );
+    }
+
+    const now = new Date();
+    const yyyy = String(now.getFullYear());
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+
+    // ✅ IMPORTANT:
+    // store files in a stable folder (served by nginx alias)
+    const uploadRoot =
+      process.env.STORE_UPLOAD_DIR ?? path.join(process.cwd(), "uploads-store");
+    const publicBase = process.env.STORE_PUBLIC_BASE ?? "/uploads/store";
+
+    const absDir = path.join(uploadRoot, yyyy, mm);
+    await fs.mkdir(absDir, { recursive: true });
+
+    const ext = safeExtFromMime(mime);
+    const filename = `${crypto.randomUUID()}.${ext}`;
+    const absPath = path.join(absDir, filename);
+
+    await fs.writeFile(absPath, bytes);
+
+    const publicPath = `${publicBase}/${yyyy}/${mm}/${filename}`.replace(/\\/g, "/");
+    const url = `${getOrigin(req)}${publicPath}`;
+
     return NextResponse.json(
-      { error: "Only image/video files are allowed" },
-      { status: 400 }
+      { ok: true, path: publicPath, url, mime, size: bytes.length },
+      { status: 200 }
+    );
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message || "Upload failed" },
+      { status: 500 }
     );
   }
-
-  const isVideo = mime.startsWith("video/");
-  const limit = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-
-  if (file.size > limit) {
-    return NextResponse.json(
-      { error: `File too large. Max ${Math.round(limit / (1024 * 1024))}MB` },
-      { status: 413 }
-    );
-  }
-
-  const ext = safeExtFrom(mime, file.name);
-  const id = crypto.randomUUID();
-
-  const now = new Date();
-  const year = String(now.getFullYear());
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-
-  const uploadRoot =
-    process.env.STORE_UPLOAD_DIR ??
-    path.join(process.cwd(), "uploads", "store"); // fallback for local dev
-
-  const publicBase = process.env.STORE_PUBLIC_BASE ?? "/uploads/store";
-
-  const absDir = path.join(uploadRoot, year, month);
-  await mkdir(absDir, { recursive: true });
-
-  const filename = `${id}${ext}`;
-  const absPath = path.join(absDir, filename);
-
-  const nodeReadable = Readable.fromWeb(file.stream() as any);
-  await pipeline(nodeReadable, createWriteStream(absPath));
-
-  const publicPath = `${publicBase}/${year}/${month}/${filename}`;
-  const url = `${getOrigin(req)}${publicPath}`;
-
-  return NextResponse.json(
-    { ok: true, path: publicPath, url, mime, size: file.size },
-    { status: 200 }
-  );
 }

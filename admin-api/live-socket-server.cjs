@@ -1,4 +1,6 @@
 // admin-api/live-socket-server.cjs
+
+require("dotenv").config();
 const http = require("http");
 const { Server } = require("socket.io");
 const { PrismaClient } = require("@prisma/client");

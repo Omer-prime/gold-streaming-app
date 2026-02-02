@@ -1,16 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 function requireUserId(req: NextRequest) {
-  const userId = req.nextUrl.searchParams.get("userId");
+  const userId = (req.nextUrl.searchParams.get("userId") || "").trim();
   if (!userId) throw new Error("userId is required");
   return userId;
+}
+
+function toAbsolute(origin: string, url?: string | null) {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${origin}${path}`;
 }
 
 export async function GET(req: NextRequest) {
   try {
     const userId = requireUserId(req);
     const now = new Date();
+    const origin = req.nextUrl.origin;
+
+    // ✅ ensure user exists
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) throw new Error("User not found");
 
     const categorySlug = (req.nextUrl.searchParams.get("category") || "").trim().toLowerCase();
 
@@ -24,7 +39,11 @@ export async function GET(req: NextRequest) {
     // - category=popular => featured items
     // - category=<slug>  => items in that category
     // - empty => first category (if exists), else featured
-    let whereItems: any = { isActive: true };
+    let whereItems: any = {
+      isActive: true,
+      category: { isActive: true }, // ✅ important
+    };
+
     if (categorySlug === "popular") {
       whereItems.isFeatured = true;
     } else if (categorySlug) {
@@ -38,11 +57,7 @@ export async function GET(req: NextRequest) {
 
     const items = await prisma.storeItem.findMany({
       where: whereItems,
-      orderBy: [
-        { sectionSortOrder: "asc" },
-        { sortOrder: "asc" },
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ sectionSortOrder: "asc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
       select: {
         id: true,
         title: true,
@@ -77,20 +92,36 @@ export async function GET(req: NextRequest) {
       select: { itemId: true, expiresAt: true },
     });
 
-    // group into sections (like your UI)
+    const ownedMap = new Map<string, { expiresAt: string | null }>();
+    for (const o of owned) ownedMap.set(o.itemId, { expiresAt: o.expiresAt ? o.expiresAt.toISOString() : null });
+
+    // group into sections
     const map = new Map<string, any[]>();
     for (const it of items) {
       const key = (it.section || "Items").trim() || "Items";
       if (!map.has(key)) map.set(key, []);
+
+      const ownedInfo = ownedMap.get(it.id);
+
       map.get(key)!.push({
         id: it.id,
         title: it.title,
+        description: it.description,
         priceCoins: it.priceCoins,
+        mediaType: it.mediaType,
         mediaUrl: it.mediaUrl,
         thumbnailUrl: it.thumbnailUrl,
+
+        // optional “absolute” URLs (helps some clients)
+        mediaUrlFull: toAbsolute(origin, it.mediaUrl),
+        thumbnailUrlFull: toAbsolute(origin, it.thumbnailUrl),
+
         type: it.type,
         durationDays: it.durationDays,
         category: it.category,
+
+        isOwned: !!ownedInfo,
+        ownedExpiresAt: ownedInfo?.expiresAt ?? null,
       });
     }
 
@@ -99,6 +130,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       meta: {
         now: now.toISOString(),
+        origin,
         totalCategories: categories.length,
         totalItems: items.length,
       },
@@ -106,7 +138,7 @@ export async function GET(req: NextRequest) {
       sections,
       wallet,
       ownedItemIds: owned.map((x) => x.itemId),
-      owned: owned, // optional (has expiresAt)
+      owned, // includes expiresAt
     });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Error" }, { status: 400 });

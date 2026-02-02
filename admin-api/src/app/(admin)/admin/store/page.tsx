@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 type Category = {
   id: string;
@@ -46,6 +46,43 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+/* =========================================================
+   ✅ Upload helpers
+   ========================================================= */
+
+async function uploadStoreFile(file: File) {
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const res = await fetch("/api/admin/store/upload", { method: "POST", body: fd });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.error || "Upload failed");
+  return String(json.url);
+}
+
+function inferMediaTypeFromFile(file: File): "IMAGE" | "GIF" | "VIDEO" {
+  const t = (file.type || "").toLowerCase();
+  if (t.startsWith("video/")) return "VIDEO";
+  if (t === "image/gif") return "GIF";
+  return "IMAGE";
+}
+
+function prettyBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let n = bytes;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n = n / 1024;
+    i++;
+  }
+  return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+/* =========================================================
+   Page
+   ========================================================= */
+
 export default function AdminStorePage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -72,6 +109,12 @@ export default function AdminStorePage() {
   // create item
   const [newItemTitle, setNewItemTitle] = useState("");
   const [newItemPrice, setNewItemPrice] = useState(0);
+
+  // uploads
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [uploadingThumb, setUploadingThumb] = useState(false);
+  const mediaInputRef = useRef<HTMLInputElement | null>(null);
+  const thumbInputRef = useRef<HTMLInputElement | null>(null);
 
   const stats = useMemo(() => {
     const totalCats = categories.length;
@@ -113,6 +156,7 @@ export default function AdminStorePage() {
     setNotice(null);
     try {
       await loadCategories();
+      // items are loaded by effect below
     } catch (e: any) {
       setErr(e?.message || "Error");
     } finally {
@@ -139,12 +183,19 @@ export default function AdminStorePage() {
 
   useEffect(() => {
     if (selectedItem) setDraft(JSON.parse(JSON.stringify(selectedItem)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedItemId]);
 
   const dirty = useMemo(() => {
     if (!draft || !selectedItem) return false;
     return JSON.stringify(draft) !== JSON.stringify(selectedItem);
   }, [draft, selectedItem]);
+
+  const busyUploads = uploadingMedia || uploadingThumb;
+
+  /* =========================================================
+     CRUD
+     ========================================================= */
 
   async function createCategory() {
     setErr(null);
@@ -225,6 +276,7 @@ export default function AdminStorePage() {
     setSaving(true);
     setErr(null);
     setNotice(null);
+
     try {
       const res = await fetch(`/api/admin/store/items/${draft.id}`, {
         method: "PATCH",
@@ -260,16 +312,74 @@ export default function AdminStorePage() {
     }
   }
 
+  /* =========================================================
+     Upload actions
+     ========================================================= */
+
+  async function onPickMediaFile(file: File) {
+    if (!draft) return;
+    setErr(null);
+    setNotice(null);
+
+    try {
+      setUploadingMedia(true);
+
+      const url = await uploadStoreFile(file);
+      const mt = inferMediaTypeFromFile(file);
+
+      setDraft((prev) => {
+        if (!prev) return prev;
+        const next: StoreItem = { ...prev, mediaUrl: url, mediaType: mt };
+
+        // nice UX: if image/gif and no thumbnail, we can reuse media as thumbnail
+        if ((mt === "IMAGE" || mt === "GIF") && !next.thumbnailUrl) {
+          next.thumbnailUrl = url;
+        }
+
+        return next;
+      });
+
+      setNotice(`Media uploaded ✅ (${file.name}${file.size ? ` • ${prettyBytes(file.size)}` : ""})`);
+    } catch (e: any) {
+      setErr(e?.message || "Upload error");
+    } finally {
+      setUploadingMedia(false);
+      if (mediaInputRef.current) mediaInputRef.current.value = "";
+    }
+  }
+
+  async function onPickThumbFile(file: File) {
+    if (!draft) return;
+    setErr(null);
+    setNotice(null);
+
+    try {
+      setUploadingThumb(true);
+      const url = await uploadStoreFile(file);
+      setDraft((prev) => (prev ? { ...prev, thumbnailUrl: url } : prev));
+      setNotice(`Thumbnail uploaded ✅ (${file.name}${file.size ? ` • ${prettyBytes(file.size)}` : ""})`);
+    } catch (e: any) {
+      setErr(e?.message || "Upload error");
+    } finally {
+      setUploadingThumb(false);
+      if (thumbInputRef.current) thumbInputRef.current.value = "";
+    }
+  }
+
+  const showVideoThumbWarning =
+    !!draft && draft.mediaType === "VIDEO" && (!draft.thumbnailUrl || !draft.thumbnailUrl.trim());
+
   return (
     <div className="w-full overflow-x-hidden px-3 sm:px-4 md:px-6 py-4 md:py-6">
       <div className="mx-auto w-full max-w-7xl space-y-6 min-w-0">
+        {/* Top bar */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <h1 className="text-[20px] md:text-[22px] font-semibold tracking-tight text-slate-50">
               Store Management
             </h1>
             <p className="text-[12px] text-slate-400 mt-1">
-              Upload store categories and items shown in the mobile Store screen.
+              Upload categories + items for the mobile Store screen. Supports file upload (image/gif/video).
             </p>
           </div>
 
@@ -277,6 +387,7 @@ export default function AdminStorePage() {
             <Pill label={`Cats: ${stats.totalCats} (${stats.activeCats} active)`} />
             <Pill label={`Items: ${stats.totalItems} (${stats.activeItems} active)`} />
             <Pill label={`Featured: ${stats.featured}`} />
+
             <button
               onClick={loadAll}
               disabled={loading}
@@ -317,6 +428,7 @@ export default function AdminStorePage() {
                 onChange={(e) => setNewCatName(e.target.value)}
               />
             </Field>
+
             <Field label="Slug (optional)" className="lg:col-span-4">
               <input
                 className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none focus:border-yellow-400/60"
@@ -324,6 +436,7 @@ export default function AdminStorePage() {
                 onChange={(e) => setNewCatSlug(e.target.value)}
               />
             </Field>
+
             <Field label="Icon (Ionicons name)" className="lg:col-span-3">
               <input
                 className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none focus:border-yellow-400/60"
@@ -332,6 +445,7 @@ export default function AdminStorePage() {
                 onChange={(e) => setNewCatIcon(e.target.value)}
               />
             </Field>
+
             <div className="lg:col-span-1 flex lg:justify-end">
               <button
                 onClick={createCategory}
@@ -349,7 +463,7 @@ export default function AdminStorePage() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-12">
-          {/* Categories */}
+          {/* Categories + Create Item */}
           <div className="lg:col-span-4">
             <div className="rounded-3xl border border-slate-800 bg-slate-900/50 p-4 shadow-xl shadow-black/20">
               <div className="flex items-center justify-between">
@@ -410,6 +524,7 @@ export default function AdminStorePage() {
                     onChange={(e) => setNewItemTitle(e.target.value)}
                   />
                 </Field>
+
                 <Field label="Price (Coins)">
                   <input
                     type="number"
@@ -418,6 +533,7 @@ export default function AdminStorePage() {
                     onChange={(e) => setNewItemPrice(Number(e.target.value) || 0)}
                   />
                 </Field>
+
                 <button
                   onClick={createItem}
                   disabled={!selectedCategoryId || !newItemTitle.trim() || saving}
@@ -446,16 +562,17 @@ export default function AdminStorePage() {
 
                 <button
                   onClick={saveItem}
-                  disabled={!dirty || saving || !draft}
+                  disabled={!dirty || saving || !draft || busyUploads}
                   className={cx(
                     "h-10 rounded-xl px-4 text-[13px] font-semibold transition border",
                     dirty
                       ? "border-yellow-400/40 bg-yellow-400 text-black hover:bg-yellow-300"
                       : "border-slate-700 bg-slate-900/60 text-slate-400 cursor-not-allowed",
-                    saving && "opacity-60 cursor-not-allowed"
+                    (saving || busyUploads) && "opacity-60 cursor-not-allowed"
                   )}
+                  title={busyUploads ? "Wait for upload to finish" : undefined}
                 >
-                  {saving ? "Saving..." : dirty ? "Save changes" : "Saved"}
+                  {busyUploads ? "Uploading..." : saving ? "Saving..." : dirty ? "Save changes" : "Saved"}
                 </button>
               </div>
 
@@ -463,6 +580,7 @@ export default function AdminStorePage() {
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 {items.map((it) => {
                   const active = it.id === selectedItemId;
+                  const hasMedia = !!it.mediaUrl || !!it.thumbnailUrl;
                   return (
                     <button
                       key={it.id}
@@ -477,13 +595,15 @@ export default function AdminStorePage() {
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-[13px] font-semibold text-slate-100 truncate">
                           {it.title}
+                          {hasMedia ? <span className="ml-2 text-[11px] text-slate-400">• media</span> : null}
                         </div>
                         <div className="text-[12px] text-yellow-300 whitespace-nowrap">
                           {it.priceCoins.toLocaleString()} coins
                         </div>
                       </div>
                       <div className="mt-1 text-[12px] text-slate-400">
-                        Section: {it.section || "Items"} • {it.isFeatured ? "Featured" : "—"}
+                        Section: {it.section || "Items"} • {it.isFeatured ? "Featured" : "—"} •{" "}
+                        {it.mediaType}
                       </div>
                     </button>
                   );
@@ -501,12 +621,147 @@ export default function AdminStorePage() {
                     <button
                       onClick={() => deleteItem(draft.id)}
                       className="h-9 rounded-xl border border-slate-700 bg-slate-900/60 px-3 text-[12px] font-medium text-red-200 hover:bg-slate-900"
-                      disabled={saving}
+                      disabled={saving || busyUploads}
                     >
                       Delete
                     </button>
                   </div>
 
+                  {/* ✅ Media Preview + Upload */}
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-[12px] font-semibold text-slate-200">Media</div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={mediaInputRef}
+                            type="file"
+                            accept="image/*,video/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) onPickMediaFile(f);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => mediaInputRef.current?.click()}
+                            disabled={uploadingMedia || saving}
+                            className={cx(
+                              "h-9 rounded-xl px-3 text-[12px] font-semibold border transition",
+                              "border-slate-700 bg-slate-900/60 text-slate-100 hover:bg-slate-900",
+                              (uploadingMedia || saving) && "opacity-60 cursor-not-allowed"
+                            )}
+                          >
+                            {uploadingMedia ? "Uploading..." : "Upload file"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setDraft({ ...draft, mediaUrl: null })}
+                            disabled={!draft.mediaUrl || uploadingMedia || saving}
+                            className={cx(
+                              "h-9 rounded-xl px-3 text-[12px] font-semibold border transition",
+                              "border-slate-700 bg-slate-950/40 text-slate-200 hover:bg-slate-950/60",
+                              (!draft.mediaUrl || uploadingMedia || saving) && "opacity-60 cursor-not-allowed"
+                            )}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-3">
+                        <MediaPreview mediaType={draft.mediaType} mediaUrl={draft.mediaUrl} />
+                        <div className="mt-2 grid gap-2 md:grid-cols-2">
+                          <Field label="Media Type">
+                            <select
+                              className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
+                              value={draft.mediaType}
+                              onChange={(e) => setDraft({ ...draft, mediaType: e.target.value as any })}
+                            >
+                              <option value="IMAGE">IMAGE</option>
+                              <option value="GIF">GIF</option>
+                              <option value="VIDEO">VIDEO</option>
+                            </select>
+                          </Field>
+
+                          <Field label="Media URL (optional)">
+                            <input
+                              className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
+                              value={draft.mediaUrl ?? ""}
+                              onChange={(e) => setDraft({ ...draft, mediaUrl: e.target.value || null })}
+                            />
+                          </Field>
+                        </div>
+                      </div>
+
+                      {showVideoThumbWarning ? (
+                        <div className="mt-2 rounded-2xl border border-yellow-400/30 bg-yellow-400/10 px-3 py-2 text-[12px] text-yellow-200">
+                          Video items should have a thumbnail for better loading on mobile.
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* ✅ Thumbnail Preview + Upload */}
+                    <div className="md:col-span-2">
+                      <div className="flex items-center justify-between mb-2 mt-1">
+                        <div className="text-[12px] font-semibold text-slate-200">Thumbnail</div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={thumbInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) onPickThumbFile(f);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => thumbInputRef.current?.click()}
+                            disabled={uploadingThumb || saving}
+                            className={cx(
+                              "h-9 rounded-xl px-3 text-[12px] font-semibold border transition",
+                              "border-slate-700 bg-slate-900/60 text-slate-100 hover:bg-slate-900",
+                              (uploadingThumb || saving) && "opacity-60 cursor-not-allowed"
+                            )}
+                          >
+                            {uploadingThumb ? "Uploading..." : "Upload thumbnail"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setDraft({ ...draft, thumbnailUrl: null })}
+                            disabled={!draft.thumbnailUrl || uploadingThumb || saving}
+                            className={cx(
+                              "h-9 rounded-xl px-3 text-[12px] font-semibold border transition",
+                              "border-slate-700 bg-slate-950/40 text-slate-200 hover:bg-slate-950/60",
+                              (!draft.thumbnailUrl || uploadingThumb || saving) && "opacity-60 cursor-not-allowed"
+                            )}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-3">
+                        <ThumbPreview thumbnailUrl={draft.thumbnailUrl} />
+                        <div className="mt-2">
+                          <Field label="Thumbnail URL (optional)">
+                            <input
+                              className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
+                              value={draft.thumbnailUrl ?? ""}
+                              onChange={(e) => setDraft({ ...draft, thumbnailUrl: e.target.value || null })}
+                            />
+                          </Field>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Other fields */}
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <Field label="Title">
                       <input
@@ -558,7 +813,9 @@ export default function AdminStorePage() {
                           "CHAT_BUBBLE",
                           "OTHER",
                         ].map((x) => (
-                          <option key={x} value={x}>{x}</option>
+                          <option key={x} value={x}>
+                            {x}
+                          </option>
                         ))}
                       </select>
                     </Field>
@@ -572,34 +829,6 @@ export default function AdminStorePage() {
                           const v = e.target.value.trim();
                           setDraft({ ...draft, durationDays: v === "" ? null : Number(v) || 0 });
                         }}
-                      />
-                    </Field>
-
-                    <Field label="Media Type">
-                      <select
-                        className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
-                        value={draft.mediaType}
-                        onChange={(e) => setDraft({ ...draft, mediaType: e.target.value as any })}
-                      >
-                        <option value="IMAGE">IMAGE</option>
-                        <option value="GIF">GIF</option>
-                        <option value="VIDEO">VIDEO</option>
-                      </select>
-                    </Field>
-
-                    <Field label="Media URL">
-                      <input
-                        className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
-                        value={draft.mediaUrl ?? ""}
-                        onChange={(e) => setDraft({ ...draft, mediaUrl: e.target.value || null })}
-                      />
-                    </Field>
-
-                    <Field label="Thumbnail URL" className="md:col-span-2">
-                      <input
-                        className="h-10 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-[13px] text-slate-100 outline-none"
-                        value={draft.thumbnailUrl ?? ""}
-                        onChange={(e) => setDraft({ ...draft, thumbnailUrl: e.target.value || null })}
                       />
                     </Field>
 
@@ -633,12 +862,20 @@ export default function AdminStorePage() {
                       />
                     </div>
                   </div>
+
+                  <div className="mt-3 text-[11px] text-slate-500">
+                    Upload endpoint:{" "}
+                    <code className="text-slate-300">POST /api/admin/store/upload</code>
+                  </div>
                 </div>
               )}
             </div>
 
             <div className="mt-3 text-[11px] text-slate-500">
-              Mobile endpoint: <code className="text-slate-300">/api/profile/store?userId=...&category=popular</code>
+              Mobile endpoint:{" "}
+              <code className="text-slate-300">
+                /api/profile/store?userId=...&category=popular
+              </code>
             </div>
           </div>
         </div>
@@ -647,7 +884,10 @@ export default function AdminStorePage() {
   );
 }
 
-/* UI helpers */
+/* =========================================================
+   UI helpers
+   ========================================================= */
+
 function Field({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
     <div className={cx("min-w-0", className)}>
@@ -681,5 +921,52 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
       <span className={cx("h-2.5 w-2.5 rounded-full", value ? "bg-emerald-400" : "bg-slate-500")} />
       {label}
     </button>
+  );
+}
+
+/* =========================================================
+   Preview components
+   ========================================================= */
+
+function MediaPreview({ mediaType, mediaUrl }: { mediaType: "IMAGE" | "GIF" | "VIDEO"; mediaUrl?: string | null }) {
+  if (!mediaUrl) {
+    return (
+      <div className="h-44 w-full rounded-2xl border border-slate-800 bg-slate-950/50 flex items-center justify-center">
+        <div className="text-[12px] text-slate-500">No media uploaded yet</div>
+      </div>
+    );
+  }
+
+  if (mediaType === "VIDEO") {
+    return (
+      <div className="w-full rounded-2xl overflow-hidden border border-slate-800 bg-black">
+        <video src={mediaUrl} controls className="w-full h-44 object-contain" />
+      </div>
+    );
+  }
+
+  // IMAGE / GIF
+  return (
+    <div className="w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/40">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={mediaUrl} alt="media" className="w-full h-44 object-cover" />
+    </div>
+  );
+}
+
+function ThumbPreview({ thumbnailUrl }: { thumbnailUrl?: string | null }) {
+  if (!thumbnailUrl) {
+    return (
+      <div className="h-36 w-full rounded-2xl border border-slate-800 bg-slate-950/50 flex items-center justify-center">
+        <div className="text-[12px] text-slate-500">No thumbnail</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/40">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={thumbnailUrl} alt="thumbnail" className="w-full h-36 object-cover" />
+    </div>
   );
 }

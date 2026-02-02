@@ -1,8 +1,10 @@
 // admin-api/src/app/api/profile/me/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getOrCreateUserSettings } from "@/lib/userSettings";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function computeProfileCompletion(user: {
   nickname: string | null;
@@ -12,7 +14,6 @@ function computeProfileCompletion(user: {
   avatarUrl: string | null;
   bio: string | null;
 }) {
-  // you can tune which fields count towards completion
   const pieces = [
     Boolean(user.nickname && user.nickname.trim()),
     Boolean(user.dateOfBirth),
@@ -31,7 +32,6 @@ function computeProfileCompletion(user: {
 
 /**
  * GET /api/profile/me?userId=xxx
- * Returns profile + wallet + stats for the current user
  */
 export async function GET(req: NextRequest) {
   try {
@@ -53,8 +53,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // ⚠️ Do NOT 404 – return an empty profile shape instead so mobile
-    // doesn't show "failed to load".
+    // Do NOT 404 – return an empty profile shape instead
     if (!user) {
       return NextResponse.json({
         user: null,
@@ -66,20 +65,21 @@ export async function GET(req: NextRequest) {
           visitors: 0,
           points: 0,
         },
+        settings: null,
       });
     }
 
     const [
+      settings,
       friendsCount,
       followingCount,
       followersCount,
       visitorsCount,
       points,
     ] = await Promise.all([
+      getOrCreateUserSettings(userId),
       prisma.friendship.count({
-        where: {
-          OR: [{ userAId: userId }, { userBId: userId }],
-        },
+        where: { OR: [{ userAId: userId }, { userBId: userId }] },
       }),
       prisma.follow.count({ where: { followerId: userId } }),
       prisma.follow.count({ where: { followingId: userId } }),
@@ -123,15 +123,16 @@ export async function GET(req: NextRequest) {
         vipLevel: user.vipLevel,
         profileCompletion,
       },
-      wallet: {
-        balance: user.wallet?.balance ?? 0,
-      },
+      wallet: { balance: user.wallet?.balance ?? 0 },
       stats: {
         friends: friendsCount,
         following: followingCount,
         followers: followersCount,
         visitors: visitorsCount,
         points: points._sum.delta ?? 0,
+      },
+      settings: {
+        notifyMessages: Boolean((settings as any).notifyMessages),
       },
     });
   } catch (error) {
@@ -145,11 +146,11 @@ export async function GET(req: NextRequest) {
 
 /**
  * PUT /api/profile/me
- * Body: { userId, nickname?, avatarUrl?, bio?, dateOfBirth?, interestTags?, profilePhotos? }
+ * Body: { userId, nickname?, avatarUrl?, bio?, dateOfBirth?, interestTags?, profilePhotos?, notifyMessages? }
  */
 export async function PUT(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
     const {
       userId,
       nickname,
@@ -158,66 +159,110 @@ export async function PUT(req: NextRequest) {
       dateOfBirth,
       interestTags,
       profilePhotos,
+      notifyMessages, // ✅ new feature
     } = body ?? {};
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "userId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
-    const data: Record<string, unknown> = {};
+    const userData: Record<string, unknown> = {};
 
     if (typeof nickname === "string") {
-      data.nickname = nickname.trim() || null;
-    }
-    if (typeof avatarUrl === "string") {
-      data.avatarUrl = avatarUrl;
-    }
-    if (typeof bio === "string") {
-      data.bio = bio;
-    }
-    if (dateOfBirth) {
-      const parsed = new Date(dateOfBirth);
-      if (!isNaN(parsed.getTime())) {
-        data.dateOfBirth = parsed;
-      }
-    }
-    if (Array.isArray(interestTags)) {
-      data.interestTags = interestTags.map((t: any) => String(t));
-    }
-    if (Array.isArray(profilePhotos)) {
-      data.profilePhotos = profilePhotos.map((p: any) => String(p));
+      const v = nickname.trim();
+      userData.nickname = v ? v : null;
     }
 
-    if (!Object.keys(data).length) {
+    if (typeof avatarUrl === "string") {
+      const v = avatarUrl.trim();
+      userData.avatarUrl = v ? v : null;
+    }
+
+    if (typeof bio === "string") {
+      const v = bio.trim();
+      userData.bio = v ? v : null;
+    }
+
+    // allow clearing dob: dateOfBirth: null
+    if (dateOfBirth === null) {
+      userData.dateOfBirth = null;
+    } else if (dateOfBirth) {
+      const parsed = new Date(dateOfBirth);
+      if (!isNaN(parsed.getTime())) userData.dateOfBirth = parsed;
+    }
+
+    if (Array.isArray(interestTags)) {
+      userData.interestTags = interestTags
+        .map((t: any) => String(t).trim())
+        .filter(Boolean);
+    }
+
+    if (Array.isArray(profilePhotos)) {
+      userData.profilePhotos = profilePhotos
+        .map((p: any) => String(p).trim())
+        .filter(Boolean);
+    }
+
+    const hasUserUpdate = Object.keys(userData).length > 0;
+    const hasSettingsUpdate = typeof notifyMessages === "boolean";
+
+    if (!hasUserUpdate && !hasSettingsUpdate) {
       return NextResponse.json(
         { error: "No fields to update" },
         { status: 400 }
       );
     }
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data,
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        avatarUrl: true,
-        bio: true,
-        dateOfBirth: true,
-        gender: true,
-        interestTags: true,
-        profilePhotos: true,
-        level: true,
-        liveLevel: true,
-        vipLevel: true,
-      },
-    });
+    const [updatedUser, updatedSettings] = await Promise.all([
+      hasUserUpdate
+        ? prisma.user.update({
+            where: { id: userId },
+            data: userData,
+            select: {
+              id: true,
+              username: true,
+              nickname: true,
+              avatarUrl: true,
+              bio: true,
+              dateOfBirth: true,
+              gender: true,
+              interestTags: true,
+              profilePhotos: true,
+              level: true,
+              liveLevel: true,
+              vipLevel: true,
+            },
+          })
+        : prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              id: true,
+              username: true,
+              nickname: true,
+              avatarUrl: true,
+              bio: true,
+              dateOfBirth: true,
+              gender: true,
+              interestTags: true,
+              profilePhotos: true,
+              level: true,
+              liveLevel: true,
+              vipLevel: true,
+            },
+          }),
+      hasSettingsUpdate
+        ? prisma.userSettings.upsert({
+            where: { userId },
+            update: { notifyMessages },
+            create: { userId, notifyMessages },
+          })
+        : getOrCreateUserSettings(userId),
+    ]);
 
-    return NextResponse.json({ user: updated });
+    return NextResponse.json({
+      user: updatedUser,
+      settings: { notifyMessages: Boolean((updatedSettings as any).notifyMessages) },
+    });
   } catch (error) {
     console.error("[PUT /api/profile/me]", error);
     return NextResponse.json(

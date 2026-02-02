@@ -349,7 +349,15 @@ model UserSettings {
   hideLiveLevel      Boolean     @default(false)
   hideMicStatus      Boolean     @default(false)
 
+   activeAvatarFrameItemId String?
+  activeProfileCardItemId String?
+  activeChatBubbleItemId  String?
+  activePartyThemeItemId  String?
+  activeRideItemId        String?
+  activePremiumIdItemId   String?
+ 
   user User @relation(fields: [userId], references: [id])
+  @@index([userId])
 }
 
 model UserBlock {

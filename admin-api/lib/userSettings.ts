@@ -1,16 +1,15 @@
 // admin-api/src/lib/userSettings.ts
-import { prisma } from "./prisma";
+import { prisma } from "@/lib/prisma";
 
+/**
+ * will never fail if multiple requests try to create settings at once.
+ */
 export async function getOrCreateUserSettings(userId: string) {
-  let settings = await prisma.userSettings.findUnique({
+  if (!userId) throw new Error("userId is required");
+
+  return prisma.userSettings.upsert({
     where: { userId },
+    update: {},
+    create: { userId },
   });
-
-  if (!settings) {
-    settings = await prisma.userSettings.create({
-      data: { userId },
-    });
-  }
-
-  return settings;
 }

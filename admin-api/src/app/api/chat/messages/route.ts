@@ -4,13 +4,21 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateUserSettings } from "@/lib/userSettings";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-// GET /api/chat/messages?userId=...&peerId=...
+function clampTake(raw: string | null) {
+  const n = Number(raw ?? "100");
+  if (!Number.isFinite(n)) return 100;
+  return Math.max(1, Math.min(200, Math.floor(n)));
+}
+
+// GET /api/chat/messages?userId=...&peerId=...&take=100
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
     const peerId = searchParams.get("peerId");
+    const take = clampTake(searchParams.get("take"));
 
     if (!userId || !peerId) {
       return NextResponse.json(
@@ -19,13 +27,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const thread = await prisma.chatThread.findFirst({
-      where: {
-        OR: [
-          { userAId: userId, userBId: peerId },
-          { userAId: peerId, userBId: userId },
-        ],
-      },
+    if (userId === peerId) {
+      return NextResponse.json({ messages: [] }, { status: 200 });
+    }
+
+    const [userAId, userBId] =
+      userId < peerId ? [userId, peerId] : [peerId, userId];
+
+    const thread = await prisma.chatThread.findUnique({
+      where: { userAId_userBId: { userAId, userBId } },
     });
 
     if (!thread) {
@@ -45,7 +55,7 @@ export async function GET(req: NextRequest) {
     const messages = await prisma.chatMessage.findMany({
       where: { threadId: thread.id },
       orderBy: { createdAt: "asc" },
-      take: 100,
+      take,
     });
 
     const data = messages.map((m) => ({
@@ -91,14 +101,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const sender = await prisma.user.findUnique({
-      where: { id: senderId },
-      select: { id: true, username: true, nickname: true },
-    });
+    // basic length guard (avoid giant payloads)
+    if (content.length > 2000) {
+      return NextResponse.json(
+        { error: "Message is too long" },
+        { status: 400 }
+      );
+    }
+
+    const [sender, receiver] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: senderId },
+        select: { id: true, username: true, nickname: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: receiverId },
+        select: { id: true },
+      }),
+    ]);
 
     if (!sender) {
+      return NextResponse.json({ error: "Sender not found" }, { status: 404 });
+    }
+    if (!receiver) {
       return NextResponse.json(
-        { error: "Sender not found" },
+        { error: "Receiver not found" },
         { status: 404 }
       );
     }
@@ -110,48 +137,28 @@ export async function POST(req: NextRequest) {
         : [receiverId, senderId];
 
     const thread = await prisma.chatThread.upsert({
-      where: {
-        userAId_userBId: {
-          userAId,
-          userBId,
-        },
-      },
-      update: {
-        lastMessageText: content,
-        lastMessageAt: now,
-      },
-      create: {
-        userAId,
-        userBId,
-        lastMessageText: content,
-        lastMessageAt: now,
-      },
+      where: { userAId_userBId: { userAId, userBId } },
+      update: { lastMessageText: content, lastMessageAt: now },
+      create: { userAId, userBId, lastMessageText: content, lastMessageAt: now },
     });
 
     const message = await prisma.chatMessage.create({
-      data: {
-        threadId: thread.id,
-        senderId,
-        content,
-      },
+      data: { threadId: thread.id, senderId, content },
     });
 
-    // create notification for receiver if they allow message notifications
+    // ✅ new feature: create notification for receiver if they allow message notifications
     try {
       const settings = await getOrCreateUserSettings(receiverId);
-      if (settings.notifyMessages) {
-        const displayName =
-          sender.nickname || sender.username || "Someone";
+
+      if (Boolean((settings as any).notifyMessages)) {
+        const displayName = sender.nickname || sender.username || "Someone";
 
         await prisma.notification.create({
           data: {
             userId: receiverId,
             type: "MESSAGE",
             title: `New message from ${displayName}`,
-            body:
-              content.length > 120
-                ? content.slice(0, 117) + "..."
-                : content,
+            body: content.length > 120 ? content.slice(0, 117) + "..." : content,
           },
         });
       }

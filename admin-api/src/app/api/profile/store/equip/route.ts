@@ -19,11 +19,18 @@ function slotForType(type: string) {
     case "PREMIUM_ID":
       return "activePremiumIdItemId";
     default:
-      return null; // HONOR/OTHER not equipable here
+      return null;
   }
 }
 
-function publicItem(i: any) {
+function toAbsolute(origin: string, url?: string | null) {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${origin}${path}`;
+}
+
+function publicItem(origin: string, i: any) {
   return {
     id: i.id,
     type: i.type,
@@ -31,6 +38,8 @@ function publicItem(i: any) {
     mediaType: i.mediaType,
     mediaUrl: i.mediaUrl ?? null,
     thumbnailUrl: i.thumbnailUrl ?? null,
+    mediaUrlFull: toAbsolute(origin, i.mediaUrl),
+    thumbnailUrlFull: toAbsolute(origin, i.thumbnailUrl),
     durationDays: i.durationDays ?? null,
   };
 }
@@ -40,6 +49,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const userId = body?.userId as string | undefined;
     const itemId = body?.itemId as string | undefined;
+    const origin = req.nextUrl.origin;
 
     if (!userId || !itemId) {
       return NextResponse.json(
@@ -106,14 +116,11 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(
-      { ok: true, equipped: updated, item: publicItem(item) },
+      { ok: true, equipped: updated, item: publicItem(origin, item) },
       { status: 200 }
     );
   } catch (e) {
     console.error("[POST /api/profile/store/equip]", e);
-    return NextResponse.json(
-      { error: "Failed to equip item" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to equip item" }, { status: 500 });
   }
 }

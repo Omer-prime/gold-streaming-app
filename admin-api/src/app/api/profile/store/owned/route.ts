@@ -4,7 +4,14 @@ import { getOrCreateUserSettings } from "@/lib/userSettings";
 
 export const dynamic = "force-dynamic";
 
-function pickItem(i: any) {
+function toAbsolute(origin: string, url?: string | null) {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${origin}${path}`;
+}
+
+function pickItem(origin: string, i: any) {
   return {
     id: i.id,
     type: i.type,
@@ -14,6 +21,8 @@ function pickItem(i: any) {
     mediaType: i.mediaType,
     mediaUrl: i.mediaUrl ?? null,
     thumbnailUrl: i.thumbnailUrl ?? null,
+    mediaUrlFull: toAbsolute(origin, i.mediaUrl),
+    thumbnailUrlFull: toAbsolute(origin, i.thumbnailUrl),
     durationDays: i.durationDays ?? null,
   };
 }
@@ -22,6 +31,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
+    const origin = req.nextUrl.origin;
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
@@ -64,7 +74,7 @@ export async function GET(req: NextRequest) {
     };
 
     const items = owned.map((row) => {
-      const item = pickItem(row.item);
+      const item = pickItem(origin, row.item);
       const equippedForType = (equippedIds as any)[item.type] ?? null;
 
       return {
@@ -75,22 +85,15 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // group for UI
     const groups: Record<string, any[]> = {};
     for (const it of items) {
       groups[it.type] = groups[it.type] || [];
       groups[it.type].push(it);
     }
 
-    return NextResponse.json(
-      { userId, equippedIds, items, groups },
-      { status: 200 }
-    );
+    return NextResponse.json({ userId, equippedIds, items, groups }, { status: 200 });
   } catch (e) {
     console.error("[GET /api/profile/store/owned]", e);
-    return NextResponse.json(
-      { error: "Failed to load owned items" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load owned items" }, { status: 500 });
   }
 }

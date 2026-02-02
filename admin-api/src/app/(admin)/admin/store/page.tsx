@@ -47,7 +47,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
 }
 
 /* =========================================================
-   ✅ Upload helpers
+     Upload helpers
    ========================================================= */
 
 async function uploadStoreFile(file: File) {
@@ -57,8 +57,11 @@ async function uploadStoreFile(file: File) {
   const res = await fetch("/api/admin/store/upload", { method: "POST", body: fd });
   const json = await res.json().catch(() => null);
   if (!res.ok) throw new Error(json?.error || "Upload failed");
-  return String(json.url);
+
+  // Prefer relative path (better for DB + mobile)
+  return String(json?.path || json?.url);
 }
+
 
 function inferMediaTypeFromFile(file: File): "IMAGE" | "GIF" | "VIDEO" {
   const t = (file.type || "").toLowerCase();
@@ -182,9 +185,10 @@ export default function AdminStorePage() {
   }, [selectedCategoryId]);
 
   useEffect(() => {
-    if (selectedItem) setDraft(JSON.parse(JSON.stringify(selectedItem)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedItemId]);
+  if (selectedItem) setDraft(JSON.parse(JSON.stringify(selectedItem)));
+  else setDraft(null);
+}, [selectedItem]);
+
 
   const dirty = useMemo(() => {
     if (!draft || !selectedItem) return false;
@@ -272,6 +276,10 @@ export default function AdminStorePage() {
   }
 
   async function saveItem() {
+    if (!draft?.id) {
+  setErr("Missing item id. Re-select the item and try again.");
+  return;
+}
     if (!draft) return;
     setSaving(true);
     setErr(null);

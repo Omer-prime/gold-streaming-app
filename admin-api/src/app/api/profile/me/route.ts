@@ -22,12 +22,28 @@ function computeProfileCompletion(user: {
     Boolean(user.avatarUrl),
     Boolean(user.bio && user.bio.trim()),
   ];
-
   const completed = pieces.filter(Boolean).length;
   const total = pieces.length;
-
   if (total === 0) return 0;
   return Math.round((completed / total) * 100);
+}
+
+function toAbsolute(origin: string, url?: string | null) {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${origin}${path}`;
+}
+
+function makeEquippedIds(settings: any) {
+  return {
+    AVATAR_FRAME: settings?.activeAvatarFrameItemId ?? null,
+    PROFILE_CARD: settings?.activeProfileCardItemId ?? null,
+    CHAT_BUBBLE: settings?.activeChatBubbleItemId ?? null,
+    PARTY_THEME: settings?.activePartyThemeItemId ?? null,
+    RIDE: settings?.activeRideItemId ?? null,
+    PREMIUM_ID: settings?.activePremiumIdItemId ?? null,
+  };
 }
 
 /**
@@ -37,6 +53,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
+    const origin = req.nextUrl.origin;
 
     if (!userId) {
       return NextResponse.json(
@@ -47,13 +64,9 @@ export async function GET(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        country: true,
-        wallet: true,
-      },
+      include: { country: true, wallet: true },
     });
 
-    // Do NOT 404 – return an empty profile shape instead
     if (!user) {
       return NextResponse.json({
         user: null,
@@ -66,6 +79,7 @@ export async function GET(req: NextRequest) {
           points: 0,
         },
         settings: null,
+        outfit: { equippedIds: makeEquippedIds(null), equippedItems: {} },
       });
     }
 
@@ -89,6 +103,48 @@ export async function GET(req: NextRequest) {
         _sum: { delta: true },
       }),
     ]);
+
+    const equippedIds = makeEquippedIds(settings);
+
+    const equippedItemIds = Object.values(equippedIds)
+      .filter(Boolean)
+      .map((x) => String(x));
+
+    const equippedItemsDb =
+      equippedItemIds.length === 0
+        ? []
+        : await prisma.storeItem.findMany({
+            where: {
+              id: { in: equippedItemIds },
+              isActive: true,
+            },
+            select: {
+              id: true,
+              type: true,
+              title: true,
+              mediaType: true,
+              mediaUrl: true,
+              thumbnailUrl: true,
+              durationDays: true,
+            },
+          });
+
+    const byId = new Map<string, any>();
+    for (const it of equippedItemsDb) {
+      byId.set(it.id, {
+        ...it,
+        mediaUrlFull: toAbsolute(origin, it.mediaUrl),
+        thumbnailUrlFull: toAbsolute(origin, it.thumbnailUrl),
+      });
+    }
+
+    // return by TYPE for easy client usage: equippedItems["AVATAR_FRAME"] = item
+    const equippedItems: Record<string, any> = {};
+    for (const [type, itemId] of Object.entries(equippedIds)) {
+      if (!itemId) continue;
+      const it = byId.get(String(itemId));
+      if (it) equippedItems[type] = it;
+    }
 
     const profileCompletion = computeProfileCompletion({
       nickname: user.nickname ?? null,
@@ -134,6 +190,10 @@ export async function GET(req: NextRequest) {
       settings: {
         notifyMessages: Boolean((settings as any).notifyMessages),
       },
+      outfit: {
+        equippedIds,
+        equippedItems,
+      },
     });
   } catch (error) {
     console.error("[GET /api/profile/me]", error);
@@ -159,7 +219,7 @@ export async function PUT(req: NextRequest) {
       dateOfBirth,
       interestTags,
       profilePhotos,
-      notifyMessages, // ✅ new feature
+      notifyMessages,
     } = body ?? {};
 
     if (!userId) {
@@ -172,18 +232,15 @@ export async function PUT(req: NextRequest) {
       const v = nickname.trim();
       userData.nickname = v ? v : null;
     }
-
     if (typeof avatarUrl === "string") {
       const v = avatarUrl.trim();
       userData.avatarUrl = v ? v : null;
     }
-
     if (typeof bio === "string") {
       const v = bio.trim();
       userData.bio = v ? v : null;
     }
 
-    // allow clearing dob: dateOfBirth: null
     if (dateOfBirth === null) {
       userData.dateOfBirth = null;
     } else if (dateOfBirth) {
@@ -207,10 +264,7 @@ export async function PUT(req: NextRequest) {
     const hasSettingsUpdate = typeof notifyMessages === "boolean";
 
     if (!hasUserUpdate && !hasSettingsUpdate) {
-      return NextResponse.json(
-        { error: "No fields to update" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
     const [updatedUser, updatedSettings] = await Promise.all([
@@ -265,9 +319,6 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error) {
     console.error("[PUT /api/profile/me]", error);
-    return NextResponse.json(
-      { error: "Failed to update profile" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
   }
 }

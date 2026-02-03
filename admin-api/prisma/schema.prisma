@@ -8,13 +8,14 @@ datasource db {
 }
 
 model Country {
-  id        Int     @id @default(autoincrement())
-  code      String  @unique
-  name      String
-  flagEmoji String?
-  isActive  Boolean @default(true)
-  sortOrder Int     @default(0)
-  users     User[]
+  id                              Int            @id @default(autoincrement())
+  code                            String         @unique
+  name                            String
+  flagEmoji                       String?
+  isActive                        Boolean        @default(true)
+  sortOrder                       Int            @default(0)
+  users                           User[]
+  settingsUsingAsAnalyticsCountry UserSettings[] @relation("AnalyticsCountry")
 
   @@index([sortOrder])
 }
@@ -117,6 +118,7 @@ model User {
   @@index([followersCount])
   @@index([totalCoinsReceived])
 }
+
 model CoinPackage {
   id        String   @id @default(cuid())
   title     String
@@ -130,6 +132,7 @@ model CoinPackage {
 
   @@index([isActive, sortOrder])
 }
+
 model Stream {
   id           String         @id @default(cuid())
   title        String
@@ -201,13 +204,12 @@ model Wallet {
   userId    String   @unique
   balance   Int      @default(0)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt   // ✅ change from @default(now())
+  updatedAt DateTime @updatedAt // ✅ change from @default(now())
 
   transactions GiftTransaction[]
   ledgers      WalletLedger[]
-  user         User @relation(fields: [userId], references: [id])
+  user         User              @relation(fields: [userId], references: [id])
 }
-
 
 model WalletLedger {
   id        String   @id @default(cuid())
@@ -349,14 +351,19 @@ model UserSettings {
   hideLiveLevel      Boolean     @default(false)
   hideMicStatus      Boolean     @default(false)
 
-   activeAvatarFrameItemId String?
+  activeAvatarFrameItemId String?
   activeProfileCardItemId String?
   activeChatBubbleItemId  String?
   activePartyThemeItemId  String?
   activeRideItemId        String?
   activePremiumIdItemId   String?
- 
+
+  analyticsCountryId Int?
+  analyticsCountry   Country? @relation("AnalyticsCountry", fields: [analyticsCountryId], references: [id])
+
   user User @relation(fields: [userId], references: [id])
+
+  @@index([analyticsCountryId])
   @@index([userId])
 }
 
@@ -1074,8 +1081,13 @@ model HelpFeedback {
   updatedAt DateTime @updatedAt
 
   userId String
+
+  // existing "type" = MY_FEEDBACK / MESSAGE_FEEDBACK
   type   HelpFeedbackType   @default(MY_FEEDBACK)
   status HelpFeedbackStatus @default(OPEN)
+
+  category HelpFeedbackCategory @default(GENERAL)
+  subject  String?
 
   message     String
   screenshots String[] @default([])
@@ -1090,6 +1102,7 @@ model HelpFeedback {
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@index([type, createdAt])
+  @@index([category, createdAt])
 }
 
 model VerificationCode {
@@ -1308,4 +1321,18 @@ enum AppLanguage {
 enum VerificationChannel {
   EMAIL
   PHONE
+}
+
+enum AnalyticsScope {
+  GLOBAL
+  COUNTRY
+}
+
+enum HelpFeedbackCategory {
+  GENERAL
+  BUG
+  PAYMENT
+  ACCOUNT
+  STREAM
+  REPORT
 }

@@ -8,17 +8,22 @@ import { useEffect, useState } from "react";
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(true);
 
   // Close sidebar automatically when route changes (on mobile)
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
+  // Auto-open Help group if you are inside /admin/help routes
+  useEffect(() => {
+    if (!pathname) return;
+    if (pathname.startsWith("/admin/help")) setHelpOpen(true);
+  }, [pathname]);
+
   const sidebarBase =
     "fixed md:static inset-y-0 left-0 z-40 w-72 border-r border-slate-900 bg-gradient-to-b from-slate-950 to-slate-900 flex flex-col shadow-xl shadow-black/40 transform transition-transform duration-200";
-  const sidebarState = mobileOpen
-    ? "translate-x-0"
-    : "-translate-x-full md:translate-x-0";
+  const sidebarState = mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0";
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col md:flex-row">
@@ -29,9 +34,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <span className="text-[13px] font-extrabold text-black">GL</span>
           </div>
           <div className="leading-tight">
-            <p className="text-[14px] font-semibold tracking-tight">
-              Gold Live Admin
-            </p>
+            <p className="text-[14px] font-semibold tracking-tight">Gold Live Admin</p>
             <p className="text-[11px] text-slate-400">Platform control center</p>
           </div>
         </div>
@@ -42,12 +45,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-900/70 text-slate-100"
         >
           <span className="sr-only">Toggle navigation</span>
-          {/* simple hamburger / close based on state */}
-          {mobileOpen ? (
-            <span className="text-xl leading-none">&times;</span>
-          ) : (
-            <span className="text-xl leading-none">&#9776;</span>
-          )}
+          {mobileOpen ? <span className="text-xl leading-none">&times;</span> : <span className="text-xl leading-none">&#9776;</span>}
         </button>
       </div>
 
@@ -59,159 +57,77 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <span className="text-[14px] font-extrabold text-black">GL</span>
           </div>
           <div className="leading-tight">
-            <p className="text-[15px] font-semibold tracking-tight">
-              Gold Live Admin
-            </p>
-            <p className="text-[11px] text-slate-400">
-              Platform control center
-            </p>
+            <p className="text-[15px] font-semibold tracking-tight">Gold Live Admin</p>
+            <p className="text-[11px] text-slate-400">Platform control center</p>
           </div>
         </div>
 
         {/* nav */}
         <nav className="flex-1 px-3 py-5 space-y-1 text-sm overflow-y-auto">
           <SectionLabel>Platform</SectionLabel>
-          <NavLink
-            href="/admin"
-            label="Dashboard"
-            icon="📊"
-            pathname={pathname}
-            exact
-            onClick={() => setMobileOpen(false)}
-          />
-          <NavLink
-            href="/admin/users"
-            label="Users"
-            icon="👥"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
-          <NavLink
-            href="/admin/hosts"
-            label="Hosts"
-            icon="🎤"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
-          <NavLink
-            href="/admin/streams"
-            label="Streams"
-            icon="📺"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
-          <NavLink
-            href="/admin/gifts"
-            label="Gifts"
-            icon="🎁"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
 
-          {/* ✅ Rewards */}
-          <NavLink
-            href="/admin/rewards"
-            label="Rewards"
-            icon="🏆"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
-           <NavLink
-            href="/admin/vip"
-            label="VIP Plans"
-            icon="👑"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
-        
-          <NavLink
-            href="/admin/guardian"
-            label="Guardian Plans"
-            icon="🛡️"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
+          <NavLink href="/admin" label="Dashboard" icon="📊" pathname={pathname} exact onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/users" label="Users" icon="👥" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/hosts" label="Hosts" icon="🎤" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/streams" label="Streams" icon="📺" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/gifts" label="Gifts" icon="🎁" pathname={pathname} onClick={() => setMobileOpen(false)} />
 
-        
-          <NavLink
-            href="/admin/store"
-            label="Store"
-            icon="🛍️"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
+          <NavLink href="/admin/rewards" label="Rewards" icon="🏆" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/vip" label="VIP Plans" icon="👑" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/guardian" label="Guardian Plans" icon="🛡️" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/store" label="Store" icon="🛍️" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/notifications" label="Notifications" icon="🔔" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/countries" label="Countries" icon="🌍" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/live-applications" label="Live applications" icon="🪪" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/topics" label="Topics" icon="🏷️" pathname={pathname} onClick={() => setMobileOpen(false)} />
 
-          <NavLink
-            href="/admin/notifications"
-            label="Notifications"
-            icon="🔔"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
-          <NavLink
-            href="/admin/countries"
-            label="Countries"
-            icon="🌍"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
-          <NavLink
-            href="/admin/live-applications"
-            label="Live applications"
-            icon="🪪"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
+          {/* ✅ Help (FAQ + Feedback) */}
+          <div className="mt-4 pt-4 border-t border-slate-900/80">
+            <button
+              type="button"
+              onClick={() => setHelpOpen((v) => !v)}
+              className="w-full group flex items-center justify-between rounded-xl px-3.5 py-2.5 text-slate-300 hover:bg-slate-900/70 hover:text-slate-50 border border-transparent transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] bg-slate-900/80 border border-slate-800 group-hover:border-slate-700">
+                  ❓
+                </span>
+                <span className="text-[14px] font-medium tracking-tight">Help</span>
+              </div>
+              <span className="text-slate-400">{helpOpen ? "▾" : "▸"}</span>
+            </button>
 
-          <NavLink
-            href="/admin/topics"
-            label="Topics"
-            icon="🏷️"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
+            {helpOpen ? (
+              <div className="mt-1 ml-2 pl-3 border-l border-slate-800 space-y-1">
+                <NavLink
+                  href="/admin/help/faqs"
+                  label="FAQs"
+                  icon="📚"
+                  pathname={pathname}
+                  onClick={() => setMobileOpen(false)}
+                  dense
+                />
+                <NavLink
+                  href="/admin/help/feedback"
+                  label="Feedback"
+                  icon="💬"
+                  pathname={pathname}
+                  onClick={() => setMobileOpen(false)}
+                  dense
+                />
+              </div>
+            ) : null}
+          </div>
 
           <div className="mt-4 pt-4 border-t border-slate-900/80">
             <SectionLabel>Operations</SectionLabel>
-            <NavLink
-              href="/admin/agencies"
-              label="Agencies"
-              icon="🏢"
-              pathname={pathname}
-              onClick={() => setMobileOpen(false)}
-            />
-            <NavLink
-              href="/admin/moderation"
-              label="Moderation"
-              icon="🛡️"
-              pathname={pathname}
-              onClick={() => setMobileOpen(false)}
-            />
+            <NavLink href="/admin/agencies" label="Agencies" icon="🏢" pathname={pathname} onClick={() => setMobileOpen(false)} />
+            <NavLink href="/admin/moderation" label="Moderation" icon="🛡️" pathname={pathname} onClick={() => setMobileOpen(false)} />
           </div>
 
-          <NavLink
-            href="/admin/currency-trading"
-            label="Currency trading"
-            icon="💱"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
-
-          <NavLink
-            href="/admin/base-salary-approval"
-            label="Base salary approval"
-            icon="💵"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
-
-          <NavLink
-            href="/admin/reseller-approval"
-            label="Reseller approval"
-            icon="✅"
-            pathname={pathname}
-            onClick={() => setMobileOpen(false)}
-          />
+          <NavLink href="/admin/currency-trading" label="Currency trading" icon="💱" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/base-salary-approval" label="Base salary approval" icon="💵" pathname={pathname} onClick={() => setMobileOpen(false)} />
+          <NavLink href="/admin/reseller-approval" label="Reseller approval" icon="✅" pathname={pathname} onClick={() => setMobileOpen(false)} />
         </nav>
 
         {/* footer */}
@@ -249,6 +165,7 @@ function NavLink({
   pathname,
   exact = false,
   onClick,
+  dense = false,
 }: {
   href: string;
   label: string;
@@ -256,6 +173,7 @@ function NavLink({
   pathname: string | null;
   exact?: boolean;
   onClick?: () => void;
+  dense?: boolean;
 }) {
   const isActive = pathname
     ? exact
@@ -263,8 +181,10 @@ function NavLink({
       : pathname === href || pathname.startsWith(href + "/")
     : false;
 
-  const baseClasses =
-    "group flex items-center gap-3 rounded-xl px-3.5 py-2.5 transition-colors";
+  const baseClasses = dense
+    ? "group flex items-center gap-3 rounded-xl px-3 py-2 transition-colors"
+    : "group flex items-center gap-3 rounded-xl px-3.5 py-2.5 transition-colors";
+
   const stateClasses = isActive
     ? "bg-slate-900 text-slate-50 border border-slate-700 shadow-sm shadow-slate-900"
     : "text-slate-300 hover:bg-slate-900/70 hover:text-slate-50 border border-transparent";
@@ -274,14 +194,14 @@ function NavLink({
       <span
         className={[
           "flex h-7 w-7 items-center justify-center rounded-full text-[15px] bg-slate-900/80 border border-slate-800",
-          isActive
-            ? "shadow-inner shadow-yellow-400/40"
-            : "group-hover:border-slate-700",
+          isActive ? "shadow-inner shadow-yellow-400/40" : "group-hover:border-slate-700",
         ].join(" ")}
       >
         {icon ?? "•"}
       </span>
-      <span className="text-[14px] font-medium tracking-tight">{label}</span>
+      <span className={dense ? "text-[13px] font-medium tracking-tight" : "text-[14px] font-medium tracking-tight"}>
+        {label}
+      </span>
     </Link>
   );
 }

@@ -1,18 +1,45 @@
-// src/app/api/profile/live-data/route.ts
+// admin-api/src/app/api/profile/live-data/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type ModeParam = "live" | "pk";
+type ScopeParam = "user" | "country" | "global";
 type RangeParam = "daily" | "weekly" | "monthly";
+
+// NOTE: keep for backward compatibility (older clients may still send mode)
+// In your current usage, you can ignore this.
+type ModeParam = "live" | "pk";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
 
     const userId = searchParams.get("userId") ?? undefined;
+
+    const scopeParamRaw = (searchParams.get("scope") ?? "user").toLowerCase();
+    const scopeParam: ScopeParam =
+      scopeParamRaw === "global"
+        ? "global"
+        : scopeParamRaw === "country"
+        ? "country"
+        : "user";
+
+    const rangeParamRaw = (searchParams.get("range") ?? "daily").toLowerCase();
+    const rangeParam: RangeParam =
+      rangeParamRaw === "weekly"
+        ? "weekly"
+        : rangeParamRaw === "monthly"
+        ? "monthly"
+        : "daily";
+
+    const dateParam = searchParams.get("date") ?? undefined; // YYYY-MM-DD
+
+    // optional overrides (future)
+    const countryIdStr = searchParams.get("countryId") ?? undefined;
+    const countryCode = (searchParams.get("countryCode") ?? undefined)?.toUpperCase();
+
+    // backward compat param (optional)
     const modeParam = (searchParams.get("mode") ?? "live").toLowerCase() as ModeParam;
-    const rangeParam = (searchParams.get("range") ?? "daily").toLowerCase() as RangeParam;
-    const dateParam = searchParams.get("date") ?? undefined; // "YYYY-MM-DD" (optional)
+    const modeFilter = modeParam === "pk" ? "PK" : undefined; // Stream.mode filter
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
@@ -20,7 +47,11 @@ export async function GET(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true },
+      select: {
+        id: true,
+        countryId: true,
+        country: { select: { id: true, code: true, name: true, flagEmoji: true } },
+      },
     });
 
     if (!user) {
@@ -36,36 +67,84 @@ export async function GET(req: NextRequest) {
     }
 
     const { start, end } = getRangeWindow(rangeParam, baseDate);
-    const modeFilter = modeParam === "pk" ? "PK" : undefined;
+
+    // resolve country (for country scope)
+    let country: { id: number; code: string; name: string; flagEmoji: string | null } | null =
+      null;
+    let countryId: number | null = null;
+
+    if (scopeParam === "country") {
+      if (countryIdStr && !Number.isNaN(Number(countryIdStr))) {
+        countryId = Number(countryIdStr);
+        country = await prisma.country.findUnique({
+          where: { id: countryId },
+          select: { id: true, code: true, name: true, flagEmoji: true },
+        });
+      } else if (countryCode) {
+        country = await prisma.country.findUnique({
+          where: { code: countryCode },
+          select: { id: true, code: true, name: true, flagEmoji: true },
+        });
+        countryId = country?.id ?? null;
+      } else {
+        countryId = user.countryId ?? null;
+        country = user.country ?? null;
+      }
+
+      if (!countryId) {
+        return NextResponse.json(
+          { error: "User country is not set. Please set country first." },
+          { status: 400 }
+        );
+      }
+    }
+
+    // ---------- WHERE builders ----------
+    const pointsWhere: any = { createdAt: { gte: start, lt: end } };
+    const streamWhere: any = {
+      startedAt: { not: null, lte: end },
+      OR: [{ endedAt: null }, { endedAt: { gte: start } }],
+    };
+    const giftWhere: any = { createdAt: { gte: start, lt: end } };
+    const followWhere: any = { createdAt: { gte: start, lt: end } };
+    const fanClubMemberWhere: any = { createdAt: { gte: start, lt: end } };
+
+    if (scopeParam === "user") {
+      pointsWhere.userId = userId;
+      streamWhere.hostId = userId;
+      giftWhere.receiverId = userId;
+      followWhere.followingId = userId;
+      fanClubMemberWhere.fanClub = { ownerId: userId };
+    }
+
+    if (scopeParam === "country") {
+      pointsWhere.user = { countryId };
+      streamWhere.host = { countryId };
+      giftWhere.receiver = { countryId };
+      followWhere.following = { countryId };
+      fanClubMemberWhere.fanClub = { owner: { countryId } };
+    }
+
+    // global scope => keep only time filters
+
+    if (modeFilter) {
+      streamWhere.mode = modeFilter;
+      giftWhere.stream = { mode: modeFilter };
+    }
 
     // 1) Won points
     const pointsAgg = await prisma.userPointLedger.aggregate({
-      where: {
-        userId,
-        createdAt: { gte: start, lt: end },
-      },
+      where: pointsWhere,
       _sum: { delta: true },
     });
     const wonPoints = pointsAgg._sum.delta ?? 0;
 
-    // 2) Stream durations (LIVE + PARTY) with overlap
-    const streamWhere: any = {
-      hostId: userId,
-      startedAt: { not: null, lte: end },
-      OR: [{ endedAt: null }, { endedAt: { gte: start } }],
-    };
-    if (modeFilter) {
-      streamWhere.mode = modeFilter;
-    }
-
+    // 2) Stream durations + avg viewers
     const streams = await prisma.stream.findMany({
       where: streamWhere,
-      select: {
-        mode: true,
-        startedAt: true,
-        endedAt: true,
-        viewers: true,
-      },
+      select: { mode: true, startedAt: true, endedAt: true, viewers: true },
+      orderBy: { startedAt: "desc" },
+      take: 5000, // safety cap for global
     });
 
     let liveDurationSeconds = 0;
@@ -81,11 +160,8 @@ export async function GET(req: NextRequest) {
       const overlap = calculateOverlapSeconds(sStart, sEnd, start, end);
       if (overlap <= 0) continue;
 
-      if (s.mode === "PARTY") {
-        partyDurationSeconds += overlap;
-      } else {
-        liveDurationSeconds += overlap;
-      }
+      if (s.mode === "PARTY") partyDurationSeconds += overlap;
+      else liveDurationSeconds += overlap;
 
       if (typeof s.viewers === "number") {
         totalViewers += s.viewers;
@@ -97,20 +173,11 @@ export async function GET(req: NextRequest) {
       viewerSamples > 0 ? Math.round(totalViewers / viewerSamples) : 0;
 
     // 3) Earnings from gifts
-    const giftWhere: any = {
-      receiverId: userId,
-      createdAt: { gte: start, lt: end },
-    };
-    if (modeFilter) {
-      giftWhere.stream = { mode: modeFilter };
-    }
-
     const gifts = await prisma.giftTransaction.findMany({
       where: giftWhere,
-      select: {
-        totalPrice: true,
-        stream: { select: { mode: true } },
-      },
+      select: { totalPrice: true, stream: { select: { mode: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 8000, // safety cap
     });
 
     let liveEarnings = 0;
@@ -118,37 +185,24 @@ export async function GET(req: NextRequest) {
 
     for (const g of gifts) {
       const m = g.stream?.mode ?? "SOLO";
-      if (m === "PARTY") {
-        partyEarnings += g.totalPrice;
-      } else {
-        liveEarnings += g.totalPrice;
-      }
+      if (m === "PARTY") partyEarnings += g.totalPrice;
+      else liveEarnings += g.totalPrice;
     }
 
     // 4) New fans
-    const newFans = await prisma.follow.count({
-      where: {
-        followingId: userId,
-        createdAt: { gte: start, lt: end },
-      },
-    });
+    const newFans = await prisma.follow.count({ where: followWhere });
 
     // 5) New fan club members
     const newFanClubMembers = await prisma.fanClubMember.count({
-      where: {
-        createdAt: { gte: start, lt: end },
-        fanClub: { ownerId: userId },
-      },
+      where: fanClubMemberWhere,
     });
 
-    // We don't yet track crown duration separately, keep 0 for now.
     const partyCrownDurationSeconds = 0;
 
     return NextResponse.json({
-      mode: modeParam === "pk" ? "pk" : "live",
-      range: ["daily", "weekly", "monthly"].includes(rangeParam)
-        ? rangeParam
-        : "daily",
+      scope: scopeParam,
+      country: scopeParam === "country" ? country : null,
+      range: rangeParam,
       date: formatDateYYYYMMDD(start),
       wonPoints,
       liveDurationSeconds,
@@ -175,22 +229,17 @@ function formatDateYYYYMMDD(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-// daily/weekly/monthly window in UTC
 function getRangeWindow(range: string, base: Date) {
   const y = base.getUTCFullYear();
   const m = base.getUTCMonth();
   const d = base.getUTCDate();
 
   if (range === "weekly") {
-    const dayOfWeek = base.getUTCDay(); // 0 = Sun, 1 = Mon...
+    const dayOfWeek = base.getUTCDay();
     const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const start = new Date(Date.UTC(y, m, d + diffToMonday));
     const end = new Date(
-      Date.UTC(
-        start.getUTCFullYear(),
-        start.getUTCMonth(),
-        start.getUTCDate() + 7
-      )
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + 7)
     );
     return { start, end };
   }
@@ -206,12 +255,7 @@ function getRangeWindow(range: string, base: Date) {
   return { start, end };
 }
 
-function calculateOverlapSeconds(
-  aStart: Date,
-  aEnd: Date,
-  bStart: Date,
-  bEnd: Date
-): number {
+function calculateOverlapSeconds(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {
   const startMs = Math.max(aStart.getTime(), bStart.getTime());
   const endMs = Math.min(aEnd.getTime(), bEnd.getTime());
   if (endMs <= startMs) return 0;

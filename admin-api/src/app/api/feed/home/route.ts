@@ -23,6 +23,9 @@ export async function GET(req: NextRequest) {
 
     const userId = searchParams.get("userId") ?? undefined;
     const rawTab = (searchParams.get("tab") ?? "following").toLowerCase();
+    const countryRaw = (searchParams.get("country") ?? "all").trim().toLowerCase();
+    const countryCode = countryRaw.toUpperCase();
+
 
     const tab: "following" | "square" | "video" =
       rawTab === "square" || rawTab === "video" ? (rawTab as any) : "following";
@@ -114,6 +117,12 @@ export async function GET(req: NextRequest) {
       and.push({ type: "VIDEO", videoUrl: { not: null } });
     } else {
       and.push({ OR: [{ type: "TEXT" }, { type: "IMAGE" }] });
+    }
+
+    if (countryRaw !== "all" && countryRaw !== "popular") {
+      and.push({
+        user: { country: { code: countryCode } },
+      });
     }
 
     if (!isVideoTab && topicId) {
@@ -242,11 +251,11 @@ export async function GET(req: NextRequest) {
 
       const topics = shouldReturnTopics
         ? await prisma.topic.findMany({
-            where: { isActive: true },
-            orderBy: [{ isTrending: "desc" }, { hotScore: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
-            take: 10,
-            select: { id: true, title: true, hotScore: true, category: true },
-          })
+          where: { isActive: true },
+          orderBy: [{ isTrending: "desc" }, { hotScore: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+          take: 10,
+          select: { id: true, title: true, hotScore: true, category: true },
+        })
         : [];
 
       const topicDtos = topics.map((t) => ({

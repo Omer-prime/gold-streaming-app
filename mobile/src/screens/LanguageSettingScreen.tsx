@@ -7,55 +7,52 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_BASE_URL } from "../config";
+import { applyLanguage, t, type AppLangCode } from "../i18n";
 
-type Nav = NativeStackNavigationProp<
-  ProfileStackParamList,
-  "LanguageSetting"
->;
+type Nav = NativeStackNavigationProp<ProfileStackParamList, "LanguageSetting">;
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.10.25:3000";
-
-const LANG_OPTIONS = [
+const LANG_OPTIONS: { label: string; value: AppLangCode }[] = [
   { label: "Follow system", value: "system" },
   { label: "English", value: "en" },
   { label: "繁體中文", value: "zh-Hant" },
-  { label: "Tiếng Việt", value: "vi" },
-  { label: "हिंदी", value: "hi" },
-  { label: "Bahasa Indonesia", value: "id" },
   { label: "العربية", value: "ar" },
   { label: "اردو", value: "ur" },
   { label: "Português", value: "pt" },
-  { label: "Türkçe", value: "tr" },
-  { label: "বাংলা", value: "bn" },
-  { label: "ภาษาไทย", value: "th" },
-  { label: "नेपाली", value: "ne" },
-  { label: "Français", value: "fr" },
   { label: "Español", value: "es" },
 ];
 
 const LanguageSettingScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
-  const [selected, setSelected] = useState<string>("system");
+  const [selected, setSelected] = useState<AppLangCode>("system");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const loadLang = async () => {
       try {
         setLoading(true);
+
+        // first try local
+        const local = (await AsyncStorage.getItem("gl_language")) as AppLangCode | null;
+        if (local) setSelected(local);
+
+        // then sync from backend (if user exists)
         const userId = await AsyncStorage.getItem("gl_user_id");
         if (!userId) return;
 
         const res = await fetch(
-          `${API_BASE_URL}/api/settings/language?userId=${encodeURIComponent(
-            userId
-          )}`
+          `${API_BASE_URL}/api/settings/language?userId=${encodeURIComponent(userId)}`
         );
+
         if (!res.ok) return;
         const json = await res.json();
-        if (json.language) {
-          setSelected(String(json.language));
-        }
+
+        const lang = String(json.language || "system") as AppLangCode;
+        setSelected(lang);
+
+        // apply immediately
+        await AsyncStorage.setItem("gl_language", lang);
+        applyLanguage(lang);
       } catch (e) {
         console.warn("load language error", e);
       } finally {
@@ -70,9 +67,11 @@ const LanguageSettingScreen: React.FC = () => {
     try {
       const userId = await AsyncStorage.getItem("gl_user_id");
       if (!userId) {
-        Alert.alert("Error", "User not found, please login again.");
+        Alert.alert("Error", t("errors.userNotFound"));
         return;
       }
+
+      setLoading(true);
 
       const res = await fetch(`${API_BASE_URL}/api/settings/language`, {
         method: "POST",
@@ -82,17 +81,19 @@ const LanguageSettingScreen: React.FC = () => {
 
       const json = await res.json().catch(() => null);
       if (!res.ok) {
-        Alert.alert("Error", json?.error ?? "Failed to update language");
+        Alert.alert("Error", json?.error ?? t("errors.updateFailed"));
         return;
       }
 
       await AsyncStorage.setItem("gl_language", selected);
+      applyLanguage(selected);
 
-      // TODO: if you integrate i18n, call i18n.changeLanguage(selected) here.
       navigation.goBack();
     } catch (e) {
       console.error("update language error", e);
-      Alert.alert("Error", "Failed to update language.");
+      Alert.alert("Error", t("errors.updateFailed"));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,12 +107,14 @@ const LanguageSettingScreen: React.FC = () => {
         >
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
+
         <Text className="text-[18px] font-semibold text-[#111827]">
-          Language Setting
+          {t("settings.language.title")}
         </Text>
+
         <Pressable onPress={handleOk} disabled={loading}>
           <Text className="text-[14px] text-[#6366F1] font-semibold">
-            {loading ? "..." : "OK"}
+            {loading ? t("common.loading") : t("common.ok")}
           </Text>
         </Pressable>
       </View>

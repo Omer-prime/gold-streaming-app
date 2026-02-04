@@ -1,5 +1,5 @@
 // src/screens/AccountSecurityScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "AccountSecurity">;
 
@@ -51,8 +53,10 @@ const AccountSecurityScreen: React.FC = () => {
         );
         if (!res.ok) return;
         const json = await res.json();
+
         setSecurity({
-          securityLevel: (json.securityLevel as SecurityInfo["securityLevel"]) || "Low",
+          securityLevel:
+            (json.securityLevel as SecurityInfo["securityLevel"]) || "Low",
           hasPassword: !!json.hasPassword,
           hasEmail: !!json.hasEmail,
           hasPhone: !!json.hasPhone,
@@ -69,14 +73,27 @@ const AccountSecurityScreen: React.FC = () => {
     loadSecurity();
   }, []);
 
+  const securityLevelText = useMemo(() => {
+    if (security.securityLevel === "High")
+      return t("settings.security.levelHigh");
+    if (security.securityLevel === "Medium")
+      return t("settings.security.levelMedium");
+    return t("settings.security.levelLow");
+  }, [security.securityLevel]);
+
+  const levelText = useMemo(() => {
+    // "Your account security level is low."
+    return t("accountSecurity.levelText", {
+      level: securityLevelText.toLowerCase(),
+    });
+  }, [securityLevelText]);
+
   const handleCancelAccount = () => {
     Alert.alert(
-      "Cancel account",
-      "Account cancellation flow will be implemented later."
+      t("accountSecurity.cancel.title"),
+      t("accountSecurity.cancel.msg")
     );
   };
-
-  const levelText = `Your account security level is ${security.securityLevel.toLowerCase()}.`;
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -89,7 +106,7 @@ const AccountSecurityScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
         <Text className="text-[18px] font-semibold text-[#111827]">
-          Account and security
+          {t("accountSecurity.title")}
         </Text>
       </View>
 
@@ -106,68 +123,96 @@ const AccountSecurityScreen: React.FC = () => {
         {/* tip */}
         <View className="px-4 py-3 bg-[#F9FAFB] border-b border-[#E5E7EB]">
           <Text className="text-[11px] text-[#6B7280]">
-            Binding a mobile number or email can raise your security level.
+            {t("accountSecurity.tip")}
           </Text>
         </View>
 
         {/* rows */}
         <View className="mt-2">
           <AccountRow
-            label="Set password"
-            trailing={security.hasPassword ? "Modify" : "Set"}
+            label={t("accountSecurity.rows.setPassword")}
+            trailing={
+              security.hasPassword
+                ? t("accountSecurity.trailing.modify")
+                : t("accountSecurity.trailing.set")
+            }
             onPress={() => navigation.navigate("SecurityPassword")}
           />
           <Divider />
           <AccountRow
-            label="Phone number"
-            trailing={security.hasPhone ? "Bound" : "Bind"}
+            label={t("accountSecurity.rows.phoneNumber")}
+            trailing={
+              security.hasPhone
+                ? t("accountSecurity.trailing.bound")
+                : t("accountSecurity.trailing.bind")
+            }
             onPress={() => navigation.navigate("BindPhone")}
           />
           <Divider />
           <AccountRow
-            label="Email"
-            trailing={security.hasEmail ? "Bound" : "Bind"}
+            label={t("accountSecurity.rows.email")}
+            trailing={
+              security.hasEmail
+                ? t("accountSecurity.trailing.bound")
+                : t("accountSecurity.trailing.bind")
+            }
             showRedDot={!security.hasEmail}
             onPress={() => navigation.navigate("BindEmail")}
           />
           <Divider />
           <AccountRow
-            label="Google"
-            trailing={security.boundGoogle ? "Bound" : "Bind"}
+            label={t("accountSecurity.rows.google")}
+            trailing={
+              security.boundGoogle
+                ? t("accountSecurity.trailing.bound")
+                : t("accountSecurity.trailing.bind")
+            }
             onPress={() => navigation.navigate("BindGoogle")}
           />
           <Divider />
           <AccountRow
-            label="Facebook"
-            trailing={security.boundFacebook ? "Bound" : "Bind"}
+            label={t("accountSecurity.rows.facebook")}
+            trailing={
+              security.boundFacebook
+                ? t("accountSecurity.trailing.bound")
+                : t("accountSecurity.trailing.bind")
+            }
             onPress={() => navigation.navigate("BindFacebook")}
           />
           <Divider />
           <AccountRow
-            label="Instagram"
-            trailing={security.boundInstagram ? "Bound" : "Bind"}
+            label={t("accountSecurity.rows.instagram")}
+            trailing={
+              security.boundInstagram
+                ? t("accountSecurity.trailing.bound")
+                : t("accountSecurity.trailing.bind")
+            }
             onPress={() => navigation.navigate("BindInstagram")}
           />
           <Divider />
           <AccountRow
-            label="TikTok"
-            trailing={security.boundTiktok ? "Bound" : "Bind"}
+            label={t("accountSecurity.rows.tiktok")}
+            trailing={
+              security.boundTiktok
+                ? t("accountSecurity.trailing.bound")
+                : t("accountSecurity.trailing.bind")
+            }
             onPress={() => navigation.navigate("BindTiktok")}
           />
           <Divider />
           <AccountRow
-            label="Device management"
+            label={t("accountSecurity.rows.deviceManagement")}
             onPress={() => navigation.navigate("DeviceManagement")}
           />
         </View>
 
-        {/* cancel account button – red bg, white text */}
+        {/* cancel account button */}
         <Pressable
           onPress={handleCancelAccount}
           className="mt-6 mx-4 h-11 rounded-full bg-[#EF4444] items-center justify-center"
         >
           <Text className="text-[14px] font-semibold text-white">
-            Cancel account
+            {t("accountSecurity.cancel.button")}
           </Text>
         </Pressable>
       </ScrollView>

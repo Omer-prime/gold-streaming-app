@@ -15,8 +15,11 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "PrivacySettings">;
+
+
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.10.25:3000";
@@ -29,13 +32,14 @@ const PrivacySettingsScreen: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const userId = await AsyncStorage.getItem("gl_user_id");
+        const userId =
+          (await AsyncStorage.getItem("gl_user_id")) ??
+          (await AsyncStorage.getItem("userId"));
+
         if (!userId) return;
 
         const res = await fetch(
-          `${API_BASE_URL}/api/settings/privacy?userId=${encodeURIComponent(
-            userId
-          )}`
+          `${API_BASE_URL}/api/settings/privacy?userId=${encodeURIComponent(userId)}`
         );
         if (!res.ok) return;
         const json = await res.json();
@@ -55,7 +59,10 @@ const PrivacySettingsScreen: React.FC = () => {
 
     const save = async () => {
       try {
-        const userId = await AsyncStorage.getItem("gl_user_id");
+        const userId =
+          (await AsyncStorage.getItem("gl_user_id")) ??
+          (await AsyncStorage.getItem("userId"));
+
         if (!userId) return;
 
         await fetch(`${API_BASE_URL}/api/settings/privacy`, {
@@ -73,7 +80,7 @@ const PrivacySettingsScreen: React.FC = () => {
 
   const openSystemSettings = () => {
     Linking.openSettings().catch(() => {
-      Alert.alert("Error", "Unable to open system settings on this device.");
+      Alert.alert(t("common.error"), t("privacySettings.errors.openSettingsFailed"));
     });
   };
 
@@ -88,7 +95,7 @@ const PrivacySettingsScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
         <Text className="text-[18px] font-semibold text-[#111827]">
-          Privacy
+          {t("privacySettings.title")}
         </Text>
       </View>
 
@@ -99,50 +106,51 @@ const PrivacySettingsScreen: React.FC = () => {
       >
         {/* Live privacy */}
         <View className="px-4 pt-4 pb-1">
-          <Text className="text-[11px] text-[#6B7280]">Live privacy</Text>
+          <Text className="text-[11px] text-[#6B7280]">
+            {t("privacySettings.sections.livePrivacy")}
+          </Text>
         </View>
         <View className="px-4 py-3 border-b border-[#E5E7EB] flex-row items-center justify-between">
           <Text className="text-[14px] text-[#111827]">
-            Hide the microphone status
+            {t("privacySettings.items.hideMicStatus")}
           </Text>
-          <Switch
-            value={hideMicStatus}
-            onValueChange={setHideMicStatus}
-          />
+          <Switch value={hideMicStatus} onValueChange={setHideMicStatus} />
         </View>
 
         {/* Permission privacy */}
         <View className="px-4 pt-4 pb-1">
-          <Text className="text-[11px] text-[#6B7280]">Permission privacy</Text>
+          <Text className="text-[11px] text-[#6B7280]">
+            {t("privacySettings.sections.permissionPrivacy")}
+          </Text>
         </View>
 
         <PermissionRow
-          label="Allow Gold Live to access your camera"
-          subLabel="For taking pictures, recording videos, etc."
-          trailingText="On"
+          label={t("privacySettings.permissions.camera.label")}
+          subLabel={t("privacySettings.permissions.camera.subLabel")}
+          trailingText={t("privacySettings.trailing.on")}
         />
         <PermissionRow
-          label="Allow Gold Live to access your voice messages"
-          subLabel="For video recording and voice sending, etc."
-          trailingText="Go settings"
+          label={t("privacySettings.permissions.voice.label")}
+          subLabel={t("privacySettings.permissions.voice.subLabel")}
+          trailingText={t("privacySettings.trailing.goSettings")}
           onPress={openSystemSettings}
         />
         <PermissionRow
-          label="Allow the platform to get your notification permission"
-          subLabel="For unread message alerts, etc."
-          trailingText="Go settings"
+          label={t("privacySettings.permissions.notifications.label")}
+          subLabel={t("privacySettings.permissions.notifications.subLabel")}
+          trailingText={t("privacySettings.trailing.goSettings")}
           onPress={openSystemSettings}
         />
         <PermissionRow
-          label="Allow the platform to access your Bluetooth permissions."
-          subLabel="Connect to Bluetooth headphones and ensure proper functioning."
-          trailingText="Go settings"
+          label={t("privacySettings.permissions.bluetooth.label")}
+          subLabel={t("privacySettings.permissions.bluetooth.subLabel")}
+          trailingText={t("privacySettings.trailing.goSettings")}
           onPress={openSystemSettings}
         />
         <PermissionRow
-          label="Allow the platform to get permission for your location"
-          subLabel="Used to find nearby streamers."
-          trailingText="Go settings"
+          label={t("privacySettings.permissions.location.label")}
+          subLabel={t("privacySettings.permissions.location.subLabel")}
+          trailingText={t("privacySettings.trailing.goSettings")}
           onPress={openSystemSettings}
         />
       </ScrollView>

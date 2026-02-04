@@ -19,6 +19,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "VipCenter">;
 
@@ -162,17 +163,18 @@ const VipCenterScreen: React.FC = () => {
   const currentTier = data?.current?.tier ?? "NONE";
   const currentText =
     currentTier === "NONE"
-      ? "Current: No VIP"
-      : `Current: ${plansByTier[currentTier]?.name ?? currentTier} • ${
-          data?.current.daysLeft ?? 0
-        } days left`;
+      ? t("vipCenter.current.none")
+      : t("vipCenter.current.active", {
+          name: plansByTier[currentTier]?.name ?? currentTier,
+          days: data?.current.daysLeft ?? 0,
+        });
 
   if (loading && !data) {
     return (
       <SafeAreaView className="flex-1 bg-[#020617]" edges={["top"]}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator />
-          <Text className="mt-2 text-[12px] text-gray-300">Loading VIP...</Text>
+          <Text className="mt-2 text-[12px] text-gray-300">{t("vipCenter.states.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -190,7 +192,7 @@ const VipCenterScreen: React.FC = () => {
             <Ionicons name="chevron-back" size={20} color="#E5E7EB" />
           </Pressable>
           <View>
-            <Text className="text-[16px] font-semibold text-white">VIP Center</Text>
+            <Text className="text-[16px] font-semibold text-white">{t("vipCenter.title")}</Text>
             <Text className="text-[11px] text-gray-300 mt-0.5">{currentText}</Text>
           </View>
         </View>
@@ -229,8 +231,10 @@ const VipCenterScreen: React.FC = () => {
               tier={tier}
               plan={plansByTier[tier]}
               onOpenVip={async () => {
-                // 🔥 This should call POST /api/profile/vip/purchase (I’ll give you backend code next)
-                Alert.alert("VIP Purchase", `Start purchase flow for ${tier}.`);
+                Alert.alert(
+                  t("vipCenter.alerts.purchaseTitle"),
+                  t("vipCenter.alerts.purchaseMsg", { tier })
+                );
               }}
             />
           </View>
@@ -280,11 +284,11 @@ const VipTierPage: React.FC<{
             <Text className="ml-1 text-[20px] font-extrabold text-[#FEFCE8]">
               {formatCoins(price)}
             </Text>
-            <Text className="ml-1 text-[12px] text-[#E0E7FF]">/M</Text>
+            <Text className="ml-1 text-[12px] text-[#E0E7FF]">{t("vipCenter.labels.perMonth")}</Text>
           </View>
 
           <Text className="mt-1 text-[11px] text-[#E0E7FF]">
-            {plan?.description ?? "Get VIP & Enjoy Privileges"}
+            {plan?.description ?? t("vipCenter.labels.defaultDescription")}
           </Text>
         </View>
       </LinearGradient>
@@ -292,7 +296,7 @@ const VipTierPage: React.FC<{
       {/* Privileges grid */}
       <View className="mt-6 px-4">
         <Text className="text-[12px] text-gray-200 mb-3">
-          VIP exclusive privileges {privileges.length}/{privileges.length}
+          {t("vipCenter.labels.privilegesCount", { count: privileges.length, total: privileges.length })}
         </Text>
 
         <View className="flex-row flex-wrap -mx-1.5">
@@ -332,7 +336,7 @@ const VipTierPage: React.FC<{
         </View>
       </View>
 
-      {/* CTA button (NOW clickable) */}
+      {/* CTA */}
       <View className="px-4 mt-4">
         <Pressable onPress={onOpenVip} className="active:opacity-90">
           <LinearGradient
@@ -342,7 +346,7 @@ const VipTierPage: React.FC<{
             style={{ borderRadius: 999, paddingVertical: 12 }}
           >
             <Text className="text-center text-[15px] font-semibold text-white">
-              Open {plan?.name ?? tier}
+              {t("vipCenter.actions.open", { name: plan?.name ?? tier })}
             </Text>
           </LinearGradient>
         </Pressable>

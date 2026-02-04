@@ -19,14 +19,13 @@ import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
+import { API_BASE_URL } from "../config";
+import { t } from "../i18n";
 
 type EditProfileNav = NativeStackNavigationProp<
   ProfileStackParamList,
   "EditProfile"
 >;
-
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.10.25:3000";
 
 type ProfileMeResponse = {
   user: {
@@ -39,18 +38,12 @@ type ProfileMeResponse = {
     gender?: "MALE" | "FEMALE" | "OTHER" | null;
     interestTags: string[];
     profilePhotos: string[];
-    country: {
-      code: string;
-      name: string;
-      flagEmoji?: string | null;
-    } | null;
+    country: { code: string; name: string; flagEmoji?: string | null } | null;
     level: number;
     liveLevel: number;
     vipLevel: number;
   };
-  wallet: {
-    balance: number;
-  };
+  wallet: { balance: number };
   stats: {
     friends: number;
     following: number;
@@ -60,18 +53,16 @@ type ProfileMeResponse = {
   };
 };
 
+const apiBase = (() => {
+  const raw = (API_BASE_URL ?? "").trim().replace(/\/+$/, "");
+  return raw || "http://192.168.10.25:3000";
+})();
+
 const formatDateYYYYMMDD = (d: Date) => {
   const y = d.getFullYear();
   const m = `${d.getMonth() + 1}`.padStart(2, "0");
   const day = `${d.getDate()}`.padStart(2, "0");
   return `${y}-${m}-${day}`;
-};
-
-const mapGender = (g?: string | null) => {
-  if (!g) return "";
-  if (g === "MALE") return "Male";
-  if (g === "FEMALE") return "Female";
-  return "Other";
 };
 
 const EditProfileScreen: React.FC = () => {
@@ -81,9 +72,8 @@ const EditProfileScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<ProfileMeResponse | null>(null);
 
-  // editable pieces
   const [nickname, setNickname] = useState("");
-  const [dobText, setDobText] = useState(""); // YYYY-MM-DD for display
+  const [dobText, setDobText] = useState("");
   const [dobDate, setDobDate] = useState<Date | null>(null);
   const [showDobPicker, setShowDobPicker] = useState(false);
   const [bio, setBio] = useState("");
@@ -95,21 +85,26 @@ const EditProfileScreen: React.FC = () => {
     const load = async () => {
       try {
         setLoading(true);
+
         const userId = await AsyncStorage.getItem("gl_user_id");
         if (!userId) {
-          setLoading(false);
-          Alert.alert("Not logged in", "Please login again.");
+          Alert.alert(
+            t("editProfile.alerts.notLoggedInTitle"),
+            t("editProfile.alerts.loginAgainMsg")
+          );
           return;
         }
 
         const res = await fetch(
-          `${API_BASE_URL}/api/profile/me?userId=${encodeURIComponent(userId)}`
+          `${apiBase}/api/profile/me?userId=${encodeURIComponent(userId)}`
         );
+
         if (!res.ok) {
           const json = await res.json().catch(() => null);
-          console.log("EditProfile load error", json || res.status);
-          Alert.alert("Error", json?.error || "Failed to load profile");
-          setLoading(false);
+          Alert.alert(
+            t("common.error"),
+            json?.error || t("editProfile.alerts.loadFailedMsg")
+          );
           return;
         }
 
@@ -129,13 +124,11 @@ const EditProfileScreen: React.FC = () => {
           }
         }
 
-        // single avatar source
-        const avatar =
-          u.avatarUrl || (u.profilePhotos && u.profilePhotos[0]) || null;
+        const avatar = u.avatarUrl || u.profilePhotos?.[0] || null;
         setAvatarUri(avatar);
       } catch (err) {
         console.error("EditProfile load error", err);
-        Alert.alert("Error", "Network error while loading profile.");
+        Alert.alert(t("common.error"), t("editProfile.alerts.networkLoadMsg"));
       } finally {
         setLoading(false);
       }
@@ -146,12 +139,11 @@ const EditProfileScreen: React.FC = () => {
 
   const handlePickAvatar = async () => {
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
-          "Permission needed",
-          "Please allow photo access so you can choose a profile picture."
+          t("editProfile.alerts.permissionNeededTitle"),
+          t("editProfile.alerts.permissionNeededMsg")
         );
         return;
       }
@@ -162,24 +154,17 @@ const EditProfileScreen: React.FC = () => {
         quality: 0.7,
       });
 
-      if (!result.canceled && result.assets && result.assets[0]?.uri) {
-        const uri = result.assets[0].uri;
-        setAvatarUri(uri);
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setAvatarUri(result.assets[0].uri);
       }
     } catch (err) {
       console.error("pick avatar error", err);
-      Alert.alert("Error", "Could not open gallery.");
+      Alert.alert(t("common.error"), t("editProfile.alerts.galleryFailedMsg"));
     }
   };
 
-  const handleDobChange = (
-    _event: any,
-    selected?: Date | undefined
-  ) => {
-    if (Platform.OS === "android") {
-      setShowDobPicker(false);
-    }
-
+  const handleDobChange = (_event: any, selected?: Date) => {
+    if (Platform.OS === "android") setShowDobPicker(false);
     if (selected) {
       setDobDate(selected);
       setDobText(formatDateYYYYMMDD(selected));
@@ -191,7 +176,10 @@ const EditProfileScreen: React.FC = () => {
     if (!trimmed) return;
 
     if (interestTags.includes(trimmed)) {
-      Alert.alert("Duplicate tag", "You already added this tag.");
+      Alert.alert(
+        t("editProfile.alerts.duplicateTagTitle"),
+        t("editProfile.alerts.duplicateTagMsg")
+      );
       return;
     }
 
@@ -200,18 +188,20 @@ const EditProfileScreen: React.FC = () => {
   };
 
   const handleRemoveTag = (tag: string) => {
-    setInterestTags((prev) => prev.filter((t) => t !== tag));
+    setInterestTags((prev) => prev.filter((x) => x !== tag));
   };
 
   const handleSaveProfile = async () => {
     try {
       const userId = await AsyncStorage.getItem("gl_user_id");
       if (!userId) {
-        Alert.alert("Not logged in", "Please login again.");
+        Alert.alert(
+          t("editProfile.alerts.notLoggedInTitle"),
+          t("editProfile.alerts.loginAgainMsg")
+        );
         return;
       }
 
-      // build DOB string from selected date
       const dobToSend = dobDate ? formatDateYYYYMMDD(dobDate) : null;
 
       const body = {
@@ -226,7 +216,7 @@ const EditProfileScreen: React.FC = () => {
 
       setSaving(true);
 
-      const res = await fetch(`${API_BASE_URL}/api/profile/me`, {
+      const res = await fetch(`${apiBase}/api/profile/me`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -235,26 +225,27 @@ const EditProfileScreen: React.FC = () => {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        console.log("Save profile error", json || res.status);
-        Alert.alert("Error", json?.error || "Failed to update profile");
+        Alert.alert(
+          t("common.error"),
+          json?.error || t("editProfile.alerts.updateFailedMsg")
+        );
         return;
       }
 
-      // merge back into local profile
       if (json?.user && profile) {
         setProfile({
           ...profile,
-          user: {
-            ...profile.user,
-            ...json.user,
-          },
+          user: { ...profile.user, ...json.user },
         });
       }
 
-      Alert.alert("Saved", "Profile updated successfully.");
+      Alert.alert(
+        t("editProfile.alerts.savedTitle"),
+        t("editProfile.alerts.savedMsg")
+      );
     } catch (err) {
       console.error("Save profile error", err);
-      Alert.alert("Error", "Network error while saving profile.");
+      Alert.alert(t("common.error"), t("editProfile.alerts.networkSaveMsg"));
     } finally {
       setSaving(false);
     }
@@ -266,7 +257,7 @@ const EditProfileScreen: React.FC = () => {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator />
           <Text className="mt-2 text-xs text-gray-500">
-            Loading profile data...
+            {t("editProfile.states.loadingProfile")}
           </Text>
         </View>
       </SafeAreaView>
@@ -274,54 +265,48 @@ const EditProfileScreen: React.FC = () => {
   }
 
   const user = profile?.user;
+
   const displayName =
-    nickname || user?.nickname || user?.username || "Someone4582";
+    nickname || user?.nickname || user?.username || t("editProfile.labels.userFallback");
 
   const avatarInitial =
-    displayName.trim().length > 0
-      ? displayName.trim().charAt(0).toUpperCase()
-      : "S";
+    displayName.trim().length > 0 ? displayName.trim().charAt(0).toUpperCase() : "S";
 
-  const gender = mapGender(user?.gender ?? null);
+  const gender =
+    user?.gender === "MALE"
+      ? t("editProfile.gender.male")
+      : user?.gender === "FEMALE"
+      ? t("editProfile.gender.female")
+      : user?.gender === "OTHER"
+      ? t("editProfile.gender.other")
+      : t("editProfile.labels.notSet");
+
   const countryName = user?.country?.name || "";
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3">
         <View className="flex-row items-center">
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={8}
-            className="pr-2"
-          >
+          <Pressable onPress={() => navigation.goBack()} hitSlop={8} className="pr-2">
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </Pressable>
           <Text className="text-[18px] font-semibold text-[#111827]">
-            Edit data
+            {t("editProfile.title")}
           </Text>
         </View>
-        <Pressable
-          onPress={handleSaveProfile}
-          disabled={saving}
-          className="pl-2"
-        >
+
+        <Pressable onPress={handleSaveProfile} disabled={saving} className="pl-2">
           {saving ? (
             <ActivityIndicator size="small" color="#6366F1" />
           ) : (
             <Text className="text-[13px] text-[#6366F1] font-semibold">
-              Save
+              {t("editProfile.actions.save")}
             </Text>
           )}
         </Pressable>
       </View>
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Photo grid */}
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         <View className="px-4 mt-2">
           <View className="flex-row">
             <Pressable
@@ -329,16 +314,12 @@ const EditProfileScreen: React.FC = () => {
               onPress={handlePickAvatar}
             >
               {avatarUri ? (
-                <Image
-                  source={{ uri: avatarUri }}
-                  style={{ width: "100%", height: "100%" }}
-                />
+                <Image source={{ uri: avatarUri }} style={{ width: "100%", height: "100%" }} />
               ) : (
-                <Text className="text-white text-[40px] font-semibold">
-                  {avatarInitial}
-                </Text>
+                <Text className="text-white text-[40px] font-semibold">{avatarInitial}</Text>
               )}
             </Pressable>
+
             <View className="flex-1 justify-between">
               <AddPhotoCell onPress={handlePickAvatar} />
               <AddPhotoCell onPress={handlePickAvatar} />
@@ -347,68 +328,57 @@ const EditProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* My profile fields */}
         <View className="mt-6 px-4">
           <Text className="text-[14px] font-semibold text-[#111827] mb-2">
-            My Profile
+            {t("editProfile.sections.myProfile")}
           </Text>
 
           <ProfileField
-            label="Nickname"
+            label={t("editProfile.fields.nickname")}
             value={nickname}
             editable
             onChangeText={setNickname}
-            placeholder="Enter nickname"
+            placeholder={t("editProfile.placeholders.enterNickname")}
           />
 
           <ProfileField
-            label="Gender(Male/Female)"
-            value={gender || "Not set"}
-            helper="[Cannot be modified]"
+            label={t("editProfile.fields.gender")}
+            value={gender}
+            helper={t("editProfile.helpers.cannotModify")}
           />
 
-          {/* Date of Birth with calendar */}
           <View className="py-3 border-b border-[#F3F4F6]">
             <Text className="text-[14px] text-[#111827] mb-1">
-              Date of Birth
+              {t("editProfile.fields.dob")}
             </Text>
-            <Pressable
-              onPress={() => setShowDobPicker(true)}
-              className="flex-row items-center justify-between"
-            >
+            <Pressable onPress={() => setShowDobPicker(true)} className="flex-row items-center justify-between">
               <Text className="text-[13px] text-[#6B7280]">
-                {dobText || "Select date"}
+                {dobText || t("editProfile.placeholders.selectDate")}
               </Text>
-              <Ionicons
-                name="calendar-outline"
-                size={18}
-                color="#9CA3AF"
-              />
+              <Ionicons name="calendar-outline" size={18} color="#9CA3AF" />
             </Pressable>
           </View>
 
           <ProfileField
-            label={countryName || "Country"}
-            value=""
-            helper="[Cannot be modified]"
+            label={t("editProfile.fields.country")}
+            value={countryName || t("editProfile.labels.notSet")}
+            helper={t("editProfile.helpers.cannotModify")}
           />
 
           <ProfileField
-            label="Self-introduction"
+            label={t("editProfile.fields.selfIntro")}
             value={bio}
             editable
             onChangeText={setBio}
-            placeholder="Write something about yourself"
+            placeholder={t("editProfile.placeholders.writeBio")}
             multiline
           />
 
-          {/* Interest tags */}
           <View className="mt-4">
             <Text className="text-[13px] text-[#374151] mb-2">
-              Interest tags
+              {t("editProfile.sections.interestTags")}
             </Text>
 
-            {/* Existing tags */}
             <View className="flex-row flex-wrap mb-2">
               {interestTags.map((tag) => (
                 <Pressable
@@ -416,9 +386,7 @@ const EditProfileScreen: React.FC = () => {
                   onLongPress={() => handleRemoveTag(tag)}
                   className="flex-row items-center px-3 py-1 mr-2 mb-2 rounded-full bg-[#EEF2FF]"
                 >
-                  <Text className="text-[11px] text-[#4B5563]">
-                    #{tag}
-                  </Text>
+                  <Text className="text-[11px] text-[#4B5563]">#{tag}</Text>
                   <Ionicons
                     name="close-circle-outline"
                     size={16}
@@ -427,36 +395,33 @@ const EditProfileScreen: React.FC = () => {
                   />
                 </Pressable>
               ))}
+
               {interestTags.length === 0 && (
                 <Text className="text-[11px] text-[#9CA3AF]">
-                  No tags yet. Add a few below.
+                  {t("editProfile.helpers.noTags")}
                 </Text>
               )}
             </View>
 
-            {/* Add new tag */}
             <View className="flex-row items-center">
               <View className="flex-1 rounded-full border border-[#D1D5DB] bg-[#F9FAFB] px-3 py-1.5 mr-2">
                 <TextInput
                   value={newTag}
                   onChangeText={setNewTag}
-                  placeholder="Type a tag"
+                  placeholder={t("editProfile.placeholders.typeTag")}
                   placeholderTextColor="#9CA3AF"
                   className="text-[13px] text-[#111827]"
                 />
               </View>
-              <Pressable
-                onPress={handleAddTag}
-                className="px-3 py-1.5 rounded-full bg-[#6366F1]"
-              >
+              <Pressable onPress={handleAddTag} className="px-3 py-1.5 rounded-full bg-[#6366F1]">
                 <Text className="text-[13px] text-white font-semibold">
-                  Add
+                  {t("editProfile.actions.addTag")}
                 </Text>
               </Pressable>
             </View>
 
             <Text className="mt-1 text-[10px] text-[#9CA3AF]">
-              Long press a tag to remove it.
+              {t("editProfile.helpers.longPressRemove")}
             </Text>
           </View>
         </View>
@@ -483,22 +448,13 @@ const ProfileField: React.FC<{
   multiline?: boolean;
   placeholder?: string;
   onChangeText?: (val: string) => void;
-}> = ({
-  label,
-  value,
-  helper,
-  editable = false,
-  multiline = false,
-  placeholder,
-  onChangeText,
-}) => (
+}> = ({ label, value, helper, editable = false, multiline = false, placeholder, onChangeText }) => (
   <View className="py-3 border-b border-[#F3F4F6]">
     <View className="flex-row items-center mb-1">
       <Text className="text-[14px] text-[#111827]">{label}</Text>
-      {helper ? (
-        <Text className="ml-1 text-[11px] text-[#9CA3AF]">{helper}</Text>
-      ) : null}
+      {helper ? <Text className="ml-1 text-[11px] text-[#9CA3AF]">{helper}</Text> : null}
     </View>
+
     {editable ? (
       <TextInput
         value={value}
@@ -508,15 +464,13 @@ const ProfileField: React.FC<{
         className="text-[13px] text-[#6B7280] py-1"
         multiline={multiline}
       />
-    ) : value ? (
+    ) : (
       <Text className="text-[13px] text-[#6B7280]">{value}</Text>
-    ) : null}
+    )}
   </View>
 );
 
-const AddPhotoCell: React.FC<{
-  onPress?: () => void;
-}> = ({ onPress }) => (
+const AddPhotoCell: React.FC<{ onPress?: () => void }> = ({ onPress }) => (
   <Pressable
     className="flex-1 aspect-[3/2] bg-[#F3F4F6] rounded-lg items-center justify-center mb-2 overflow-hidden"
     onPress={onPress}

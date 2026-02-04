@@ -36,6 +36,9 @@ import MyProfileScreen from "../screens/MyProfileScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import PostMomentScreen from "../screens/PostMomentScreen";
 
+// ✅ NEW: Gift Gallery screen
+import GiftGalleryScreen from "../screens/GiftGalleryScreen";
+
 // 🆕 Visit profile (other user)
 import VisitProfileScreen from "../screens/VisitProfileScreen";
 
@@ -80,6 +83,9 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   PostMoment: undefined;
 
+  // ✅ NEW
+  GiftGallery: undefined;
+
   VisitProfile: { userId: string };
   MomentComments: { momentId: string; ownerName: string };
 
@@ -98,20 +104,15 @@ export type ProfileStackParamList = {
   Ranking: undefined;
   Store: undefined;
   Invite: undefined;
-
-  // ✅ make Guardian params optional (so old calls won’t break)
   Guardian: { userId?: string } | undefined;
-
-  // ✅ NEW guardian sub screens (optional userId too)
   MyGuardian: { userId?: string } | undefined;
   GuardMe: { userId?: string } | undefined;
 
   FanClub: undefined;
-  MedalWall: undefined;
+  MedalWall: { userId: string };
 
   Coins: undefined;
   Points: undefined;
-
   FansRanking: undefined;
 
   LiveApplication: undefined;
@@ -157,6 +158,9 @@ const ProfileStackNavigator: React.FC = () => {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="PostMoment" component={PostMomentScreen} options={{ headerShown: false }} />
 
+      {/* ✅ NEW */}
+      <Stack.Screen name="GiftGallery" component={GiftGalleryScreen} options={{ headerShown: false }} />
+
       <Stack.Screen name="VisitProfile" component={VisitProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="MomentComments" component={MomentCommentsScreen} options={{ headerShown: false }} />
 
@@ -196,10 +200,7 @@ const ProfileStackNavigator: React.FC = () => {
       <Stack.Screen name="Store" component={StoreScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Invite" component={InviteScreen} options={{ headerShown: false }} />
 
-      {/* ✅ Guardian main */}
       <Stack.Screen name="Guardian" component={GuardianScreen} options={{ headerShown: false }} />
-
-      {/* ✅ Guardian sub screens */}
       <Stack.Screen name="MyGuardian" component={MyGuardianScreen} options={{ headerShown: false }} />
       <Stack.Screen name="GuardMe" component={GuardMeScreen} options={{ headerShown: false }} />
 

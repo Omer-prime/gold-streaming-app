@@ -17,6 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { io, Socket } from "socket.io-client";
+import { t } from "../i18n";
 
 type LiveStatus = {
   approved: boolean;
@@ -38,6 +39,7 @@ type SocketChatPayload = {
 const HostLiveRoomScreen: React.FC = () => {
   const navigation = useNavigation<any>();
 
+
   const [perm, requestPerm] = useCameraPermissions();
   const [cameraFacing, setCameraFacing] = useState<"front" | "back">("front");
 
@@ -48,14 +50,14 @@ const HostLiveRoomScreen: React.FC = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [hostName, setHostName] = useState<string>("Host");
   const [streamId, setStreamId] = useState<string | null>(null);
-  const [streamTitle, setStreamTitle] = useState<string>("My Live");
+  const [streamTitle, setStreamTitle] = useState<string>(t("hostLiveRoom.defaults.liveTitle"));
   const [seconds, setSeconds] = useState(0);
 
   const [viewerCount, setViewerCount] = useState(0);
 
   const [chat, setChat] = useState("");
   const [messages, setMessages] = useState<ChatMsg[]>([
-    { id: "1", text: "Welcome to your live room 👋" },
+    { id: "1", text: t("hostLiveRoom.chat.welcome") },
   ]);
 
   const socketRef = useRef<Socket | null>(null);
@@ -98,11 +100,11 @@ const HostLiveRoomScreen: React.FC = () => {
         return;
       }
 
-      setHostName(json.host?.name || "Host");
+      setHostName(json.host?.name || t("hostLiveRoom.defaults.hostName"));
 
       if (json.activeStream?.id) {
         setStreamId(json.activeStream.id);
-        setStreamTitle(json.activeStream.title || "My Live");
+        setStreamTitle(json.activeStream.title || t("hostLiveRoom.defaults.liveTitle"));
         setSeconds(0);
         setViewerCount(json.activeStream.viewers ?? 0);
       } else {
@@ -116,7 +118,7 @@ const HostLiveRoomScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [navigation, perm?.granted, requestPerm]);
+  }, [navigation, perm?.granted, requestPerm, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -127,8 +129,8 @@ const HostLiveRoomScreen: React.FC = () => {
   // timer
   useEffect(() => {
     if (!streamId) return;
-    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(t);
+    const tt = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(tt);
   }, [streamId]);
 
   const timeLabel = useMemo(() => {
@@ -161,7 +163,7 @@ const HostLiveRoomScreen: React.FC = () => {
         s.emit("join", {
           streamId,
           userId,
-          name: hostName || "Host",
+          name: hostName || t("hostLiveRoom.defaults.hostName"),
           role: "host",
         });
       });
@@ -173,13 +175,21 @@ const HostLiveRoomScreen: React.FC = () => {
 
       s.on("chat", (payload: SocketChatPayload) => {
         if (!mounted) return;
-        const line = `${payload?.name || "Guest"}: ${payload?.text || ""}`;
+        const line = t("hostLiveRoom.chat.line", {
+          name: payload?.name || t("hostLiveRoom.chat.guest"),
+          text: payload?.text || "",
+        });
         setMessages((prev) => [{ id: payload.id || String(Date.now()), text: line }, ...prev]);
       });
 
       s.on("system", (payload: { text: string }) => {
         if (!mounted) return;
-        if (payload?.text) setMessages((prev) => [{ id: String(Date.now()), text: `ℹ️ ${payload.text}` }, ...prev]);
+        if (payload?.text) {
+          setMessages((prev) => [
+            { id: String(Date.now()), text: t("hostLiveRoom.chat.system", { text: payload.text }) },
+            ...prev,
+          ]);
+        }
       });
     };
 
@@ -188,7 +198,7 @@ const HostLiveRoomScreen: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [streamId, userId, hostName]);
+  }, [streamId, userId, hostName, t]);
 
   const startLive = async () => {
     if (!userId || starting) return;
@@ -197,7 +207,7 @@ const HostLiveRoomScreen: React.FC = () => {
       await requestPerm();
       if (!perm?.granted) {
         setMessages((prev) => [
-          { id: Date.now().toString(), text: "❗ Camera permission is required to go live." },
+          { id: Date.now().toString(), text: t("hostLiveRoom.errors.cameraRequiredToGoLive") },
           ...prev,
         ]);
         return;
@@ -227,7 +237,7 @@ const HostLiveRoomScreen: React.FC = () => {
         setViewerCount(json?.stream?.viewers ?? 0);
 
         setMessages((prev) => [
-          { id: Date.now().toString(), text: "🔴 You are LIVE now!" },
+          { id: Date.now().toString(), text: t("hostLiveRoom.messages.liveNow") },
           ...prev,
         ]);
       }
@@ -267,25 +277,25 @@ const HostLiveRoomScreen: React.FC = () => {
       else navigation.goBack();
       return;
     }
-    Alert.alert("Stop live?", "This will end your live streaming.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Stop", style: "destructive", onPress: stopLive },
+    Alert.alert(t("hostLiveRoom.alerts.stopTitle"), t("hostLiveRoom.alerts.stopMsg"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("hostLiveRoom.actions.stop"), style: "destructive", onPress: stopLive },
     ]);
   };
 
   const sendChat = () => {
-    const t = chat.trim();
-    if (!t) return;
+    const tt = chat.trim();
+    if (!tt) return;
 
     setChat("");
-    setMessages((prev) => [{ id: Date.now().toString(), text: `Me: ${t}` }, ...prev]);
+    setMessages((prev) => [{ id: Date.now().toString(), text: t("hostLiveRoom.chat.meLine", { text: tt }) }, ...prev]);
 
     try {
       socketRef.current?.emit("chat", {
         streamId,
         userId: userId || "host",
-        name: hostName || "Host",
-        text: t,
+        name: hostName || t("hostLiveRoom.defaults.hostName"),
+        text: tt,
       });
     } catch {}
   };
@@ -294,7 +304,7 @@ const HostLiveRoomScreen: React.FC = () => {
     return (
       <SafeAreaView className="flex-1 bg-black items-center justify-center">
         <ActivityIndicator color="#fff" />
-        <Text className="mt-2 text-[12px] text-white/70">Preparing live room...</Text>
+        <Text className="mt-2 text-[12px] text-white/70">{t("hostLiveRoom.states.preparing")}</Text>
       </SafeAreaView>
     );
   }
@@ -308,9 +318,9 @@ const HostLiveRoomScreen: React.FC = () => {
         />
       ) : (
         <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
-          <Text className="text-white/70 text-[12px] mb-3">Camera permission required</Text>
+          <Text className="text-white/70 text-[12px] mb-3">{t("hostLiveRoom.permission.required")}</Text>
           <Pressable onPress={requestPerm} className="rounded-full bg-white/15 px-4 py-2">
-            <Text className="text-white text-[12px] font-semibold">Grant permission</Text>
+            <Text className="text-white text-[12px] font-semibold">{t("hostLiveRoom.permission.grant")}</Text>
           </Pressable>
         </View>
       )}
@@ -329,7 +339,7 @@ const HostLiveRoomScreen: React.FC = () => {
 
               {!!streamId && (
                 <View className="ml-2 px-2 py-0.5 rounded-full bg-red-500">
-                  <Text className="text-white text-[10px] font-bold">LIVE</Text>
+                  <Text className="text-white text-[10px] font-bold">{t("hostLiveRoom.labels.liveBadge")}</Text>
                 </View>
               )}
 
@@ -340,7 +350,7 @@ const HostLiveRoomScreen: React.FC = () => {
 
           {!!streamId ? (
             <Pressable onPress={confirmStop} className="px-4 py-2 rounded-full bg-red-500">
-              <Text className="text-white font-semibold text-[12px]">Stop</Text>
+              <Text className="text-white font-semibold text-[12px]">{t("hostLiveRoom.actions.stop")}</Text>
             </Pressable>
           ) : (
             <Pressable
@@ -369,11 +379,11 @@ const HostLiveRoomScreen: React.FC = () => {
         {!streamId && (
           <View style={{ position: "absolute", left: 14, right: 14, bottom: 170 }}>
             <View className="bg-black/35 rounded-2xl px-3 py-3">
-              <Text className="text-white/80 text-[11px] mb-2">Live title</Text>
+              <Text className="text-white/80 text-[11px] mb-2">{t("hostLiveRoom.labels.liveTitle")}</Text>
               <TextInput
                 value={streamTitle}
                 onChangeText={setStreamTitle}
-                placeholder="Enter live title..."
+                placeholder={t("hostLiveRoom.placeholders.liveTitle")}
                 placeholderTextColor="rgba(255,255,255,0.55)"
                 className="text-white text-[13px]"
               />
@@ -384,7 +394,11 @@ const HostLiveRoomScreen: React.FC = () => {
               onPress={startLive}
               className={`mt-3 rounded-full py-3 ${starting ? "bg-red-500/60" : "bg-red-500"}`}
             >
-              {starting ? <ActivityIndicator color="#fff" /> : <Text className="text-center text-white font-semibold text-[14px]">Go Live</Text>}
+              {starting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="text-center text-white font-semibold text-[14px]">{t("hostLiveRoom.actions.goLive")}</Text>
+              )}
             </Pressable>
           </View>
         )}
@@ -399,7 +413,7 @@ const HostLiveRoomScreen: React.FC = () => {
               <TextInput
                 value={chat}
                 onChangeText={setChat}
-                placeholder="Say something..."
+                placeholder={t("hostLiveRoom.placeholders.chat")}
                 placeholderTextColor="rgba(255,255,255,0.55)"
                 className="flex-1 ml-2 text-white text-[13px]"
               />
@@ -415,7 +429,7 @@ const HostLiveRoomScreen: React.FC = () => {
 
           {ending && (
             <View className="px-3 pb-2">
-              <Text className="text-center text-white/70 text-[11px]">Stopping live...</Text>
+              <Text className="text-center text-white/70 text-[11px]">{t("hostLiveRoom.states.stopping")}</Text>
             </View>
           )}
         </KeyboardAvoidingView>

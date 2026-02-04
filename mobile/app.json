@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "gold-live",
+    "slug": "gold-live",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,7 +12,12 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-     "plugins": ["@livekit/react-native-expo-plugin", "@config-plugins/react-native-webrtc"],
+    "plugins": [
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc",
+      "expo-localization",
+      "expo-web-browser"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.omerprime.mobile",

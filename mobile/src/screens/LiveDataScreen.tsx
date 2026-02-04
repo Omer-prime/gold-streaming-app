@@ -15,19 +15,25 @@ import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { t } from "../i18n";
 
-type TopTab = "Live" | "PK";
+type TopTab = "Live" | "Country";
 type RangeTab = "Daily" | "Weekly" | "Monthly";
-
-type PKTabType = "Random" | "Friend" | "Team";
-type PKRange = "Today" | "Recent7" | "Monthly";
 
 const API_BASE_URL =
   (process.env.EXPO_PUBLIC_API_BASE_URL || "").replace(/\/$/, "") ||
   "http://192.168.10.25:3000";
 
+type CountryInfo = {
+  id: number;
+  code: string;
+  name: string;
+  flagEmoji?: string | null;
+};
+
 type LiveDataApiResponse = {
-  mode: "live" | "pk";
+  scope: "user" | "country" | "global";
+  country: CountryInfo | null; // present for country scope, null otherwise
   range: "daily" | "weekly" | "monthly";
   date: string; // YYYY-MM-DD
 
@@ -43,24 +49,9 @@ type LiveDataApiResponse = {
   partyCrownDurationSeconds: number;
 };
 
-type PKDataApiResponse = {
-  pkType: "random" | "friend" | "team";
-  range: "today" | "7days" | "monthly";
-  winRate: number; // 0–100
-  pkScore: number;
-  sessions: number;
-  history: {
-    id: string;
-    createdAt: string;
-    opponentName: string;
-    result: "win" | "lose" | "draw";
-    score: string;
-  }[];
-};
-
 async function apiGetJson<T>(url: string, timeoutMs = 12000): Promise<T> {
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(url, {
@@ -76,12 +67,12 @@ async function apiGetJson<T>(url: string, timeoutMs = 12000): Promise<T> {
       throw new Error(msg);
     }
 
-    if (!json) throw new Error("Empty response from server.");
+    if (!json) throw new Error(t("liveData.errors.emptyResponse"));
     if (json?.error) throw new Error(json.error);
 
     return json as T;
   } finally {
-    clearTimeout(t);
+    clearTimeout(timer);
   }
 }
 
@@ -92,22 +83,12 @@ const LiveDataScreen: React.FC = () => {
   const [topTab, setTopTab] = useState<TopTab>("Live");
   const [range, setRange] = useState<RangeTab>("Daily");
 
-  // user state
   const [userId, setUserId] = useState<string | null>(null);
 
-  // live data state
   const [data, setData] = useState<LiveDataApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  // PK data state
-  const [pkTab, setPkTab] = useState<PKTabType>("Random");
-  const [pkRange, setPkRange] = useState<PKRange>("Today");
-  const [pkData, setPkData] = useState<PKDataApiResponse | null>(null);
-  const [pkLoading, setPkLoading] = useState(false);
-  const [pkErrorText, setPkErrorText] = useState<string | null>(null);
-
-  // date selection (for live tab)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -117,16 +98,11 @@ const LiveDataScreen: React.FC = () => {
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // help description modal
   const [showHelp, setShowHelp] = useState(false);
-
-  // pull-to-refresh
   const [refreshing, setRefreshing] = useState(false);
 
-  // polling
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
-  // load userId once (and keep it)
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -143,10 +119,14 @@ const LiveDataScreen: React.FC = () => {
   }, []);
 
   const rangeParam = useMemo(() => range.toLowerCase(), [range]); // daily/weekly/monthly
+  const scopeParam = useMemo(
+    () => (topTab === "Live" ? "global" : "country"),
+    [topTab]
+  );
 
-  const refreshLive = useCallback(async () => {
+  const refreshData = useCallback(async () => {
     if (!userId) {
-      setErrorText("Not logged in.");
+      setErrorText(t("liveData.errors.notLoggedIn"));
       setData(null);
       return;
     }
@@ -158,13 +138,12 @@ const LiveDataScreen: React.FC = () => {
       const url =
         `${API_BASE_URL}/api/profile/live-data` +
         `?userId=${encodeURIComponent(userId)}` +
-        `&mode=live` +
+        `&scope=${encodeURIComponent(scopeParam)}` +
         `&range=${encodeURIComponent(rangeParam)}` +
         `&date=${encodeURIComponent(selectedDate)}`;
 
       const json = await apiGetJson<LiveDataApiResponse>(url);
 
-      // normalize numeric fields (avoid NaN/undefined)
       const normalized: LiveDataApiResponse = {
         ...json,
         wonPoints: Number(json.wonPoints ?? 0),
@@ -176,108 +155,46 @@ const LiveDataScreen: React.FC = () => {
         newFanClubMembers: Number(json.newFanClubMembers ?? 0),
         averageOnlineUsers: Number(json.averageOnlineUsers ?? 0),
         partyCrownDurationSeconds: Number(json.partyCrownDurationSeconds ?? 0),
+        country: json.country ?? null,
       };
 
       setData(normalized);
     } catch (e: any) {
-      setErrorText(e?.message || "Failed to load live data.");
+      setErrorText(e?.message || t("liveData.errors.loadFailedLive"));
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [userId, selectedDate, rangeParam]);
-
-  const refreshPK = useCallback(async () => {
-    if (!userId) {
-      setPkErrorText("Not logged in.");
-      setPkData(null);
-      return;
-    }
-
-    setPkLoading(true);
-    setPkErrorText(null);
-
-    try {
-      const typeParam =
-        pkTab === "Friend" ? "friend" : pkTab === "Team" ? "team" : "random";
-      const pkRangeParam =
-        pkRange === "Today" ? "today" : pkRange === "Recent7" ? "7days" : "monthly";
-
-      const url =
-        `${API_BASE_URL}/api/profile/pk-data` +
-        `?userId=${encodeURIComponent(userId)}` +
-        `&type=${encodeURIComponent(typeParam)}` +
-        `&range=${encodeURIComponent(pkRangeParam)}`;
-
-      const json = await apiGetJson<Partial<PKDataApiResponse>>(url);
-
-      // IMPORTANT: normalize history to [] to prevent `.map` crash
-      const history = Array.isArray((json as any)?.history) ? ((json as any).history as any[]) : [];
-
-      const normalized: PKDataApiResponse = {
-        pkType: (json as any)?.pkType ?? typeParam,
-        range: (json as any)?.range ?? pkRangeParam,
-        winRate: Number((json as any)?.winRate ?? 0),
-        pkScore: Number((json as any)?.pkScore ?? 0),
-        sessions: Number((json as any)?.sessions ?? 0),
-        history: history.map((h: any) => ({
-          id: String(h?.id ?? `${Math.random()}`),
-          createdAt: String(h?.createdAt ?? new Date().toISOString()),
-          opponentName: String(h?.opponentName ?? "Unknown"),
-          result: (h?.result === "win" || h?.result === "lose" || h?.result === "draw") ? h.result : "draw",
-          score: String(h?.score ?? "0-0"),
-        })),
-      };
-
-      setPkData(normalized);
-    } catch (e: any) {
-      setPkErrorText(e?.message || "Failed to load PK data.");
-      setPkData(null);
-    } finally {
-      setPkLoading(false);
-    }
-  }, [userId, pkTab, pkRange]);
-
-  // auto-load on changes
-  useEffect(() => {
-    if (topTab !== "Live") return;
-    refreshLive();
-  }, [topTab, range, selectedDate, refreshLive]);
+  }, [userId, selectedDate, rangeParam, scopeParam]);
 
   useEffect(() => {
-    if (topTab !== "PK") return;
-    refreshPK();
-  }, [topTab, pkTab, pkRange, refreshPK]);
+    refreshData();
+  }, [topTab, range, selectedDate, refreshData]);
 
-  // real-time polling (while screen focused)
   useEffect(() => {
     if (!isFocused) return;
 
-    // clear old
     if (pollRef.current) clearInterval(pollRef.current);
 
     pollRef.current = setInterval(() => {
-      if (topTab === "Live") refreshLive();
-      if (topTab === "PK") refreshPK();
-    }, 20000); // 20s
+      refreshData();
+    }, 20000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       pollRef.current = null;
     };
-  }, [isFocused, topTab, refreshLive, refreshPK]);
+  }, [isFocused, refreshData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      if (topTab === "Live") await refreshLive();
-      else await refreshPK();
+      await refreshData();
     } finally {
       setRefreshing(false);
     }
-  }, [topTab, refreshLive, refreshPK]);
+  }, [refreshData]);
 
-  // derived live values
   const wonPoints = data?.wonPoints ?? 0;
   const liveDuration = formatSeconds(data?.liveDurationSeconds ?? 0);
   const partyDuration = formatSeconds(data?.partyDurationSeconds ?? 0);
@@ -287,6 +204,13 @@ const LiveDataScreen: React.FC = () => {
   const newFans = data?.newFans ?? 0;
   const newFanClubMembers = data?.newFanClubMembers ?? 0;
   const avgOnlineUsers = data?.averageOnlineUsers ?? 0;
+
+  const avgOnlineLabel =
+    range === "Daily"
+      ? t("liveData.stats.avgOnline.daily")
+      : range === "Weekly"
+      ? t("liveData.stats.avgOnline.weekly")
+      : t("liveData.stats.avgOnline.monthly");
 
   const handleDateChange = (_event: any, date?: Date) => {
     if (Platform.OS === "android") setShowDatePicker(false);
@@ -298,221 +222,200 @@ const LiveDataScreen: React.FC = () => {
     }
   };
 
-  const pkHistory = pkData?.history ?? [];
+  const displayDate = data?.date ?? selectedDate;
+
+  const countryLabel =
+    topTab === "Country"
+      ? data?.country
+        ? `${data.country.flagEmoji ?? ""} ${data.country.code}`
+        : "—"
+      : null;
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-[#F9FAFB]" edges={["top"]}>
       {/* Header */}
-      <View className="flex-row items-center px-4 pt-3 pb-2">
-        <Pressable onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color="#111827" />
-        </Pressable>
-        <View className="flex-1 flex-row justify-center space-x-8">
-          <TopTabButton
-            label="Live data"
-            active={topTab === "Live"}
-            onPress={() => setTopTab("Live")}
-          />
-          <TopTabButton
-            label="PK data"
-            active={topTab === "PK"}
-            onPress={() => setTopTab("PK")}
-          />
+      <View className="px-4 pt-3 pb-3 bg-white border-b border-[#F1F5F9]">
+        <View className="flex-row items-center justify-between">
+          <Pressable
+            onPress={() => navigation.goBack()}
+            className="h-9 w-9 items-center justify-center rounded-full bg-[#F3F4F6]"
+          >
+            <Ionicons name="chevron-back" size={20} color="#111827" />
+          </Pressable>
+
+          <View className="flex-1 items-center px-3">
+            <View className="flex-row bg-[#F3F4F6] rounded-full p-1 w-full max-w-[280px]">
+              <TopTabButton
+                // keep your i18n key if you want, but this tab is GLOBAL now
+                label={t("liveData.tabs.live")}
+                active={topTab === "Live"}
+                onPress={() => setTopTab("Live")}
+              />
+              <TopTabButton
+                // reuse existing key if you don’t want to touch i18n now
+                label={t("liveData.tabs.pk")}
+                active={topTab === "Country"}
+                onPress={() => setTopTab("Country")}
+              />
+            </View>
+          </View>
+
+          <Pressable
+            onPress={() => setShowHelp(true)}
+            className="h-9 w-9 items-center justify-center rounded-full bg-[#F3F4F6]"
+          >
+            <Ionicons name="help-circle-outline" size={19} color="#6B7280" />
+          </Pressable>
         </View>
-        <Pressable onPress={() => setShowHelp(true)}>
-          <Ionicons name="help-circle-outline" size={20} color="#6B7280" />
-        </Pressable>
       </View>
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: 32, paddingTop: 12 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {topTab === "Live" ? (
-          <>
-            {/* Range tabs + date */}
-            <View className="mt-2 flex-row items-center justify-between px-4">
-              <View className="flex-row">
-                <RangeTabButton
-                  label="Daily data"
-                  active={range === "Daily"}
-                  onPress={() => setRange("Daily")}
-                />
-                <RangeTabButton
-                  label="Weekly Data"
-                  active={range === "Weekly"}
-                  onPress={() => setRange("Weekly")}
-                />
-                <RangeTabButton
-                  label="Monthly data"
-                  active={range === "Monthly"}
-                  onPress={() => setRange("Monthly")}
-                />
-              </View>
-
-              <Pressable className="flex-row items-center" onPress={() => setShowDatePicker(true)}>
-                <Ionicons name="calendar-outline" size={14} color="#6B7280" />
-                <Text className="ml-1 text-[12px] text-[#111827]">
-                  {data?.date ?? selectedDate}
-                </Text>
-              </Pressable>
+        {/* Filters (range + date) */}
+        <View className="mx-4 rounded-2xl bg-white border border-[#EEF2F7] px-3 py-3">
+          <View className="rounded-full bg-[#F3F4F6] p-1 flex-row items-center">
+            <View className="flex-1 flex-row">
+              <RangeTabButton
+                label={t("liveData.range.daily")}
+                active={range === "Daily"}
+                onPress={() => setRange("Daily")}
+              />
+              <RangeTabButton
+                label={t("liveData.range.weekly")}
+                active={range === "Weekly"}
+                onPress={() => setRange("Weekly")}
+              />
+              <RangeTabButton
+                label={t("liveData.range.monthly")}
+                active={range === "Monthly"}
+                onPress={() => setRange("Monthly")}
+              />
             </View>
 
-            {/* Optional error text */}
-            {errorText && (
-              <View className="mt-3 mx-4 rounded-2xl bg-red-50 px-3 py-2">
-                <Text className="text-[11px] text-red-600">{errorText}</Text>
+            <Pressable
+              onPress={() => setShowDatePicker(true)}
+              className="ml-2 h-9 rounded-full bg-white border border-[#E5E7EB] px-3 flex-row items-center justify-center"
+            >
+              <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+              <Text
+                className="ml-2 text-[12px] font-semibold text-[#111827]"
+                style={{ includeFontPadding: false, textAlignVertical: "center" }}
+              >
+                {displayDate}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* ✅ Scope helper line */}
+          <View className="mt-2 flex-row items-center justify-between">
+            <Text className="text-[11px] text-[#6B7280]">
+              {topTab === "Live" ? "Scope: Global" : "Scope: Country"}
+            </Text>
+            {topTab === "Country" && (
+              <View className="flex-row items-center">
+                <Ionicons name="flag-outline" size={14} color="#6B7280" />
+                <Text className="ml-1 text-[11px] font-semibold text-[#111827]">
+                  {countryLabel}
+                </Text>
               </View>
             )}
+          </View>
 
-            {/* Stats card */}
-            <View className="mt-3 mx-4 rounded-3xl bg-[#FCE7F3] px-4 py-4">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-[12px] text-pink-500 mb-2">Won points</Text>
-                {loading && <ActivityIndicator size="small" color="#EC4899" />}
-              </View>
-
-              <Text className="text-[28px] font-bold text-[#EC4899]">{wonPoints}</Text>
-
-              {/* Rows */}
-              <View className="mt-3 rounded-2xl bg-white px-4 py-3 space-y-3">
-                <TwoColRow
-                  leftLabel="Live duration"
-                  leftValue={liveDuration}
-                  rightLabel="Live earnings"
-                  rightValue={String(liveEarnings)}
-                />
-                <TwoColRow
-                  leftLabel={
-                    range === "Daily"
-                      ? "Average number of online users today"
-                      : range === "Weekly"
-                      ? "Average number of online users this week"
-                      : "Average number of online users this month"
-                  }
-                  leftValue={String(avgOnlineUsers)}
-                  rightLabel="Party duration"
-                  rightValue={partyDuration}
-                />
-                <TwoColRow
-                  leftLabel="Party earnings"
-                  leftValue={String(partyEarnings)}
-                  rightLabel="Party crown duration"
-                  rightValue={partyCrownDuration}
-                />
-                <TwoColRow
-                  leftLabel="The number of new fans"
-                  leftValue={String(newFans)}
-                  rightLabel="New members of fans club"
-                  rightValue={String(newFanClubMembers)}
-                />
-              </View>
+          {errorText && (
+            <View className="mt-3 rounded-xl bg-red-50 px-3 py-2">
+              <Text className="text-[11px] text-red-600">{errorText}</Text>
             </View>
+          )}
+        </View>
 
-            {/* Get more points */}
-            <View className="mt-4 mx-4">
-              <Pressable
-                className="rounded-full bg-[#6366F1] py-3"
-                onPress={() => navigation.navigate("Reward")}
-              >
-                <Text className="text-center text-[14px] font-semibold text-white">
-                  Get more points
+        {/* Main stats */}
+        <View className="mt-4 mx-4 rounded-3xl bg-white border border-[#EEF2F7] px-4 py-4">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center">
+              <View className="h-9 w-9 rounded-xl bg-[#EEF2FF] items-center justify-center mr-2">
+                <Ionicons name="sparkles-outline" size={18} color="#6366F1" />
+              </View>
+              <View>
+                <Text className="text-[12px] text-[#6B7280]">
+                  {t("liveData.stats.wonPoints")}
                 </Text>
-              </Pressable>
-            </View>
-
-            {/* Contribution -> Fans ranking */}
-            <View className="mt-4 mx-4">
-              <Pressable
-                className="rounded-2xl bg-white px-4 py-3 flex-row items-center justify-between"
-                onPress={() => {
-                  // Pass params so FansRanking screen can fetch safely
-                  navigation.navigate("FansRanking", {
-                    userId,
-                    date: selectedDate,
-                    range: rangeParam,
-                  });
-                }}
-              >
-                <View className="flex-row items-center">
-                  <Ionicons name="trophy-outline" size={18} color="#F59E0B" />
-                  <Text className="ml-2 text-[14px] text-[#111827]">Contribution</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-              </Pressable>
-            </View>
-          </>
-        ) : (
-          /* ---------- PK TAB UI ---------- */
-          <>
-            {/* PK type tabs */}
-            <View className="mt-2 px-4 flex-row justify-around">
-              <PKTabButton
-                label="Random PK"
-                active={pkTab === "Random"}
-                onPress={() => setPkTab("Random")}
-              />
-              <PKTabButton
-                label="Friend PK"
-                active={pkTab === "Friend"}
-                onPress={() => setPkTab("Friend")}
-              />
-              <PKTabButton
-                label="Team PK"
-                active={pkTab === "Team"}
-                onPress={() => setPkTab("Team")}
-              />
-            </View>
-
-            {/* Range buttons */}
-            <View className="mt-3 px-4 flex-row justify-center">
-              <PKRangeButton label="Today" active={pkRange === "Today"} onPress={() => setPkRange("Today")} />
-              <PKRangeButton
-                label="Recent 7 days"
-                active={pkRange === "Recent7"}
-                onPress={() => setPkRange("Recent7")}
-              />
-              <PKRangeButton label="Monthly" active={pkRange === "Monthly"} onPress={() => setPkRange("Monthly")} />
-            </View>
-
-            {pkErrorText && (
-              <View className="mt-3 mx-4 rounded-2xl bg-red-50 px-3 py-2">
-                <Text className="text-[11px] text-red-600">{pkErrorText}</Text>
-              </View>
-            )}
-
-            {/* Summary cards */}
-            <View className="mt-4 px-4 flex-row justify-between">
-              <PKStatCard label="Win%" value={`${(pkData?.winRate ?? 0).toFixed(2)}%`} />
-              <PKStatCard label="PK Score" value={String(pkData?.pkScore ?? 0)} />
-              <PKStatCard label="Sessions" value={String(pkData?.sessions ?? 0)} />
-            </View>
-
-            {/* History */}
-            <View className="mt-5 px-4 mb-8">
-              <Text className="text-[13px] font-semibold text-[#111827] mb-2">Historical record</Text>
-
-              {pkLoading && !pkData && (
-                <View className="py-4 items-center">
-                  <ActivityIndicator />
-                  <Text className="mt-2 text-[11px] text-gray-500">Loading PK history...</Text>
-                </View>
-              )}
-
-              {!pkLoading && pkHistory.length === 0 && (
-                <Text className="text-[12px] text-[#9CA3AF]">
-                  No record. Invite friends to PK.
+                <Text className="text-[26px] font-extrabold text-[#111827]">
+                  {wonPoints}
                 </Text>
-              )}
-
-              {(pkHistory ?? []).map((item) => (
-                <PKHistoryRow key={item.id} item={item} />
-              ))}
+              </View>
             </View>
-          </>
-        )}
+
+            {loading && <ActivityIndicator size="small" color="#6366F1" />}
+          </View>
+
+          <View className="mt-4 rounded-2xl bg-[#F9FAFB] border border-[#EEF2F7] px-4 py-3 space-y-3">
+            <TwoColRow
+              leftLabel={t("liveData.stats.liveDuration")}
+              leftValue={liveDuration}
+              rightLabel={t("liveData.stats.liveEarnings")}
+              rightValue={String(liveEarnings)}
+            />
+            <TwoColRow
+              leftLabel={avgOnlineLabel}
+              leftValue={String(avgOnlineUsers)}
+              rightLabel={t("liveData.stats.partyDuration")}
+              rightValue={partyDuration}
+            />
+            <TwoColRow
+              leftLabel={t("liveData.stats.partyEarnings")}
+              leftValue={String(partyEarnings)}
+              rightLabel={t("liveData.stats.partyCrownDuration")}
+              rightValue={partyCrownDuration}
+            />
+            <TwoColRow
+              leftLabel={t("liveData.stats.newFans")}
+              leftValue={String(newFans)}
+              rightLabel={t("liveData.stats.newFanClubMembers")}
+              rightValue={String(newFanClubMembers)}
+            />
+          </View>
+        </View>
+
+        {/* CTA */}
+        <View className="mt-4 mx-4">
+          <Pressable
+            className="rounded-full bg-[#6366F1] py-3"
+            onPress={() => navigation.navigate("Reward")}
+          >
+            <Text className="text-center text-[14px] font-semibold text-white">
+              {t("liveData.actions.getMorePoints")}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Contribution */}
+        <View className="mt-4 mx-4">
+          <Pressable
+            className="rounded-2xl bg-white border border-[#EEF2F7] px-4 py-3 flex-row items-center justify-between"
+            onPress={() => {
+              navigation.navigate("FansRanking", {
+                userId,
+                date: selectedDate,
+                range: rangeParam,
+                scope: scopeParam,
+              });
+            }}
+          >
+            <View className="flex-row items-center">
+              <View className="h-9 w-9 rounded-xl bg-[#FFFBEB] items-center justify-center mr-2">
+                <Ionicons name="trophy-outline" size={18} color="#F59E0B" />
+              </View>
+              <Text className="text-[14px] font-semibold text-[#111827]">
+                {t("liveData.actions.contribution")}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+          </Pressable>
+        </View>
       </ScrollView>
 
       {/* Help modal */}
@@ -525,22 +428,23 @@ const LiveDataScreen: React.FC = () => {
         <View className="flex-1 bg-black/40 items-center justify-center px-8">
           <View className="w-full rounded-2xl bg-white px-5 py-4">
             <Text className="text-[16px] font-semibold text-[#111827] mb-3 text-center">
-              Description
+              {t("liveData.help.title")}
             </Text>
             <Text className="text-[13px] text-[#4B5563] mb-4">
-              1. The settlement cycle is 00:00:00–23:59:59 in UTC+8.
+              {t("liveData.help.line1")}
             </Text>
             <Pressable
               onPress={() => setShowHelp(false)}
               className="mt-1 rounded-full bg-[#6366F1] py-2"
             >
-              <Text className="text-center text-[14px] font-semibold text-white">Confirm</Text>
+              <Text className="text-center text-[14px] font-semibold text-white">
+                {t("liveData.help.confirm")}
+              </Text>
             </Pressable>
           </View>
         </View>
       </Modal>
 
-      {/* Date picker for live data */}
       {showDatePicker && (
         <DateTimePicker
           mode="date"
@@ -553,20 +457,27 @@ const LiveDataScreen: React.FC = () => {
   );
 };
 
+/* ---------------- UI components ---------------- */
+
 const TopTabButton: React.FC<{
   label: string;
   active: boolean;
   onPress: () => void;
 }> = ({ label, active, onPress }) => (
-  <Pressable onPress={onPress} className="pb-1">
+  <Pressable
+    onPress={onPress}
+    className={`flex-1 rounded-full px-4 py-2 items-center ${
+      active ? "bg-white" : "bg-transparent"
+    }`}
+  >
     <Text
-      className={`text-[15px] ${
-        active ? "text-[#111827] font-semibold" : "text-gray-400"
+      className={`text-[13px] ${
+        active ? "text-[#111827] font-extrabold" : "text-[#6B7280] font-semibold"
       }`}
+      numberOfLines={1}
     >
       {label}
     </Text>
-    {active && <View className="h-[2px] bg-[#111827] mt-1 rounded-full" />}
   </Pressable>
 );
 
@@ -575,15 +486,20 @@ const RangeTabButton: React.FC<{
   active: boolean;
   onPress: () => void;
 }> = ({ label, active, onPress }) => (
-  <Pressable onPress={onPress} className="mr-3">
+  <Pressable
+    onPress={onPress}
+    className={`h-9 px-3 rounded-full items-center justify-center ${
+      active ? "bg-white" : "bg-transparent"
+    }`}
+  >
     <Text
       className={`text-[12px] ${
-        active ? "text-[#111827] font-semibold" : "text-gray-400"
+        active ? "text-[#111827] font-extrabold" : "text-[#6B7280] font-semibold"
       }`}
+      style={{ includeFontPadding: false, textAlignVertical: "center" }}
     >
       {label}
     </Text>
-    {active && <View className="h-[2px] bg-[#111827] mt-0.5 rounded-full" />}
   </Pressable>
 );
 
@@ -595,98 +511,25 @@ const TwoColRow: React.FC<{
 }> = ({ leftLabel, leftValue, rightLabel, rightValue }) => (
   <View className="flex-row justify-between">
     <View className="flex-1 mr-2">
-      <Text className="text-[11px] text-gray-500">{leftLabel}</Text>
-      <Text className="mt-1 text-[13px] font-semibold text-[#111827]">
-        {leftValue}
-      </Text>
+      <Text className="text-[11px] text-[#6B7280]">{leftLabel}</Text>
+      <Text className="mt-1 text-[13px] font-extrabold text-[#111827]">{leftValue}</Text>
     </View>
     <View className="flex-1 ml-2">
-      <Text className="text-[11px] text-gray-500">{rightLabel}</Text>
-      <Text className="mt-1 text-[13px] font-semibold text-[#111827]">
-        {rightValue}
-      </Text>
+      <Text className="text-[11px] text-[#6B7280]">{rightLabel}</Text>
+      <Text className="mt-1 text-[13px] font-extrabold text-[#111827]">{rightValue}</Text>
     </View>
   </View>
 );
 
-/* ----- PK components ----- */
-
-const PKTabButton: React.FC<{
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}> = ({ label, active, onPress }) => (
-  <Pressable onPress={onPress} className="px-3 py-1 rounded-full">
-    <Text
-      className={`text-[13px] ${
-        active ? "text-[#111827] font-semibold" : "text-gray-400"
-      }`}
-    >
-      {label}
-    </Text>
-    {active && <View className="h-[2px] bg-[#111827] mt-1 rounded-full" />}
-  </Pressable>
-);
-
-const PKRangeButton: React.FC<{
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}> = ({ label, active, onPress }) => (
-  <Pressable onPress={onPress} className="mx-2 px-3 py-1 rounded-full">
-    <Text
-      className={`text-[12px] ${
-        active ? "text-[#111827] font-semibold" : "text-gray-400"
-      }`}
-    >
-      {label}
-    </Text>
-  </Pressable>
-);
-
-const PKStatCard: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <View className="flex-1 mx-1 rounded-2xl bg-white px-3 py-3 shadow-sm">
-    <Text className="text-[11px] text-[#6B7280] mb-1">{label}</Text>
-    <Text className="text-[16px] font-semibold text-[#111827]">{value}</Text>
-  </View>
-);
-
-const PKHistoryRow: React.FC<{ item: PKDataApiResponse["history"][number] }> = ({ item }) => {
-  const date = new Date(item.createdAt);
-  const valid = !isNaN(date.getTime());
-  const timeStr = valid
-    ? `${date.getMonth() + 1}/${date.getDate()} ${date
-        .getHours()
-        .toString()
-        .padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`
-    : "—";
-
-  const resultColor =
-    item.result === "win" ? "#16A34A" : item.result === "lose" ? "#DC2626" : "#6B7280";
-
-  return (
-    <View className="flex-row items-center justify-between py-2 border-b border-[#F3F4F6]">
-      <View>
-        <Text className="text-[13px] text-[#111827]">{item.opponentName}</Text>
-        <Text className="text-[11px] text-[#9CA3AF] mt-0.5">{timeStr}</Text>
-      </View>
-      <View className="items-end">
-        <Text className="text-[11px] font-semibold" style={{ color: resultColor }}>
-          {item.result === "win" ? "Win" : item.result === "lose" ? "Lose" : "Draw"}
-        </Text>
-        <Text className="text-[11px] text-[#6B7280] mt-0.5">Score: {item.score}</Text>
-      </View>
-    </View>
-  );
-};
-
-// helper for 00:00:00 format
 function formatSeconds(total: number): string {
   const s = Math.max(0, Math.floor(total));
   const hours = Math.floor(s / 3600);
   const minutes = Math.floor((s % 3600) / 60);
   const seconds = s % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+    2,
+    "0"
+  )}:${String(seconds).padStart(2, "0")}`;
 }
 
 function parseYYYYMMDD(str: string): Date {

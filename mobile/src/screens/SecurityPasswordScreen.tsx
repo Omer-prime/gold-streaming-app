@@ -1,13 +1,6 @@
 // src/screens/SecurityPasswordScreen.tsx
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
-  Alert,
-} from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -15,10 +8,9 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-type Nav = NativeStackNavigationProp<
-  ProfileStackParamList,
-  "SecurityPassword"
->;
+import { t } from "../i18n";
+
+type Nav = NativeStackNavigationProp<ProfileStackParamList, "SecurityPassword">;
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.10.25:3000";
@@ -32,11 +24,11 @@ const SecurityPasswordScreen: React.FC = () => {
 
   const handleSave = async () => {
     if (!newPwd || !confirmPwd) {
-      Alert.alert("Error", "Please enter new password.");
+      Alert.alert(t("securityPassword.errors.title"), t("securityPassword.errors.enterNew"));
       return;
     }
     if (newPwd !== confirmPwd) {
-      Alert.alert("Error", "New password and confirm password do not match.");
+      Alert.alert(t("securityPassword.errors.title"), t("securityPassword.errors.mismatch"));
       return;
     }
 
@@ -44,7 +36,7 @@ const SecurityPasswordScreen: React.FC = () => {
       setSaving(true);
       const userId = await AsyncStorage.getItem("gl_user_id");
       if (!userId) {
-        Alert.alert("Error", "User not found, please login again.");
+        Alert.alert(t("securityPassword.errors.title"), t("errors.userNotFound"));
         return;
       }
 
@@ -61,19 +53,22 @@ const SecurityPasswordScreen: React.FC = () => {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        Alert.alert("Error", json?.error ?? "Failed to update password");
+        Alert.alert(
+          t("securityPassword.errors.title"),
+          json?.error ?? t("securityPassword.errors.updateFailed")
+        );
         return;
       }
 
-      Alert.alert("Success", "Password updated successfully.", [
+      Alert.alert(t("securityPassword.success.title"), t("securityPassword.success.msg"), [
         {
-          text: "OK",
+          text: t("common.ok"),
           onPress: () => navigation.goBack(),
         },
       ]);
     } catch (e) {
       console.error("update password error", e);
-      Alert.alert("Error", "Network error, please try again.");
+      Alert.alert(t("securityPassword.errors.title"), t("securityPassword.errors.network"));
     } finally {
       setSaving(false);
     }
@@ -89,7 +84,7 @@ const SecurityPasswordScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
         <Text className="text-[18px] font-semibold text-[#111827]">
-          Security Password
+          {t("securityPassword.title")}
         </Text>
       </View>
 
@@ -99,17 +94,17 @@ const SecurityPasswordScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <PasswordField
-          label="Current password"
+          label={t("securityPassword.fields.current")}
           value={oldPwd}
           onChangeText={setOldPwd}
         />
         <PasswordField
-          label="New password"
+          label={t("securityPassword.fields.new")}
           value={newPwd}
           onChangeText={setNewPwd}
         />
         <PasswordField
-          label="Confirm new password"
+          label={t("securityPassword.fields.confirm")}
           value={confirmPwd}
           onChangeText={setConfirmPwd}
         />
@@ -120,7 +115,7 @@ const SecurityPasswordScreen: React.FC = () => {
           className="mt-6 h-11 rounded-full bg-[#3B82F6] items-center justify-center"
         >
           <Text className="text-[14px] font-semibold text-white">
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("securityPassword.actions.saving") : t("securityPassword.actions.save")}
           </Text>
         </Pressable>
       </ScrollView>
@@ -134,11 +129,7 @@ type FieldProps = {
   onChangeText: (val: string) => void;
 };
 
-const PasswordField: React.FC<FieldProps> = ({
-  label,
-  value,
-  onChangeText,
-}) => (
+const PasswordField: React.FC<FieldProps> = ({ label, value, onChangeText }) => (
   <View className="mb-4">
     <Text className="mb-1 text-[13px] text-[#374151]">{label}</Text>
     <View className="h-11 rounded-full border border-[#E5E7EB] px-4 flex-row items-center bg-[#F9FAFB]">

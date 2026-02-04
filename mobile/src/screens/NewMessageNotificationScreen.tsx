@@ -17,8 +17,11 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "NewMessageNotification">;
+
+
 
 type NotificationItem = {
   id: string;
@@ -50,7 +53,7 @@ const NewMessageNotificationScreen: React.FC = () => {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [notifError, setNotifError] = useState<string | null>(null);
 
-  // debug counters (helps you confirm API is returning)
+  // debug counters
   const [serverTotal, setServerTotal] = useState(0);
   const [serverUnread, setServerUnread] = useState(0);
   const [debugUserId, setDebugUserId] = useState<string | null>(null);
@@ -59,7 +62,10 @@ const NewMessageNotificationScreen: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const userId = await AsyncStorage.getItem("gl_user_id");
+        const userId =
+          (await AsyncStorage.getItem("gl_user_id")) ??
+          (await AsyncStorage.getItem("userId"));
+
         setDebugUserId(userId);
         if (!userId) return;
 
@@ -92,7 +98,10 @@ const NewMessageNotificationScreen: React.FC = () => {
 
     const save = async () => {
       try {
-        const userId = await AsyncStorage.getItem("gl_user_id");
+        const userId =
+          (await AsyncStorage.getItem("gl_user_id")) ??
+          (await AsyncStorage.getItem("userId"));
+
         if (!userId) return;
 
         await fetch(`${API_BASE_URL}/api/settings/notifications`, {
@@ -115,7 +124,16 @@ const NewMessageNotificationScreen: React.FC = () => {
     };
 
     save();
-  }, [loaded, liveAlerts, messageSwitch, sound, vibrate, mutualFollowers, myFollowing, stranger]);
+  }, [
+    loaded,
+    liveAlerts,
+    messageSwitch,
+    sound,
+    vibrate,
+    mutualFollowers,
+    myFollowing,
+    stranger,
+  ]);
 
   // -------- NOTIFICATIONS: LOAD LIST ----------
   const loadNotifications = useCallback(async () => {
@@ -123,17 +141,20 @@ const NewMessageNotificationScreen: React.FC = () => {
       setNotifError(null);
       setLoadingNotifications(true);
 
-      const userId = await AsyncStorage.getItem("gl_user_id");
+      const userId =
+        (await AsyncStorage.getItem("gl_user_id")) ??
+        (await AsyncStorage.getItem("userId"));
+
       setDebugUserId(userId);
+
       if (!userId) {
         setNotifications([]);
         setServerTotal(0);
         setServerUnread(0);
-        setNotifError("Missing userId in AsyncStorage (gl_user_id)");
+        setNotifError(t("newMessageNotification.errors.missingUserId", { key: "gl_user_id" }));
         return;
       }
 
-      // force pageSize so you always see a lot
       const res = await fetch(
         `${API_BASE_URL}/api/notifications?userId=${encodeURIComponent(userId)}&page=1&pageSize=50`
       );
@@ -141,7 +162,7 @@ const NewMessageNotificationScreen: React.FC = () => {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setNotifError(json?.error || "Failed to load notifications");
+        setNotifError(json?.error || t("newMessageNotification.errors.loadFailed"));
         setNotifications([]);
         setServerTotal(0);
         setServerUnread(0);
@@ -153,7 +174,7 @@ const NewMessageNotificationScreen: React.FC = () => {
       setServerUnread(Number(json?.unreadCount ?? 0));
     } catch (e) {
       console.error("load notifications error", e);
-      setNotifError("Network error while loading notifications");
+      setNotifError(t("newMessageNotification.errors.network"));
       setNotifications([]);
       setServerTotal(0);
       setServerUnread(0);
@@ -175,7 +196,10 @@ const NewMessageNotificationScreen: React.FC = () => {
   // -------- NOTIFICATIONS: MARK ALL READ ----------
   const handleMarkAllRead = async () => {
     try {
-      const userId = await AsyncStorage.getItem("gl_user_id");
+      const userId =
+        (await AsyncStorage.getItem("gl_user_id")) ??
+        (await AsyncStorage.getItem("userId"));
+
       if (!userId) return;
 
       const res = await fetch(`${API_BASE_URL}/api/notifications`, {
@@ -187,7 +211,9 @@ const NewMessageNotificationScreen: React.FC = () => {
       if (!res.ok) return;
 
       const nowIso = new Date().toISOString();
-      setNotifications((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: nowIso })));
+      setNotifications((prev) =>
+        prev.map((n) => (n.readAt ? n : { ...n, readAt: nowIso }))
+      );
       setServerUnread(0);
     } catch (e) {
       console.error("mark all read error", e);
@@ -199,13 +225,13 @@ const NewMessageNotificationScreen: React.FC = () => {
   // settings rows for search
   const allRows = useMemo(
     () => [
-      { key: "liveAlerts", label: "Live room opening alerts", value: liveAlerts, onValueChange: setLiveAlerts },
-      { key: "messageSwitch", label: "Message notification switch", value: messageSwitch, onValueChange: setMessageSwitch },
-      { key: "sound", label: "Sound", value: sound, onValueChange: setSound },
-      { key: "vibrate", label: "Vibrate", value: vibrate, onValueChange: setVibrate },
-      { key: "mutualFollowers", label: "Mutual followers", value: mutualFollowers, onValueChange: setMutualFollowers },
-      { key: "myFollowing", label: "My Following", value: myFollowing, onValueChange: setMyFollowing },
-      { key: "stranger", label: "Stranger", value: stranger, onValueChange: setStranger },
+      { key: "liveAlerts", label: t("newMessageNotification.settings.liveAlerts"), value: liveAlerts, onValueChange: setLiveAlerts },
+      { key: "messageSwitch", label: t("newMessageNotification.settings.messageSwitch"), value: messageSwitch, onValueChange: setMessageSwitch },
+      { key: "sound", label: t("newMessageNotification.settings.sound"), value: sound, onValueChange: setSound },
+      { key: "vibrate", label: t("newMessageNotification.settings.vibrate"), value: vibrate, onValueChange: setVibrate },
+      { key: "mutualFollowers", label: t("newMessageNotification.settings.mutualFollowers"), value: mutualFollowers, onValueChange: setMutualFollowers },
+      { key: "myFollowing", label: t("newMessageNotification.settings.myFollowing"), value: myFollowing, onValueChange: setMyFollowing },
+      { key: "stranger", label: t("newMessageNotification.settings.stranger"), value: stranger, onValueChange: setStranger },
     ],
     [liveAlerts, messageSwitch, sound, vibrate, mutualFollowers, myFollowing, stranger]
   );
@@ -221,13 +247,18 @@ const NewMessageNotificationScreen: React.FC = () => {
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <View className="flex-row items-center px-4 pt-3 pb-2 border-b border-gray-100">
-        <Pressable onPress={() => navigation.goBack()} className="mr-3 h-9 w-9 items-center justify-center rounded-full">
+        <Pressable
+          onPress={() => navigation.goBack()}
+          className="mr-3 h-9 w-9 items-center justify-center rounded-full"
+        >
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
-        <Text className="text-[18px] font-semibold text-[#111827]">Notifications</Text>
+        <Text className="text-[18px] font-semibold text-[#111827]">
+          {t("newMessageNotification.title")}
+        </Text>
       </View>
 
-      {/* Search bar (zIndex fix) */}
+      {/* Search bar */}
       <View className="px-4 pt-3" style={{ zIndex: 10 }}>
         <View
           className="flex-row items-center rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2"
@@ -238,7 +269,7 @@ const NewMessageNotificationScreen: React.FC = () => {
             ref={searchRef}
             value={search}
             onChangeText={setSearch}
-            placeholder="Search notification settings"
+            placeholder={t("newMessageNotification.searchPlaceholder")}
             placeholderTextColor="#9CA3AF"
             autoCorrect={false}
             autoCapitalize="none"
@@ -258,9 +289,13 @@ const NewMessageNotificationScreen: React.FC = () => {
           )}
         </View>
 
-        {/* tiny debug line (remove later) */}
+        {/* debug line (remove later) */}
         <Text className="mt-1 text-[10px] text-[#9CA3AF]">
-          uid: {debugUserId ?? "null"} • total: {serverTotal} • unread: {serverUnread}
+          {t("newMessageNotification.debugLine", {
+            uid: debugUserId ?? "null",
+            total: serverTotal,
+            unread: serverUnread,
+          })}
         </Text>
       </View>
 
@@ -269,9 +304,11 @@ const NewMessageNotificationScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={loadingNotifications} onRefresh={loadNotifications} />}
+        refreshControl={
+          <RefreshControl refreshing={loadingNotifications} onRefresh={loadNotifications} />
+        }
       >
-        <SectionTitle title="Notifications list" />
+        <SectionTitle title={t("newMessageNotification.sections.notificationsList")} />
 
         {notifError && (
           <View className="px-4 pb-2">
@@ -285,14 +322,18 @@ const NewMessageNotificationScreen: React.FC = () => {
           </View>
         ) : notifications.length === 0 ? (
           <View className="px-4 pt-2">
-            <Text className="text-[12px] text-[#9CA3AF]">No notifications yet.</Text>
+            <Text className="text-[12px] text-[#9CA3AF]">
+              {t("newMessageNotification.empty")}
+            </Text>
           </View>
         ) : (
           <>
             {hasUnread && (
               <View className="px-4 pt-1 pb-2 flex-row justify-end">
                 <Pressable onPress={handleMarkAllRead}>
-                  <Text className="text-[11px] text-[#6C4DFF] font-semibold">Mark all as read</Text>
+                  <Text className="text-[11px] text-[#6C4DFF] font-semibold">
+                    {t("newMessageNotification.actions.markAllRead")}
+                  </Text>
                 </Pressable>
               </View>
             )}
@@ -302,10 +343,21 @@ const NewMessageNotificationScreen: React.FC = () => {
           </>
         )}
 
-        <SectionTitle title={isSearching ? "Search results" : "Notification settings"} />
+        <SectionTitle
+          title={
+            isSearching
+              ? t("newMessageNotification.sections.searchResults")
+              : t("newMessageNotification.sections.notificationSettings")
+          }
+        />
 
         {(isSearching ? filteredRows : allRows).map((row) => (
-          <SimpleToggleRow key={row.key} label={row.label} value={row.value} onValueChange={row.onValueChange} />
+          <SimpleToggleRow
+            key={row.key}
+            label={row.label}
+            value={row.value}
+            onValueChange={row.onValueChange}
+          />
         ))}
       </ScrollView>
     </SafeAreaView>
@@ -337,7 +389,16 @@ const NotificationCard: React.FC<{ item: NotificationItem }> = ({ item }) => {
     <View className="px-4 pt-2">
       <View className="flex-row rounded-xl border border-[#E5E7EB] bg-white px-3 py-2">
         <View className="mr-2 mt-2">
-          {isUnread && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#F97316" }} />}
+          {isUnread && (
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: "#F97316",
+              }}
+            />
+          )}
         </View>
 
         <View style={{ flex: 1 }}>

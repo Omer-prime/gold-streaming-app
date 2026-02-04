@@ -1,4 +1,3 @@
-// src/screens/InviteScreen.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
@@ -20,6 +19,7 @@ import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator"
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config";
 import QRCode from "react-native-qrcode-svg";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList>;
 
@@ -40,12 +40,16 @@ type InviteResp = {
   last7Days: InviteRow[];
 };
 
-// ✅ Your domain fallback (if backend doesn’t return inviteLink)
 const FALLBACK_INVITE_BASE = "https://goldilivepainelgeral.com/invite";
 
-/**
- * ✅ Clipboard safe helper (won’t crash if ExpoClipboard not compiled in dev client)
- */
+function toAbsoluteUrl(base: string, url?: string | null) {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const b = (base || "").replace(/\/+$/, "");
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${b}${path}`;
+}
+
 async function safeCopy(text: string) {
   try {
     const Clipboard = await import("expo-clipboard");
@@ -56,14 +60,21 @@ async function safeCopy(text: string) {
   }
 }
 
+type Tab = "myRewards" | "incomeRank";
+
 const InviteScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
-  const [tab, setTab] = useState<"My rewards" | "Income Rank">("My rewards");
+  const [tab, setTab] = useState<Tab>("myRewards");
 
   const [userId, setUserId] = useState<string | null>(null);
   const [data, setData] = useState<InviteResp | null>(null);
   const [loading, setLoading] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+
+  const apiBase = useMemo(
+    () => String(API_BASE_URL || "").replace(/\/+$/, ""),
+    []
+  );
 
   useEffect(() => {
     AsyncStorage.getItem("gl_user_id").then(setUserId);
@@ -90,9 +101,7 @@ const InviteScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const url = `${API_BASE_URL}/api/profile/invite?userId=${encodeURIComponent(
-        userId
-      )}`;
+      const url = `${apiBase}/api/profile/invite?userId=${encodeURIComponent(userId)}`;
 
       const res = await fetch(url);
       const json = (await res.json().catch(() => null)) as InviteResp | null;
@@ -102,16 +111,16 @@ const InviteScreen: React.FC = () => {
       }
 
       if (!json?.inviteCode) {
-        throw new Error("Invite code missing from backend response");
+        throw new Error(t("invite.alerts.inviteCodeMissing"));
       }
 
       setData(json);
     } catch (e: any) {
-      Alert.alert("Invite error", e?.message || "Failed to load invite data");
+      Alert.alert(t("invite.alerts.errorTitle"), e?.message || t("invite.alerts.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [apiBase, userId]);
 
   useEffect(() => {
     load();
@@ -120,49 +129,41 @@ const InviteScreen: React.FC = () => {
   const onCopyCode = async () => {
     const code = data?.inviteCode?.trim();
     if (!code) {
-      Alert.alert("Invite", "Invite code not ready. Tap refresh.");
+      Alert.alert(t("invite.alerts.inviteTitle"), t("invite.alerts.codeNotReady"));
       return;
     }
 
     const ok = await safeCopy(code);
     if (!ok) {
-      Alert.alert(
-        "Clipboard not ready",
-        "Clipboard module is not in your Dev Client build. Rebuild Dev Client to enable copy."
-      );
+      Alert.alert(t("invite.alerts.clipboardNotReadyTitle"), t("invite.alerts.clipboardNotReadyMsg"));
       return;
     }
-    Alert.alert("Copied", "Invite code copied");
+    Alert.alert(t("invite.alerts.copiedTitle"), t("invite.alerts.codeCopied"));
   };
 
   const onCopyLink = async () => {
     if (!inviteLink) {
-      Alert.alert("Invite", "Invite link not ready. Tap refresh.");
+      Alert.alert(t("invite.alerts.inviteTitle"), t("invite.alerts.linkNotReady"));
       return;
     }
 
     const ok = await safeCopy(inviteLink);
     if (!ok) {
-      Alert.alert(
-        "Clipboard not ready",
-        "Clipboard module is not in your Dev Client build. Rebuild Dev Client to enable copy."
-      );
+      Alert.alert(t("invite.alerts.clipboardNotReadyTitle"), t("invite.alerts.clipboardNotReadyMsg"));
       return;
     }
-    Alert.alert("Copied", "Invite link copied");
+    Alert.alert(t("invite.alerts.copiedTitle"), t("invite.alerts.linkCopied"));
   };
 
   const onShare = async () => {
-    const code = data?.inviteCode?.trim();
-
+    const code = data?.inviteCode?.trim() || "-";
     if (!inviteLink) {
-      Alert.alert("Invite", "Invite link not ready. Tap refresh.");
+      Alert.alert(t("invite.alerts.inviteTitle"), t("invite.alerts.linkNotReady"));
       return;
     }
-
     try {
       await Share.share({
-        message: `Join me on Gold Live 🎥\nUse my invite code: ${code || "-"}\n${inviteLink}`,
+        message: t("invite.shareMessage", { code, link: inviteLink }),
       });
     } catch {
       // ignore
@@ -171,134 +172,72 @@ const InviteScreen: React.FC = () => {
 
   const onOpenQr = () => {
     if (!inviteLink) {
-      Alert.alert("Invite", "Invite link not ready. Tap refresh.");
+      Alert.alert(t("invite.alerts.inviteTitle"), t("invite.alerts.linkNotReady"));
       return;
     }
     setQrOpen(true);
   };
 
+  const onReceive = () => {
+    Alert.alert(t("invite.alerts.soonTitle"), t("invite.alerts.receiveSoon"));
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       {/* Header */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: "#F3F4F6",
-        }}
-      >
+      <View className="flex-row items-center px-4 pt-3 pb-2 border-b border-gray-100">
         <Pressable
           onPress={navigation.goBack}
-          style={{
-            marginRight: 12,
-            height: 32,
-            width: 32,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          className="mr-3 h-9 w-9 items-center justify-center rounded-full"
         >
-          <Ionicons name="chevron-back" size={22} color="#111827" />
+          <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
 
-        <Text
-          style={{
-            flex: 1,
-            textAlign: "center",
-            fontSize: 17,
-            fontWeight: "600",
-            color: "#111827",
-          }}
-        >
-          Invitation Bonus
+        <Text className="flex-1 text-center text-[18px] font-semibold text-[#111827]">
+          {t("invite.title")}
         </Text>
 
         <Pressable
           onPress={load}
-          style={{ width: 32, alignItems: "center", justifyContent: "center" }}
+          className="h-9 w-9 items-center justify-center rounded-full"
         >
-          {loading ? (
-            <ActivityIndicator />
-          ) : (
-            <Ionicons name="refresh-outline" size={20} color="#9CA3AF" />
-          )}
+          {loading ? <ActivityIndicator /> : <Ionicons name="refresh-outline" size={20} color="#9CA3AF" />}
         </Pressable>
       </View>
 
       <ScrollView
-        style={{ flex: 1 }}
+        className="flex-1"
         contentContainerStyle={{ paddingBottom: 32, paddingHorizontal: 16 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top banner */}
+        {/* Banner */}
         <LinearGradient
           colors={["#FB923C", "#F97316"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={{
-            marginTop: 16,
-            borderRadius: 24,
-            paddingHorizontal: 16,
-            paddingVertical: 16,
-          }}
+          style={{ marginTop: 16, borderRadius: 24, paddingHorizontal: 16, paddingVertical: 16 }}
         >
-          <Text style={{ fontSize: 13, color: "white" }}>Invite someone</Text>
-          <Text
-            style={{
-              marginTop: 4,
-              fontSize: 22,
-              fontWeight: "600",
-              color: "white",
-            }}
-          >
-            Earn rewards by inviting friends
+          <Text style={{ fontSize: 13, color: "white" }}>{t("invite.banner.small")}</Text>
+          <Text style={{ marginTop: 4, fontSize: 22, fontWeight: "600", color: "white" }}>
+            {t("invite.banner.title")}
           </Text>
-          <Text
-            style={{
-              marginTop: 4,
-              fontSize: 11,
-              color: "rgba(255,255,255,0.85)",
-            }}
-          >
-            Share your invite link or code. We will count your invitees automatically.
+          <Text style={{ marginTop: 4, fontSize: 11, color: "rgba(255,255,255,0.85)" }}>
+            {t("invite.banner.subtitle")}
           </Text>
         </LinearGradient>
 
         {/* Tabs */}
-        <View
-          style={{
-            marginTop: 16,
-            flexDirection: "row",
-            borderRadius: 999,
-            backgroundColor: "#F3F4F6",
-            padding: 4,
-          }}
-        >
-          {(["My rewards", "Income Rank"] as const).map((t) => {
-            const active = t === tab;
+        <View className="mt-4 flex-row rounded-full bg-[#F3F4F6] p-1">
+          {(["myRewards", "incomeRank"] as const).map((k) => {
+            const active = k === tab;
             return (
               <Pressable
-                key={t}
-                onPress={() => setTab(t)}
-                style={{
-                  flex: 1,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 999,
-                  paddingVertical: 10,
-                  backgroundColor: active ? "#fff" : "transparent",
-                }}
+                key={k}
+                onPress={() => setTab(k)}
+                className={`flex-1 items-center justify-center rounded-full py-2.5 ${active ? "bg-white" : ""}`}
               >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: active ? "600" : "400",
-                    color: active ? "#F97316" : "#6B7280",
-                  }}
-                >
-                  {t}
+                <Text className={`text-[12px] ${active ? "font-semibold text-[#F97316]" : "text-[#6B7280]"}`}>
+                  {t(`invite.tabs.${k}`)}
                 </Text>
               </Pressable>
             );
@@ -306,145 +245,72 @@ const InviteScreen: React.FC = () => {
         </View>
 
         {/* Stats */}
-        <View
-          style={{
-            marginTop: 16,
-            borderRadius: 24,
-            backgroundColor: "#fff",
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-            borderWidth: 1,
-            borderColor: "#F3F4F6",
-          }}
-        >
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Stat label="Claimed Rewards" value={String(headerCounts.claimed)} />
-            <Stat label="Number of invitees" value={String(headerCounts.invitees)} />
+        <View className="mt-4 rounded-3xl bg-white px-4 py-4 border border-[#F3F4F6]">
+          <View className="flex-row justify-between">
+            <Stat label={t("invite.stats.claimed")} value={String(headerCounts.claimed)} />
+            <Stat label={t("invite.stats.invitees")} value={String(headerCounts.invitees)} />
           </View>
 
-          <View
-            style={{
-              marginTop: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text style={{ fontSize: 12, color: "#374151" }}>
-              Available for today:{" "}
-              <Text style={{ fontWeight: "600", color: "#F97316" }}>
-                {headerCounts.availableToday}
-              </Text>
+          <View className="mt-4 flex-row items-center justify-between">
+            <Text className="text-[12px] text-[#374151]">
+              {t("invite.stats.availableToday", { count: headerCounts.availableToday })}
             </Text>
 
-            <Pressable
-              onPress={() =>
-                Alert.alert("Soon", "Claim rewards will be enabled when invite reward rules are added.")
-              }
-              style={{
-                borderRadius: 999,
-                backgroundColor: "#E5E7EB",
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: "600", color: "#6B7280" }}>
-                Receive
+            <Pressable onPress={onReceive} className="rounded-full bg-[#E5E7EB] px-4 py-2">
+              <Text className="text-[11px] font-semibold text-[#6B7280]">
+                {t("invite.actions.receive")}
               </Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Invitations list */}
-        <View
-          style={{
-            marginTop: 16,
-            borderRadius: 24,
-            backgroundColor: "#fff",
-            paddingHorizontal: 16,
-            paddingVertical: 16,
-            borderWidth: 1,
-            borderColor: "#F3F4F6",
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 10,
-            }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: "600", color: "#111827" }}>
-              Invitations from last 7 days ({data?.last7Days?.length ?? 0})
+        {/* List */}
+        <View className="mt-4 rounded-3xl bg-white px-4 py-4 border border-[#F3F4F6]">
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-[13px] font-semibold text-[#111827]">
+              {t("invite.list.title", { count: data?.last7Days?.length ?? 0 })}
             </Text>
-            <Text style={{ fontSize: 11, color: "#6B7280" }}>More &gt;</Text>
+            <Text className="text-[11px] text-[#6B7280]">{t("invite.list.more")}</Text>
           </View>
 
           {!data ? (
-            <View style={{ paddingVertical: 20, alignItems: "center" }}>
+            <View className="py-6 items-center">
               <ActivityIndicator />
-              <Text style={{ marginTop: 8, fontSize: 12, color: "#9CA3AF" }}>
-                Loading…
-              </Text>
+              <Text className="mt-2 text-[12px] text-[#9CA3AF]">{t("invite.list.loading")}</Text>
             </View>
           ) : data.last7Days.length === 0 ? (
-            <View style={{ alignItems: "center", paddingVertical: 20 }}>
-              <View
-                style={{
-                  height: 96,
-                  width: 96,
-                  borderRadius: 24,
-                  backgroundColor: "#EEF2FF",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 8,
-                }}
-              >
+            <View className="items-center py-6">
+              <View className="h-24 w-24 rounded-3xl bg-[#EEF2FF] items-center justify-center mb-2">
                 <Ionicons name="planet-outline" size={32} color="#9CA3AF" />
               </View>
-              <Text style={{ fontSize: 12, color: "#9CA3AF" }}>No invitations yet</Text>
+              <Text className="text-[12px] text-[#9CA3AF]">{t("invite.list.empty")}</Text>
             </View>
           ) : (
             <View style={{ gap: 10 }}>
               {data.last7Days.slice(0, 7).map((row) => (
                 <View
                   key={row.id}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
+                  className="flex-row items-center justify-between"
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View className="flex-row items-center">
                     {row.user?.avatarUrl ? (
                       <Image
-                        source={{ uri: row.user.avatarUrl }}
+                        source={{ uri: toAbsoluteUrl(apiBase, row.user.avatarUrl) ?? row.user.avatarUrl }}
                         style={{ height: 36, width: 36, borderRadius: 18, marginRight: 10 }}
                       />
                     ) : (
-                      <View
-                        style={{
-                          height: 36,
-                          width: 36,
-                          borderRadius: 18,
-                          backgroundColor: "#F3F4F6",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          marginRight: 10,
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#6B7280" }}>
+                      <View className="h-9 w-9 rounded-full bg-[#F3F4F6] items-center justify-center mr-2.5">
+                        <Text className="text-[12px] font-semibold text-[#6B7280]">
                           {(row.user?.username || "U").slice(0, 1).toUpperCase()}
                         </Text>
                       </View>
                     )}
 
                     <View>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>
-                        {row.user?.username || "User"}
+                      <Text className="text-[12px] font-semibold text-[#111827]">
+                        {row.user?.username || t("invite.labels.userFallback")}
                       </Text>
-                      <Text style={{ marginTop: 2, fontSize: 11, color: "#6B7280" }}>
+                      <Text className="mt-0.5 text-[11px] text-[#6B7280]">
                         {new Date(row.createdAt).toISOString().slice(0, 10)}
                       </Text>
                     </View>
@@ -456,72 +322,36 @@ const InviteScreen: React.FC = () => {
             </View>
           )}
 
-          {/* My code row */}
-          <View
-            style={{
-              marginTop: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text style={{ fontSize: 11, color: "#6B7280" }}>
-              My code:{" "}
-              <Text style={{ fontWeight: "700", color: "#111827" }}>
-                {data?.inviteCode || "-"}
-              </Text>
+          {/* My code */}
+          <View className="mt-4 flex-row items-center justify-between">
+            <Text className="text-[11px] text-[#6B7280]">
+              {t("invite.list.myCode", { code: data?.inviteCode || "-" })}
             </Text>
 
-            <View style={{ flexDirection: "row", gap: 10 }}>
+            <View className="flex-row">
               <Pressable
                 onPress={onCopyCode}
-                style={{
-                  height: 40,
-                  paddingHorizontal: 12,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
+                className="h-10 px-3 rounded-xl border border-[#E5E7EB] items-center justify-center mr-2.5"
               >
                 <Ionicons name="copy-outline" size={18} color="#111827" />
               </Pressable>
 
               <Pressable
                 onPress={onOpenQr}
-                style={{
-                  height: 40,
-                  width: 40,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
+                className="h-10 w-10 rounded-xl border border-[#E5E7EB] items-center justify-center"
               >
                 <Ionicons name="qr-code-outline" size={20} color="#111827" />
               </Pressable>
             </View>
           </View>
 
-          {/* Copy Link */}
+          {/* Copy link */}
           <Pressable
             onPress={onCopyLink}
-            style={{
-              marginTop: 12,
-              borderRadius: 14,
-              borderWidth: 1,
-              borderColor: "#F3F4F6",
-              paddingVertical: 12,
-              paddingHorizontal: 12,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
+            className="mt-3 rounded-xl border border-[#F3F4F6] px-3 py-3 flex-row items-center justify-between"
           >
-            <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: "#111827" }}>
-              {inviteLink || "Invite link not ready (tap refresh)"}
+            <Text numberOfLines={1} className="flex-1 text-[12px] text-[#111827] mr-2">
+              {inviteLink || t("invite.list.linkPlaceholder")}
             </Text>
             <Ionicons name="copy-outline" size={16} color="#111827" />
           </Pressable>
@@ -530,89 +360,44 @@ const InviteScreen: React.FC = () => {
         {/* CTA */}
         <Pressable
           onPress={onShare}
-          style={{
-            marginTop: 20,
-            borderRadius: 999,
-            backgroundColor: "#F97316",
-            paddingVertical: 14,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          className="mt-5 rounded-full bg-[#F97316] py-3.5 items-center justify-center"
         >
-          <Text style={{ fontSize: 15, fontWeight: "600", color: "#fff" }}>
-            Invite Now
+          <Text className="text-[15px] font-semibold text-white">
+            {t("invite.actions.inviteNow")}
           </Text>
         </Pressable>
       </ScrollView>
 
-      {/* QR MODAL */}
-      <Modal
-        visible={qrOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setQrOpen(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.45)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <View
-            style={{
-              width: "100%",
-              maxWidth: 360,
-              backgroundColor: "#fff",
-              borderRadius: 18,
-              padding: 16,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827" }}>Scan to join</Text>
-              <Pressable
-                onPress={() => setQrOpen(false)}
-                style={{ height: 34, width: 34, alignItems: "center", justifyContent: "center" }}
-              >
+      {/* QR Modal */}
+      <Modal visible={qrOpen} transparent animationType="fade" onRequestClose={() => setQrOpen(false)}>
+        <View className="flex-1 bg-black/50 items-center justify-center px-5">
+          <View className="w-full max-w-[360px] bg-white rounded-2xl p-4">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-[14px] font-semibold text-[#111827]">
+                {t("invite.qr.title")}
+              </Text>
+              <Pressable onPress={() => setQrOpen(false)} className="h-9 w-9 items-center justify-center rounded-full">
                 <Ionicons name="close" size={20} color="#111827" />
               </Pressable>
             </View>
 
-            <View style={{ alignItems: "center", marginTop: 14, paddingVertical: 8 }}>
+            <View className="items-center mt-4 py-2">
               {!!inviteLink && <QRCode value={inviteLink} size={220} />}
-              <Text style={{ marginTop: 12, fontSize: 11, color: "#6B7280", textAlign: "center" }}>
+              <Text className="mt-3 text-[11px] text-[#6B7280] text-center">
                 {inviteLink}
               </Text>
             </View>
 
-            <Pressable
-              onPress={onShare}
-              style={{
-                marginTop: 10,
-                borderRadius: 999,
-                backgroundColor: "#F97316",
-                paddingVertical: 12,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>Share</Text>
+            <Pressable onPress={onShare} className="mt-3 rounded-full bg-[#F97316] py-3 items-center justify-center">
+              <Text className="text-[13px] font-semibold text-white">
+                {t("invite.actions.share")}
+              </Text>
             </Pressable>
 
-            <Pressable
-              onPress={onCopyLink}
-              style={{
-                marginTop: 10,
-                borderRadius: 999,
-                backgroundColor: "#111827",
-                paddingVertical: 12,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>Copy link</Text>
+            <Pressable onPress={onCopyLink} className="mt-3 rounded-full bg-[#111827] py-3 items-center justify-center">
+              <Text className="text-[13px] font-semibold text-white">
+                {t("invite.actions.copyLink")}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -622,19 +407,19 @@ const InviteScreen: React.FC = () => {
 };
 
 const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <View style={{ flex: 1, alignItems: "center" }}>
-    <Text style={{ fontSize: 18, fontWeight: "600", color: "#111827" }}>{value}</Text>
-    <Text style={{ marginTop: 4, fontSize: 11, color: "#6B7280" }}>{label}</Text>
+  <View className="flex-1 items-center">
+    <Text className="text-[18px] font-semibold text-[#111827]">{value}</Text>
+    <Text className="mt-1 text-[11px] text-[#6B7280]">{label}</Text>
   </View>
 );
 
 function Badge({ status }: { status: "REGISTERED" | "QUALIFIED" | "REWARDED" }) {
   const cfg =
     status === "REWARDED"
-      ? { bg: "rgba(16,185,129,0.12)", fg: "#059669", text: "Rewarded" }
+      ? { bg: "rgba(16,185,129,0.12)", fg: "#059669", text: t("invite.badge.rewarded") }
       : status === "QUALIFIED"
-      ? { bg: "rgba(59,130,246,0.12)", fg: "#2563EB", text: "Qualified" }
-      : { bg: "rgba(249,115,22,0.12)", fg: "#F97316", text: "Registered" };
+      ? { bg: "rgba(59,130,246,0.12)", fg: "#2563EB", text: t("invite.badge.qualified") }
+      : { bg: "rgba(249,115,22,0.12)", fg: "#F97316", text: t("invite.badge.registered") };
 
   return (
     <View style={{ backgroundColor: cfg.bg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 }}>

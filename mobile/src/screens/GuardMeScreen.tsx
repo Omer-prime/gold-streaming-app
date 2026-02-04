@@ -1,28 +1,34 @@
 // src/screens/GuardMeScreen.tsx
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, Image, RefreshControl, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  Image,
+  RefreshControl,
+  ScrollView,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
+import { API_BASE_URL } from "../config";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "GuardMe">;
-type R = RouteProp<ProfileStackParamList, "GuardMe">;
+export type R = RouteProp<ProfileStackParamList, "GuardMe">;
 
 const USER_ID_KEY = "gl_user_id";
 
-function getApiBase() {
-  const raw =
-    (process.env.EXPO_PUBLIC_API_URL ??
-      process.env.EXPO_PUBLIC_API_BASE_URL ??
-      "").trim();
-  const base = raw.replace(/\/+$/, "");
-  return base || "http://192.168.10.25:3000";
-}
-
-type ApiUser = { id: string; username: string; nickname?: string | null; avatarUrl?: string | null };
+type ApiUser = {
+  id: string;
+  username: string;
+  nickname?: string | null;
+  avatarUrl?: string | null;
+};
 
 type GuardianResponse = {
   myGuardian: null | {
@@ -49,7 +55,7 @@ function initials(name: string) {
   return (p[0][0] + p[1][0]).toUpperCase();
 }
 
-const GuardMeScreen: React.FC = () => {
+export default function GuardMeScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<R>();
   const routeUserId = (route.params as any)?.userId as string | undefined;
@@ -78,15 +84,17 @@ const GuardMeScreen: React.FC = () => {
       setErr(null);
       setLoading(true);
 
-      if (!userId) throw new Error("Missing userId. Please login again.");
+      if (!userId) throw new Error(t("guardMe.errors.missingUser"));
 
-      const base = getApiBase();
+      const base = (API_BASE_URL ?? "").trim().replace(/\/+$/, "") || "http://192.168.10.25:3000";
       const res = await fetch(`${base}/api/profile/guardian?userId=${encodeURIComponent(userId)}`);
       const json = (await res.json().catch(() => null)) as any;
-      if (!res.ok) throw new Error(json?.error || "Failed to load");
+
+      if (!res.ok) throw new Error(json?.error || t("guardMe.errors.loadFailed"));
+
       setMyGuardian(json?.myGuardian ?? null);
     } catch (e: any) {
-      setErr(e?.message || "Error");
+      setErr(e?.message || t("common.error"));
       setMyGuardian(null);
     } finally {
       setLoading(false);
@@ -106,13 +114,12 @@ const GuardMeScreen: React.FC = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      {/* Header */}
       <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
         <Pressable onPress={navigation.goBack} className="h-8 w-8 items-center justify-center">
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
         <Text className="flex-1 text-center text-[16px] font-semibold text-[#111827]">
-          Guard me
+          {t("guardMe.title")}
         </Text>
         <Pressable onPress={load} className="h-8 w-8 items-center justify-center">
           <Ionicons name="refresh-outline" size={20} color="#111827" />
@@ -128,7 +135,7 @@ const GuardMeScreen: React.FC = () => {
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator />
-          <Text className="mt-2 text-[12px] text-gray-500">Loading…</Text>
+          <Text className="mt-2 text-[12px] text-gray-500">{t("guardMe.states.loading")}</Text>
         </View>
       ) : !myGuardian?.guardian ? (
         <View className="flex-1 items-center justify-center px-8">
@@ -136,13 +143,10 @@ const GuardMeScreen: React.FC = () => {
             <Ionicons name="planet-outline" size={42} color="#9CA3AF" />
           </View>
           <Text className="mt-4 text-[13px] text-gray-500 text-center">
-            No one is guarding you yet
+            {t("guardMe.states.empty")}
           </Text>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            className="mt-5 rounded-full bg-[#111827] px-5 py-3"
-          >
-            <Text className="text-white text-[13px] font-semibold">Go back</Text>
+          <Pressable onPress={() => navigation.goBack()} className="mt-5 rounded-full bg-[#111827] px-5 py-3">
+            <Text className="text-white text-[13px] font-semibold">{t("guardMe.actions.goBack")}</Text>
           </Pressable>
         </View>
       ) : (
@@ -150,10 +154,11 @@ const GuardMeScreen: React.FC = () => {
           contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          <View className="rounded-2xl border border-gray-100 bg-white p-4"
+          <View
+            className="rounded-2xl border border-gray-100 bg-white p-4"
             style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 1 }}
           >
-            <Text className="text-[12px] text-gray-500 mb-2">Your current guardian</Text>
+            <Text className="text-[12px] text-gray-500 mb-2">{t("guardMe.labels.currentGuardian")}</Text>
 
             <Pressable
               onPress={() => navigation.navigate("VisitProfile" as any, { userId: myGuardian.guardian.id })}
@@ -181,13 +186,16 @@ const GuardMeScreen: React.FC = () => {
 
             <View className="mt-4 rounded-xl bg-gray-50 px-3 py-3">
               <Text className="text-[12px] text-gray-600">
-                Tier: <Text className="font-semibold text-[#111827]">{String(myGuardian.tier).toUpperCase()}</Text>
+                {t("guardMe.labels.tier")}:{" "}
+                <Text className="font-semibold text-[#111827]">{String(myGuardian.tier).toUpperCase()}</Text>
               </Text>
               <Text className="mt-1 text-[12px] text-gray-600">
-                Ends: <Text className="font-semibold text-[#111827]">{fmtDate(myGuardian.endsAt)}</Text>
+                {t("guardMe.labels.ends")}:{" "}
+                <Text className="font-semibold text-[#111827]">{fmtDate(myGuardian.endsAt)}</Text>
               </Text>
               <Text className="mt-1 text-[12px] text-gray-600">
-                Started: <Text className="font-semibold text-[#111827]">{fmtDate(myGuardian.startedAt)}</Text>
+                {t("guardMe.labels.started")}:{" "}
+                <Text className="font-semibold text-[#111827]">{fmtDate(myGuardian.startedAt)}</Text>
               </Text>
             </View>
           </View>
@@ -195,6 +203,4 @@ const GuardMeScreen: React.FC = () => {
       )}
     </SafeAreaView>
   );
-};
-
-export default GuardMeScreen;
+}

@@ -10,18 +10,21 @@ import {
   Image,
   useWindowDimensions,
   Alert,
+  Modal,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config";
+import { t } from "../i18n";
 
-type TopTab = "Following" | "Explore" | "New" | "Near";
+type TopTab = "FOLLOWING" | "EXPLORE" | "NEW" | "NEAR";
 
 export type ExploreItem = {
-  id: string; // host userId
+  id: string;
   displayName: string;
   avatarUrl: string | null;
   countryCode: string | null;
@@ -30,7 +33,6 @@ export type ExploreItem = {
   liveViewers: number;
   followersCount: number;
   coins: number;
-
   streamId?: string | null;
   activeStreamId?: string | null;
 };
@@ -48,21 +50,23 @@ const ExploreScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const tabBarHeight = useBottomTabBarHeight();
 
-  const [activeTopTab, setActiveTopTab] = useState<TopTab>("Explore");
+  const [activeTopTab, setActiveTopTab] = useState<TopTab>("EXPLORE");
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const [countries, setCountries] = useState<Country[]>([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
   const [countriesErr, setCountriesErr] = useState<string | null>(null);
-
   const [activeCountryCode, setActiveCountryCode] = useState<string>("popular");
+
+  // ✅ More modal state
+  const [countriesModalOpen, setCountriesModalOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
 
   const [items, setItems] = useState<ExploreItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ refresh on focus (your old logic)
   const [refreshTick, setRefreshTick] = useState(0);
   useFocusEffect(
     useCallback(() => {
@@ -70,14 +74,13 @@ const ExploreScreen: React.FC = () => {
     }, [])
   );
 
-  // ✅ NEW: “Realtime” polling (every 2s) while screen focused
   const [pollTick, setPollTick] = useState(0);
   useEffect(() => {
     if (!isFocused) return;
-    if (!(activeTopTab === "Explore" || activeTopTab === "Following")) return;
+    if (!(activeTopTab === "EXPLORE" || activeTopTab === "FOLLOWING")) return;
 
-    const t = setInterval(() => setPollTick((x) => x + 1), 2000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setPollTick((x) => x + 1), 2000);
+    return () => clearInterval(timer);
   }, [isFocused, activeTopTab]);
 
   useEffect(() => {
@@ -94,18 +97,23 @@ const ExploreScreen: React.FC = () => {
         if (!res.ok) {
           if (!cancelled) {
             setCountries([]);
-            setCountriesErr(json?.error || "Failed to load countries");
+            setCountriesErr(json?.error || t("explore.errors.loadCountries"));
           }
           return;
         }
 
         const list = (json?.countries ?? []) as Country[];
-        if (!cancelled) setCountries(Array.isArray(list) ? list : []);
+        const safe = Array.isArray(list) ? list : [];
+
+        // ✅ sort A-Z so modal is nice
+        safe.sort((a, b) => (a?.name || "").localeCompare(b?.name || ""));
+
+        if (!cancelled) setCountries(safe);
       } catch (e) {
         console.error("load countries error", e);
         if (!cancelled) {
           setCountries([]);
-          setCountriesErr("Network error while loading countries");
+          setCountriesErr(t("explore.errors.networkCountries"));
         }
       } finally {
         if (!cancelled) setCountriesLoading(false);
@@ -118,11 +126,10 @@ const ExploreScreen: React.FC = () => {
     };
   }, []);
 
-  // ✅ Explore feed fetch (now depends on pollTick too)
   useEffect(() => {
     let cancelled = false;
 
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       try {
         setError(null);
         setLoading(true);
@@ -131,8 +138,17 @@ const ExploreScreen: React.FC = () => {
 
         const params = new URLSearchParams();
         if (userId) params.set("userId", userId);
-        params.set("tab", activeTopTab.toLowerCase());
+
+        const tabMap: Record<TopTab, string> = {
+          FOLLOWING: "following",
+          EXPLORE: "explore",
+          NEW: "new",
+          NEAR: "near",
+        };
+
+        params.set("tab", tabMap[activeTopTab]);
         params.set("country", activeCountryCode || "popular");
+
         if (searchQuery.trim().length > 0) params.set("q", searchQuery.trim());
         params.set("limit", "30");
 
@@ -141,7 +157,7 @@ const ExploreScreen: React.FC = () => {
 
         if (!res.ok) {
           if (!cancelled) {
-            setError(json?.error || "Failed to load explore feed");
+            setError(json?.error || t("explore.errors.loadFeed"));
             setItems([]);
           }
           return;
@@ -149,7 +165,6 @@ const ExploreScreen: React.FC = () => {
 
         const list = (json?.items ?? []) as ExploreItem[];
 
-        // ✅ live only
         const liveOnly = (Array.isArray(list) ? list : []).filter((x) => {
           const sid = x.streamId ?? x.activeStreamId ?? null;
           return !!x.isLive && !!sid;
@@ -159,7 +174,7 @@ const ExploreScreen: React.FC = () => {
       } catch (e) {
         console.error("load explore feed error", e);
         if (!cancelled) {
-          setError("Network error while loading feed");
+          setError(t("explore.errors.networkFeed"));
           setItems([]);
         }
       } finally {
@@ -169,7 +184,7 @@ const ExploreScreen: React.FC = () => {
 
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [activeTopTab, activeCountryCode, searchQuery, refreshTick, pollTick]);
 
@@ -195,7 +210,19 @@ const ExploreScreen: React.FC = () => {
     return remaining.length > 0;
   }, [countries, visibleCountries]);
 
-  // ✅ IMPORTANT: Before opening, confirm stream still live (prevents “fake room”)
+  // ✅ modal list filtering
+  const modalCountries = useMemo(() => {
+    const q = countrySearch.trim().toLowerCase();
+    if (!q) return countries;
+    return countries.filter((c) => (c.name || "").toLowerCase().includes(q) || (c.code || "").toLowerCase().includes(q));
+  }, [countries, countrySearch]);
+
+  const onSelectCountry = useCallback((code: string) => {
+    setActiveCountryCode(code);
+    setCountriesModalOpen(false);
+    setCountrySearch("");
+  }, []);
+
   const openLiveRoom = async (item: ExploreItem) => {
     const sid = item.streamId ?? item.activeStreamId ?? null;
     if (!sid) return;
@@ -205,7 +232,7 @@ const ExploreScreen: React.FC = () => {
       const json = await res.json().catch(() => null);
 
       if (res.ok && json && json.isLive === false) {
-        Alert.alert("Live ended", "This live stream has ended.");
+        Alert.alert(t("explore.alerts.liveEndedTitle"), t("explore.alerts.liveEndedMsg"));
         return;
       }
     } catch {}
@@ -235,14 +262,19 @@ const ExploreScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: 150, paddingTop: 8 }}
         >
-          {(activeTopTab === "Explore" || activeTopTab === "Following") && (
+          {(activeTopTab === "EXPLORE" || activeTopTab === "FOLLOWING") && (
             <>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}
               >
-                <Chip label="Popular" active={activeCountryCode === "popular"} onPress={() => setActiveCountryCode("popular")} />
+                <Chip
+                  label={t("explore.chips.popular")}
+                  active={activeCountryCode === "popular"}
+                  onPress={() => setActiveCountryCode("popular")}
+                />
+
                 {visibleCountries.map((c) => (
                   <Chip
                     key={c.id}
@@ -252,7 +284,15 @@ const ExploreScreen: React.FC = () => {
                     onPress={() => setActiveCountryCode(c.code)}
                   />
                 ))}
-                {showMore && <Chip label="More" iconRight="chevron-forward" onPress={() => {}} />}
+
+                {showMore && (
+                  <Chip
+                    label={t("explore.chips.more")}
+                    iconRight="chevron-forward"
+                    // ✅ FIX: open modal
+                    onPress={() => setCountriesModalOpen(true)}
+                  />
+                )}
               </ScrollView>
 
               {!!countriesErr && (
@@ -260,9 +300,12 @@ const ExploreScreen: React.FC = () => {
                   <Text className="text-[11px] text-red-500">{countriesErr}</Text>
                 </View>
               )}
+
               {countriesLoading && (
                 <View style={{ paddingHorizontal: 16, paddingBottom: 6 }}>
-                  <Text className="text-[11px] text-[#9CA3AF]">Loading countries...</Text>
+                  <Text className="text-[11px] text-[#9CA3AF]">
+                    {t("explore.states.loadingCountries")}
+                  </Text>
                 </View>
               )}
             </>
@@ -271,7 +314,9 @@ const ExploreScreen: React.FC = () => {
           {loading && (
             <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
               <ActivityIndicator size="small" color="#6C4DFF" />
-              <Text className="text-[11px] text-gray-400 mt-2">Refreshing live list...</Text>
+              <Text className="text-[11px] text-gray-400 mt-2">
+                {t("explore.states.refreshingList")}
+              </Text>
             </View>
           )}
 
@@ -283,7 +328,7 @@ const ExploreScreen: React.FC = () => {
 
           {!loading && !error && items.length === 0 && (
             <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
-              <Text className="text-[13px] text-gray-500">No live hosts found. Try changing filters.</Text>
+              <Text className="text-[13px] text-gray-500">{t("explore.states.empty")}</Text>
             </View>
           )}
 
@@ -314,13 +359,41 @@ const ExploreScreen: React.FC = () => {
                 elevation: 12,
               }}
             >
-              <LinearGradient colors={["#FF4B8B", "#FF2D55"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ height: 66, width: 66, borderRadius: 999, alignItems: "center", justifyContent: "center" }}>
+              <LinearGradient
+                colors={["#FF4B8B", "#FF2D55"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  height: 66,
+                  width: 66,
+                  borderRadius: 999,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
                 <Ionicons name="videocam" size={30} color="#ffffff" />
               </LinearGradient>
             </View>
-            <Text style={{ marginTop: 6, fontSize: 12, fontWeight: "800", color: "#FF2D55" }}>Live</Text>
+
+            <Text style={{ marginTop: 6, fontSize: 12, fontWeight: "800", color: "#FF2D55" }}>
+              {t("explore.actions.live")}
+            </Text>
           </View>
         </Pressable>
+
+        {/* ✅ Countries "More" Modal */}
+        <CountriesModal
+          visible={countriesModalOpen}
+          onClose={() => {
+            setCountriesModalOpen(false);
+            setCountrySearch("");
+          }}
+          countries={modalCountries}
+          search={countrySearch}
+          setSearch={setCountrySearch}
+          activeCountryCode={activeCountryCode}
+          onSelect={(code) => onSelectCountry(code)}
+        />
       </View>
     </SafeAreaView>
   );
@@ -351,7 +424,7 @@ const ExploreHeader: React.FC<HeaderProps> = ({
         <View className="flex-row items-center bg-gray-100 rounded-full px-3 py-2">
           <Ionicons name="search" size={18} color="#6B7280" />
           <TextInput
-            placeholder="Search"
+            placeholder={t("explore.search.placeholder")}
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -362,17 +435,40 @@ const ExploreHeader: React.FC<HeaderProps> = ({
               <Ionicons name="close-circle" size={18} color="#9CA3AF" />
             </Pressable>
           )}
-          <Pressable onPress={() => { setSearchMode(false); setSearchQuery(""); }}>
-            <Text className="ml-3 text-[13px] text-[#6C4DFF]">Cancel</Text>
+          <Pressable
+            onPress={() => {
+              setSearchMode(false);
+              setSearchQuery("");
+            }}
+          >
+            <Text className="ml-3 text-[13px] text-[#6C4DFF]">
+              {t("explore.search.cancel")}
+            </Text>
           </Pressable>
         </View>
       ) : (
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <HeaderTab label="Following" active={activeTopTab === "Following"} onPress={() => setActiveTopTab("Following")} />
-            <HeaderTab label="Explore" active={activeTopTab === "Explore"} onPress={() => setActiveTopTab("Explore")} />
-            <HeaderTab label="New" active={activeTopTab === "New"} onPress={() => setActiveTopTab("New")} />
-            <HeaderTab label="Near" active={activeTopTab === "Near"} onPress={() => setActiveTopTab("Near")} />
+            <HeaderTab
+              label={t("explore.tabs.following")}
+              active={activeTopTab === "FOLLOWING"}
+              onPress={() => setActiveTopTab("FOLLOWING")}
+            />
+            <HeaderTab
+              label={t("explore.tabs.explore")}
+              active={activeTopTab === "EXPLORE"}
+              onPress={() => setActiveTopTab("EXPLORE")}
+            />
+            <HeaderTab
+              label={t("explore.tabs.new")}
+              active={activeTopTab === "NEW"}
+              onPress={() => setActiveTopTab("NEW")}
+            />
+            <HeaderTab
+              label={t("explore.tabs.near")}
+              active={activeTopTab === "NEAR"}
+              onPress={() => setActiveTopTab("NEAR")}
+            />
           </View>
 
           <View className="flex-row items-center">
@@ -390,9 +486,15 @@ const ExploreHeader: React.FC<HeaderProps> = ({
   );
 };
 
-const HeaderTab: React.FC<{ label: string; active?: boolean; onPress: () => void }> = ({ label, active, onPress }) => (
+const HeaderTab: React.FC<{ label: string; active?: boolean; onPress: () => void }> = ({
+  label,
+  active,
+  onPress,
+}) => (
   <Pressable onPress={onPress} hitSlop={8}>
-    <Text className={`mr-4 text-[14px] ${active ? "text-black font-semibold" : "text-gray-400"}`}>{label}</Text>
+    <Text className={`mr-4 text-[14px] ${active ? "text-black font-semibold" : "text-gray-400"}`}>
+      {label}
+    </Text>
   </Pressable>
 );
 
@@ -416,13 +518,17 @@ const Chip: React.FC<{
     }}
   >
     {!!flag && <Text style={{ marginRight: 8, fontSize: 13 }}>{flag}</Text>}
-    <Text style={{ fontSize: 13, fontWeight: active ? "800" : "600", color: active ? "#fff" : "#374151" }}>{label}</Text>
-    {!!iconRight && <Ionicons name={iconRight} size={14} color={active ? "#fff" : "#6B7280"} style={{ marginLeft: 6 }} />}
+    <Text style={{ fontSize: 13, fontWeight: active ? "800" : "600", color: active ? "#fff" : "#374151" }}>
+      {label}
+    </Text>
+    {!!iconRight && (
+      <Ionicons name={iconRight} size={14} color={active ? "#fff" : "#6B7280"} style={{ marginLeft: 6 }} />
+    )}
   </Pressable>
 );
 
 const RoomCard: React.FC<{ item: ExploreItem; onPress?: () => void }> = ({ item, onPress }) => {
-  const initials = (item.displayName || "U").slice(0, 1).toUpperCase();
+  const initials = (item.displayName || t("explore.labels.userFallback")).slice(0, 1).toUpperCase();
 
   return (
     <Pressable onPress={onPress} style={{ width: "48%", marginBottom: 12 }}>
@@ -431,15 +537,36 @@ const RoomCard: React.FC<{ item: ExploreItem; onPress?: () => void }> = ({ item,
           <Image source={{ uri: item.avatarUrl }} resizeMode="cover" style={{ width: "100%", height: "100%" }} />
         ) : (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <View style={{ height: 74, width: 74, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" }}>
+            <View
+              style={{
+                height: 74,
+                width: 74,
+                borderRadius: 999,
+                backgroundColor: "rgba(255,255,255,0.12)",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <Text style={{ color: "#fff", fontSize: 28, fontWeight: "900" }}>{initials}</Text>
             </View>
           </View>
         )}
 
         {item.isLive && (
-          <View style={{ position: "absolute", right: 8, top: 8, backgroundColor: "#EF4444", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 }}>
-            <Text style={{ color: "#fff", fontSize: 11, fontWeight: "900" }}>LIVE</Text>
+          <View
+            style={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+              backgroundColor: "#EF4444",
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 999,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 11, fontWeight: "900" }}>
+              {t("explore.labels.liveBadge")}
+            </Text>
           </View>
         )}
 
@@ -455,11 +582,115 @@ const RoomCard: React.FC<{ item: ExploreItem; onPress?: () => void }> = ({ item,
             {item.displayName}
           </Text>
           <Text style={{ marginTop: 2, color: "rgba(255,255,255,0.9)", fontSize: 11 }}>
-            👀 {item.liveViewers || 0}
+            {t("explore.labels.viewers", { count: item.liveViewers || 0 })}
           </Text>
         </View>
       </View>
     </Pressable>
+  );
+};
+
+/* ------------------------------ Countries Modal ----------------------------- */
+
+const CountriesModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  countries: Country[];
+  search: string;
+  setSearch: (v: string) => void;
+  activeCountryCode: string;
+  onSelect: (code: string) => void;
+}> = ({ visible, onClose, countries, search, setSearch, activeCountryCode, onSelect }) => {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)" }}>
+        <Pressable
+          onPress={() => {}}
+          style={{
+            marginTop: 90,
+            marginHorizontal: 14,
+            borderRadius: 18,
+            backgroundColor: "#fff",
+            overflow: "hidden",
+          }}
+        >
+          {/* header */}
+          <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", flexDirection: "row", alignItems: "center" }}>
+            <Text style={{ flex: 1, fontWeight: "900", fontSize: 15, color: "#111827" }}>
+              {t("explore.chips.more")}
+            </Text>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={18} color="#111827" />
+            </Pressable>
+          </View>
+
+          {/* search */}
+          <View style={{ padding: 14, paddingBottom: 10 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#F3F4F6",
+                borderRadius: 999,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+              }}
+            >
+              <Ionicons name="search" size={16} color="#6B7280" />
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder={t("explore.search.placeholder")}
+                placeholderTextColor="#9CA3AF"
+                style={{ flex: 1, marginLeft: 8, color: "#111827" }}
+              />
+              {!!search && (
+                <Pressable onPress={() => setSearch("")} hitSlop={10}>
+                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* list */}
+          <FlatList
+            data={countries}
+            keyExtractor={(c) => c.id}
+            style={{ maxHeight: 460 }}
+            contentContainerStyle={{ paddingHorizontal: 6, paddingBottom: 10 }}
+            renderItem={({ item }) => {
+              const active = activeCountryCode === item.code;
+              return (
+                <Pressable
+                  onPress={() => onSelect(item.code)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    paddingHorizontal: 14,
+                    borderRadius: 14,
+                    marginHorizontal: 6,
+                    marginBottom: 6,
+                    backgroundColor: active ? "rgba(108,77,255,0.10)" : "transparent",
+                  }}
+                >
+                  <Text style={{ width: 30, fontSize: 16 }}>{item.flagEmoji ?? "🌍"}</Text>
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: active ? "900" : "700", color: "#111827" }}>
+                    {item.name}
+                  </Text>
+                  {active ? <Ionicons name="checkmark" size={18} color="#6C4DFF" /> : null}
+                </Pressable>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={{ padding: 16 }}>
+                <Text style={{ color: "#6B7280", fontSize: 13 }}>{t("explore.states.empty")}</Text>
+              </View>
+            }
+          />
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 };
 

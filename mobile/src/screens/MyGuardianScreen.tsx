@@ -1,12 +1,21 @@
 // src/screens/MyGuardianScreen.tsx
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable, FlatList, ActivityIndicator, Image, RefreshControl } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  FlatList,
+  ActivityIndicator,
+  Image,
+  RefreshControl,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "MyGuardian">;
 type R = RouteProp<ProfileStackParamList, "MyGuardian">;
@@ -22,7 +31,12 @@ function getApiBase() {
   return base || "http://192.168.10.25:3000";
 }
 
-type ApiUser = { id: string; username: string; nickname?: string | null; avatarUrl?: string | null };
+type ApiUser = {
+  id: string;
+  username: string;
+  nickname?: string | null;
+  avatarUrl?: string | null;
+};
 
 type GuardianResponse = {
   myGuarding: Array<{
@@ -50,6 +64,8 @@ function initials(name: string) {
 }
 
 const MyGuardianScreen: React.FC = () => {
+
+
   const navigation = useNavigation<Nav>();
   const route = useRoute<R>();
 
@@ -79,20 +95,23 @@ const MyGuardianScreen: React.FC = () => {
       setErr(null);
       setLoading(true);
 
-      if (!userId) throw new Error("Missing userId. Please login again.");
+      if (!userId) throw new Error(t("myGuardian.errors.missingUserId"));
 
       const base = getApiBase();
-      const res = await fetch(`${base}/api/profile/guardian?userId=${encodeURIComponent(userId)}`);
+      const res = await fetch(
+        `${base}/api/profile/guardian?userId=${encodeURIComponent(userId)}`
+      );
       const json = (await res.json().catch(() => null)) as any;
-      if (!res.ok) throw new Error(json?.error || "Failed to load");
+      if (!res.ok) throw new Error(json?.error || t("myGuardian.errors.loadFailed"));
+
       setList(Array.isArray(json?.myGuarding) ? json.myGuarding : []);
     } catch (e: any) {
-      setErr(e?.message || "Error");
+      setErr(e?.message || t("common.error"));
       setList([]);
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, t]);
 
   useEffect(() => {
     if (!userId) return;
@@ -109,12 +128,17 @@ const MyGuardianScreen: React.FC = () => {
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       {/* Header */}
       <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
-        <Pressable onPress={navigation.goBack} className="h-8 w-8 items-center justify-center">
+        <Pressable
+          onPress={navigation.goBack}
+          className="h-8 w-8 items-center justify-center"
+        >
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
+
         <Text className="flex-1 text-center text-[16px] font-semibold text-[#111827]">
-          My guardian
+          {t("myGuardian.title")}
         </Text>
+
         <View className="h-8 w-8" />
       </View>
 
@@ -127,22 +151,27 @@ const MyGuardianScreen: React.FC = () => {
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator />
-          <Text className="mt-2 text-[12px] text-gray-500">Loading…</Text>
+          <Text className="mt-2 text-[12px] text-gray-500">
+            {t("common.loadingText")}
+          </Text>
         </View>
       ) : list.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">
           <View className="h-24 w-24 rounded-full bg-gray-100 items-center justify-center">
             <Ionicons name="shield-outline" size={42} color="#9CA3AF" />
           </View>
+
           <Text className="mt-4 text-[13px] text-gray-500 text-center">
-            You haven't guarded someone yet.
+            {t("myGuardian.empty")}
           </Text>
 
           <Pressable
             onPress={() => navigation.goBack()}
             className="mt-5 rounded-full bg-[#111827] px-5 py-3"
           >
-            <Text className="text-white text-[13px] font-semibold">Go back</Text>
+            <Text className="text-white text-[13px] font-semibold">
+              {t("myGuardian.actions.goBack")}
+            </Text>
           </Pressable>
         </View>
       ) : (
@@ -150,31 +179,54 @@ const MyGuardianScreen: React.FC = () => {
           data={list}
           keyExtractor={(x) => x.id}
           contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
           renderItem={({ item }) => {
             const name = item.guarded.nickname || item.guarded.username;
             return (
               <Pressable
-                onPress={() => navigation.navigate("VisitProfile" as any, { userId: item.guarded.id })}
+                onPress={() =>
+                  navigation.navigate("VisitProfile" as any, {
+                    userId: item.guarded.id,
+                  })
+                }
                 className="rounded-2xl border border-gray-100 bg-white px-14 py-4"
-                style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 1 }}
+                style={{
+                  shadowColor: "#000",
+                  shadowOpacity: 0.05,
+                  shadowRadius: 10,
+                  elevation: 1,
+                }}
               >
                 <View className="flex-row items-center">
                   <View className="h-12 w-12 rounded-full bg-[#F97316] overflow-hidden items-center justify-center">
                     {item.guarded.avatarUrl ? (
-                      <Image source={{ uri: item.guarded.avatarUrl }} style={{ width: "100%", height: "100%" }} />
+                      <Image
+                        source={{ uri: item.guarded.avatarUrl }}
+                        style={{ width: "100%", height: "100%" }}
+                      />
                     ) : (
-                      <Text className="text-white font-semibold">{initials(name)}</Text>
+                      <Text className="text-white font-semibold">
+                        {initials(name)}
+                      </Text>
                     )}
                   </View>
 
                   <View className="flex-1 ml-3">
-                    <Text className="text-[14px] font-semibold text-[#111827]">{name}</Text>
-                    <Text className="text-[12px] text-gray-500">@{item.guarded.username}</Text>
+                    <Text className="text-[14px] font-semibold text-[#111827]">
+                      {name}
+                    </Text>
+                    <Text className="text-[12px] text-gray-500">
+                      @{item.guarded.username}
+                    </Text>
+
                     <Text className="mt-1 text-[11px] text-gray-500">
-                      Tier: <Text className="font-semibold">{String(item.tier).toUpperCase()}</Text> • Ends:{" "}
-                      <Text className="font-semibold">{fmtDate(item.endsAt)}</Text>
+                      {t("myGuardian.card.meta", {
+                        tier: String(item.tier).toUpperCase(),
+                        ends: fmtDate(item.endsAt),
+                      })}
                     </Text>
                   </View>
 

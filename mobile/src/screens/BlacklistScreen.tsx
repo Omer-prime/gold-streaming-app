@@ -8,6 +8,7 @@ import {
   Image,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,8 +16,11 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "Blacklist">;
+
+
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.10.25:3000";
@@ -41,7 +45,10 @@ const BlacklistScreen: React.FC = () => {
   const loadBlacklist = async () => {
     try {
       setLoading(true);
-      const userId = await AsyncStorage.getItem("gl_user_id");
+      const userId =
+        (await AsyncStorage.getItem("gl_user_id")) ??
+        (await AsyncStorage.getItem("userId"));
+
       if (!userId) return;
 
       const res = await fetch(
@@ -67,9 +74,12 @@ const BlacklistScreen: React.FC = () => {
     if (!search.trim()) return;
 
     try {
-      const userId = await AsyncStorage.getItem("gl_user_id");
+      const userId =
+        (await AsyncStorage.getItem("gl_user_id")) ??
+        (await AsyncStorage.getItem("userId"));
+
       if (!userId) {
-        Alert.alert("Error", "User not found, please login again.");
+        Alert.alert(t("common.error"), t("errors.userNotFound"));
         return;
       }
 
@@ -82,7 +92,7 @@ const BlacklistScreen: React.FC = () => {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        Alert.alert("Error", json?.error ?? "Failed to add to blacklist");
+        Alert.alert(t("common.error"), json?.error ?? t("blacklist.errors.addFailed"));
         return;
       }
 
@@ -90,13 +100,16 @@ const BlacklistScreen: React.FC = () => {
       await loadBlacklist();
     } catch (e) {
       console.error("add blacklist error", e);
-      Alert.alert("Error", "Failed to add to blacklist.");
+      Alert.alert(t("common.error"), t("blacklist.errors.addFailed"));
     }
   };
 
   const handleRemove = async (blockedUserId: string) => {
     try {
-      const userId = await AsyncStorage.getItem("gl_user_id");
+      const userId =
+        (await AsyncStorage.getItem("gl_user_id")) ??
+        (await AsyncStorage.getItem("userId"));
+
       if (!userId) return;
 
       await fetch(`${API_BASE_URL}/api/settings/blacklist`, {
@@ -105,9 +118,7 @@ const BlacklistScreen: React.FC = () => {
         body: JSON.stringify({ userId, blockedUserId }),
       });
 
-      setBlocked((prev) =>
-        prev.filter((b) => b.blockedUser.id !== blockedUserId)
-      );
+      setBlocked((prev) => prev.filter((b) => b.blockedUser.id !== blockedUserId));
     } catch (e) {
       console.error("remove blacklist error", e);
     }
@@ -123,12 +134,14 @@ const BlacklistScreen: React.FC = () => {
         >
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
+
         <Text className="text-[18px] font-semibold text-[#111827]">
-          Blacklist
+          {t("blacklist.title")}
         </Text>
+
         <Pressable onPress={() => setEditing((v) => !v)}>
           <Text className="text-[13px] text-[#6B7280]">
-            {editing ? "Done" : "Edit"}
+            {editing ? t("common.done") : t("common.edit")}
           </Text>
         </Pressable>
       </View>
@@ -140,17 +153,28 @@ const BlacklistScreen: React.FC = () => {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Enter user's ID or username"
+            placeholder={t("blacklist.searchPlaceholder")}
             placeholderTextColor="#9CA3AF"
             className="flex-1 ml-2 text-[13px] text-[#111827]"
+            autoCapitalize="none"
           />
           <Pressable onPress={handleSearchAdd}>
-            <Text className="ml-2 text-[13px] text-[#6C4DFF]">Block</Text>
+            <Text className="ml-2 text-[13px] text-[#6C4DFF]">
+              {t("common.block")}
+            </Text>
           </Pressable>
         </View>
       </View>
 
-      {blocked.length === 0 && !loading ? (
+      {/* Content */}
+      {loading && blocked.length === 0 ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator />
+          <Text className="mt-3 text-[12px] text-[#9CA3AF]">
+            {t("common.loadingText")}
+          </Text>
+        </View>
+      ) : blocked.length === 0 ? (
         <View className="flex-1 items-center justify-center">
           <Image
             source={require("../../assets/placeholder-image.jpeg")}
@@ -158,14 +182,13 @@ const BlacklistScreen: React.FC = () => {
             style={{ width: 140, height: 140, borderRadius: 24 }}
           />
           <Text className="mt-3 text-[13px] text-[#9CA3AF]">
-            No blocked users
+            {t("blacklist.empty")}
           </Text>
         </View>
       ) : (
-        <ScrollView className="flex-1 mt-3">
+        <ScrollView className="flex-1 mt-3" keyboardShouldPersistTaps="handled">
           {blocked.map((item) => {
-            const name =
-              item.blockedUser.nickname || item.blockedUser.username;
+            const name = item.blockedUser.nickname || item.blockedUser.username;
             return (
               <View
                 key={item.id}
@@ -174,15 +197,18 @@ const BlacklistScreen: React.FC = () => {
                 <View>
                   <Text className="text-[14px] text-[#111827]">{name}</Text>
                   <Text className="text-[11px] text-[#6B7280]">
-                    ID: {item.blockedUser.id}
+                    {t("blacklist.labels.id", { id: item.blockedUser.id })}
                   </Text>
                 </View>
+
                 {editing ? (
                   <Pressable
                     onPress={() => handleRemove(item.blockedUser.id)}
                     className="px-3 py-1 rounded-full bg-red-100"
                   >
-                    <Text className="text-[12px] text-red-500">Remove</Text>
+                    <Text className="text-[12px] text-red-500">
+                      {t("common.remove")}
+                    </Text>
                   </Pressable>
                 ) : null}
               </View>

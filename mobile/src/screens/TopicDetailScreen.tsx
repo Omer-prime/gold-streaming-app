@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config";
 import type { SquarePost } from "./HomeFeedScreen";
 import { SquarePostCard } from "./HomeFeedScreen";
+import { t } from "../i18n";
 
 type TopicDetailRouteParams = {
   topicId: string;
@@ -45,22 +46,22 @@ const TopicDetailScreen: React.FC = () => {
 
         const res = await fetch(`${API_BASE_URL}/api/feed/home?${params.toString()}`);
 
+        const jsonMaybe = await res.json().catch(() => null);
+
         if (!res.ok) {
-          const json = await res.json().catch(() => null);
           if (!cancelled) {
-            setError(json?.error || "Failed to load topic feed");
+            setError(jsonMaybe?.error || t("topicDetail.errors.loadFailed"));
             setPosts([]);
           }
           return;
         }
 
-        const json = await res.json();
-
+        const json = jsonMaybe ?? {};
         if (!cancelled) {
           const mappedPosts: SquarePost[] = (json.items || []).map((m: any) => ({
             id: String(m.id),
             userId: String(m.userId),
-            userName: String(m.userName ?? "User"),
+            userName: String(m.userName ?? t("common.userFallback")),
             avatarUrl: m.avatarUrl ?? null,
             countryFlag: m.countryFlag ?? null,
             text: m.text ?? null,
@@ -78,7 +79,7 @@ const TopicDetailScreen: React.FC = () => {
       } catch (err) {
         console.error("load topic feed error", err);
         if (!cancelled) {
-          setError("Network error while loading topic feed");
+          setError(t("topicDetail.errors.network"));
           setPosts([]);
         }
       } finally {
@@ -108,7 +109,7 @@ const TopicDetailScreen: React.FC = () => {
 
   const handleToggleLike = async (post: SquarePost) => {
     if (!myUserId) {
-      Alert.alert("Login required", "Please login to like posts.");
+      Alert.alert(t("topicDetail.alerts.loginRequiredTitle"), t("topicDetail.alerts.loginRequiredMsg"));
       return;
     }
 
@@ -117,7 +118,9 @@ const TopicDetailScreen: React.FC = () => {
     const nextLiked = !prevLiked;
     const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
 
-    setPosts((cur) => cur.map((p) => (p.id === post.id ? { ...p, isLikedByMe: nextLiked, likeCount: nextCount } : p)));
+    setPosts((cur) =>
+      cur.map((p) => (p.id === post.id ? { ...p, isLikedByMe: nextLiked, likeCount: nextCount } : p))
+    );
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/profile/moments/like`, {
@@ -134,15 +137,15 @@ const TopicDetailScreen: React.FC = () => {
 
       setPosts((cur) =>
         cur.map((p) =>
-          p.id === post.id
-            ? { ...p, isLikedByMe: serverLiked, likeCount: Math.max(0, serverCount) }
-            : p
+          p.id === post.id ? { ...p, isLikedByMe: serverLiked, likeCount: Math.max(0, serverCount) } : p
         )
       );
     } catch (err) {
       console.error("toggle like error", err);
-      setPosts((cur) => cur.map((p) => (p.id === post.id ? { ...p, isLikedByMe: prevLiked, likeCount: prevCount } : p)));
-      Alert.alert("Error", "Unable to like this post right now.");
+      setPosts((cur) =>
+        cur.map((p) => (p.id === post.id ? { ...p, isLikedByMe: prevLiked, likeCount: prevCount } : p))
+      );
+      Alert.alert(t("topicDetail.alerts.likeFailedTitle"), t("topicDetail.alerts.likeFailedMsg"));
     }
   };
 
@@ -173,7 +176,7 @@ const TopicDetailScreen: React.FC = () => {
 
         {!loading && !error && posts.length === 0 && (
           <View className="px-4 mt-4">
-            <Text className="text-[13px] text-gray-500">No moments yet under this topic.</Text>
+            <Text className="text-[13px] text-gray-500">{t("topicDetail.states.empty")}</Text>
           </View>
         )}
 

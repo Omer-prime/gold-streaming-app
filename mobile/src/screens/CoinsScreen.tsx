@@ -1,18 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  ActivityIndicator,
-  FlatList,
-  Alert,
-  Modal,
-} from "react-native";
+import { View, Text, Pressable, ActivityIndicator, FlatList, Alert, Modal, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
+
 import { API_BASE_URL } from "../config";
+import { t } from "../i18n";
 
 type LedgerItem = {
   id: string;
@@ -23,7 +18,8 @@ type LedgerItem = {
   title?: string | null;
 };
 
-type PackageItem = { id: string; coins: number; priceLabel: string };
+type PackageApi = { id: string; coins: number; price: number; currency: string; title: string };
+type PackageItem = PackageApi & { priceLabel: string };
 
 const CoinsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -54,10 +50,10 @@ const CoinsScreen: React.FC = () => {
       setLoadingBalance(true);
       const res = await fetch(`${API_BASE_URL}/api/wallet?userId=${encodeURIComponent(uid)}`);
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error || "Failed to load wallet");
+      if (!res.ok) throw new Error(json?.error || t("coins.errors.loadWallet"));
       setBalance(Number(json?.wallet?.balance ?? 0));
     } catch (e: any) {
-      Alert.alert("Wallet error", e?.message || "Failed to load wallet");
+      Alert.alert(t("coins.alerts.walletErrorTitle"), e?.message || t("coins.errors.loadWallet"));
     } finally {
       setLoadingBalance(false);
     }
@@ -65,8 +61,8 @@ const CoinsScreen: React.FC = () => {
 
   const ledgerUrl = useMemo(() => {
     const base = `${API_BASE_URL}/api/wallet/ledger?userId=${encodeURIComponent(userId || "")}&limit=20`;
-    const t = filterType !== "ALL" ? `&type=${encodeURIComponent(filterType)}` : `&type=ALL`;
-    return base + t;
+    const tt = filterType !== "ALL" ? `&type=${encodeURIComponent(filterType)}` : `&type=ALL`;
+    return base + tt;
   }, [userId, filterType]);
 
   const loadLedgerFirst = useCallback(async () => {
@@ -75,11 +71,11 @@ const CoinsScreen: React.FC = () => {
       setLoadingLedger(true);
       const res = await fetch(ledgerUrl);
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error || "Failed to load history");
+      if (!res.ok) throw new Error(json?.error || t("coins.errors.loadHistory"));
       setItems(json?.items ?? []);
       setNextCursor(json?.nextCursor ?? null);
     } catch (e: any) {
-      Alert.alert("History error", e?.message || "Failed to load history");
+      Alert.alert(t("coins.alerts.historyErrorTitle"), e?.message || t("coins.errors.loadHistory"));
     } finally {
       setLoadingLedger(false);
     }
@@ -91,12 +87,12 @@ const CoinsScreen: React.FC = () => {
       setLoadingMore(true);
       const res = await fetch(`${ledgerUrl}&cursor=${encodeURIComponent(nextCursor)}`);
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error || "Failed to load more");
+      if (!res.ok) throw new Error(json?.error || t("coins.errors.loadMore"));
       const more = (json?.items ?? []) as LedgerItem[];
       setItems((prev) => [...prev, ...more]);
       setNextCursor(json?.nextCursor ?? null);
     } catch (e: any) {
-      Alert.alert("History error", e?.message || "Failed to load more");
+      Alert.alert(t("coins.alerts.historyErrorTitle"), e?.message || t("coins.errors.loadMore"));
     } finally {
       setLoadingMore(false);
     }
@@ -107,10 +103,17 @@ const CoinsScreen: React.FC = () => {
       setLoadingPkgs(true);
       const res = await fetch(`${API_BASE_URL}/api/coins/packages`);
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error || "Failed to load packages");
-      setPackages(json?.packages ?? []);
+      if (!res.ok) throw new Error(json?.error || t("coins.errors.loadPackages"));
+
+      const pkgs = (json?.packages ?? []) as PackageApi[];
+      const mapped: PackageItem[] = pkgs.map((p) => ({
+        ...p,
+        priceLabel: `${p.currency} ${p.price}`,
+      }));
+
+      setPackages(mapped);
     } catch (e: any) {
-      Alert.alert("Top up error", e?.message || "Failed to load packages");
+      Alert.alert(t("coins.alerts.topupErrorTitle"), e?.message || t("coins.errors.loadPackages"));
     } finally {
       setLoadingPkgs(false);
     }
@@ -123,7 +126,7 @@ const CoinsScreen: React.FC = () => {
 
   const doTopup = useCallback(
     async (pkg: PackageItem) => {
-      if (!userId) return Alert.alert("Login required");
+      if (!userId) return Alert.alert(t("coins.alerts.loginRequiredTitle"));
       if (toppingUp) return;
 
       try {
@@ -137,24 +140,24 @@ const CoinsScreen: React.FC = () => {
 
         const json = await res.json().catch(() => null);
         if (!res.ok) {
-          return Alert.alert("Top up failed", json?.error || "Top up failed");
+          return Alert.alert(t("coins.alerts.topupFailedTitle"), json?.error || t("coins.errors.topupFailed"));
         }
 
-        // update local balance immediately
-        setBalance(Number(json?.balance ?? balance + pkg.coins));
+        const newBalance = Number(json?.wallet?.balance ?? balance);
+        setBalance(newBalance);
 
-        // refresh ledger
         await loadLedgerFirst();
+        await loadBalance(userId);
 
-        Alert.alert("Success", `Added ${pkg.coins} coins`);
+        Alert.alert(t("coins.alerts.successTitle"), t("coins.alerts.addedCoinsMsg", { coins: pkg.coins }));
         setTopupOpen(false);
       } catch (e: any) {
-        Alert.alert("Top up failed", e?.message || "Top up failed");
+        Alert.alert(t("coins.alerts.topupFailedTitle"), e?.message || t("coins.errors.topupFailed"));
       } finally {
         setToppingUp(null);
       }
     },
-    [userId, toppingUp, balance, loadLedgerFirst]
+    [userId, toppingUp, balance, loadLedgerFirst, loadBalance]
   );
 
   useEffect(() => {
@@ -165,72 +168,93 @@ const CoinsScreen: React.FC = () => {
 
   const balanceText = loadingBalance ? "…" : String(balance);
 
+  const filterLabel =
+    filterType === "ALL"
+      ? t("coins.filters.all")
+      : filterType === "TOPUP"
+      ? t("coins.filters.topups")
+      : t("coins.filters.spent");
+
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      {/* Header with tabs */}
-      <View className="flex-row items-center px-4 pt-3 pb-2">
-        <Pressable onPress={() => navigation.goBack()}>
+      {/* ✅ Header (same UX as Points screen) */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, flexDirection: "row", alignItems: "center" }}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
 
-        <View className="flex-1 flex-row justify-center space-x-6">
-          <Text className="text-[15px] font-semibold text-[#111827]">Coins</Text>
-          <Pressable onPress={() => navigation.navigate("Points")}>
-            <Text className="text-[15px] text-gray-400">Points</Text>
-          </Pressable>
+        {/* ✅ Segmented Tabs */}
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <View style={styles.segmentWrap}>
+            <View style={[styles.segmentBtn, styles.segmentBtnActive]}>
+              <Text style={styles.segmentTextActive}>{t("coins.title")}</Text>
+            </View>
+
+            <View style={{ width: 8 }} />
+
+            <Pressable
+              onPress={() => navigation.navigate("Points")}
+              style={[styles.segmentBtn, styles.segmentBtnInactive]}
+            >
+              <Text style={styles.segmentTextInactive}>{t("coins.pointsTab")}</Text>
+            </Pressable>
+          </View>
         </View>
 
+        {/* keep right spacing balanced */}
         <View style={{ width: 22 }} />
       </View>
 
-      {/* Body */}
-      <View className="flex-1 px-4 pt-4">
-        {/* Orange card */}
-        <View className="rounded-3xl bg-[#FDBA74] px-4 py-4 flex-row items-center justify-between">
-          <View>
-            <Text className="text-[26px] font-bold text-white">{balanceText}</Text>
-            <Text className="mt-1 text-[12px] text-orange-50">Remaining coins</Text>
-          </View>
+      <View className="flex-1 px-4 pt-2">
+        {/* ✅ Balance Card (nicer gradient + topup button) */}
+        <LinearGradient
+          colors={["#FDBA74", "#FB923C"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.balanceCard}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View>
+              <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+                <Text style={styles.balanceValue}>{balanceText}</Text>
+                <Text style={styles.balanceUnit}>{t("coins.labels.coinsUnit")}</Text>
+              </View>
+              <Text style={styles.balanceLabel}>{t("coins.labels.remainingCoins")}</Text>
+            </View>
 
-          <Pressable
-            className="px-5 py-2 rounded-full bg-white"
-            onPress={openTopup}
-          >
-            <Text className="text-[13px] font-semibold text-[#FB923C]">Top Up</Text>
-          </Pressable>
-        </View>
-
-        {/* Filter row */}
-        <View className="mt-4 flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <Pressable
-              onPress={() =>
-                setFilterType((p) => (p === "ALL" ? "TOPUP" : p === "TOPUP" ? "GIFT_SENT" : "ALL"))
-              }
-              className="flex-row items-center mr-4"
-            >
-              <Text className="text-[13px] text-[#111827] mr-1">
-                {filterType === "ALL" ? "All" : filterType === "TOPUP" ? "Top ups" : "Spent"}
-              </Text>
-              <Ionicons name="repeat-outline" size={14} color="#6B7280" />
+            <Pressable style={styles.topupBtn} onPress={openTopup}>
+              <Ionicons name="add-circle-outline" size={18} color="#FB923C" />
+              <Text style={styles.topupText}>{t("coins.actions.topUp")}</Text>
             </Pressable>
           </View>
+        </LinearGradient>
 
-          <Pressable onPress={loadLedgerFirst} className="flex-row items-center">
+        {/* ✅ Filter row (cleaner) */}
+        <View style={{ marginTop: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Pressable
+            onPress={() => setFilterType((p) => (p === "ALL" ? "TOPUP" : p === "TOPUP" ? "GIFT_SENT" : "ALL"))}
+            style={styles.filterPill}
+            hitSlop={10}
+          >
+            <Ionicons name="funnel-outline" size={14} color="#6B7280" />
+            <Text style={styles.filterText}>{filterLabel}</Text>
+            <Ionicons name="repeat-outline" size={14} color="#6B7280" />
+          </Pressable>
+
+          <Pressable onPress={loadLedgerFirst} style={styles.refreshPill} hitSlop={10}>
             <Ionicons name="refresh-outline" size={14} color="#6B7280" />
-            <Text className="ml-1 text-[13px] text-[#111827]">Refresh</Text>
+            <Text style={styles.refreshText}>{t("coins.actions.refresh")}</Text>
           </Pressable>
         </View>
 
-        {/* History list */}
         {loadingLedger ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator />
-            <Text className="mt-2 text-[13px] text-gray-400">Loading…</Text>
+            <Text className="mt-2 text-[13px] text-gray-400">{t("coins.states.loading")}</Text>
           </View>
         ) : items.length === 0 ? (
           <View className="flex-1 items-center justify-center">
-            <Text className="text-[13px] text-gray-400">No history</Text>
+            <Text className="text-[13px] text-gray-400">{t("coins.states.empty")}</Text>
           </View>
         ) : (
           <FlatList
@@ -246,34 +270,46 @@ const CoinsScreen: React.FC = () => {
                 </View>
               ) : nextCursor ? (
                 <View className="py-4 items-center">
-                  <Text className="text-[12px] text-gray-400">Scroll for more…</Text>
+                  <Text className="text-[12px] text-gray-400">{t("coins.states.scrollMore")}</Text>
                 </View>
               ) : (
                 <View className="py-4 items-center">
-                  <Text className="text-[12px] text-gray-300">End</Text>
+                  <Text className="text-[12px] text-gray-300">{t("coins.states.end")}</Text>
                 </View>
               )
             }
             renderItem={({ item }) => {
               const isPlus = item.delta > 0;
               const d = new Date(item.createdAt);
-              const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-                d.getDate()
-              ).padStart(2, "0")}`;
+              const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(
+                2,
+                "0"
+              )}`;
+
+              const fallbackTitle =
+                item.type === "TOPUP"
+                  ? t("coins.types.topup")
+                  : item.type === "GIFT_SENT"
+                  ? t("coins.types.giftSent")
+                  : item.type;
 
               return (
-                <View className="py-3 border-b border-gray-100">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-[13px] font-semibold text-[#111827]">
-                      {item.title || (item.type === "TOPUP" ? "Top up" : item.type === "GIFT_SENT" ? "Gift sent" : item.type)}
-                    </Text>
-                    <Text className={`text-[13px] font-bold ${isPlus ? "text-emerald-600" : "text-rose-600"}`}>
-                      {isPlus ? `+${item.delta}` : String(item.delta)}
-                    </Text>
+                <View style={styles.row}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <Text style={styles.rowTitle}>{item.title || fallbackTitle}</Text>
+
+                    <View style={[styles.deltaPill, { backgroundColor: isPlus ? "#ECFDF5" : "#FFF1F2" }]}>
+                      <Text style={[styles.deltaText, { color: isPlus ? "#059669" : "#E11D48" }]}>
+                        {isPlus ? `+${item.delta}` : String(item.delta)}
+                      </Text>
+                    </View>
                   </View>
-                  <View className="flex-row items-center justify-between mt-1">
-                    <Text className="text-[12px] text-gray-400">{date}</Text>
-                    <Text className="text-[12px] text-gray-400">Balance: {item.balanceAfter}</Text>
+
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+                    <Text style={styles.rowMeta}>{date}</Text>
+                    <Text style={styles.rowMeta}>
+                      {t("coins.labels.balanceAfter", { balance: item.balanceAfter })}
+                    </Text>
                   </View>
                 </View>
               );
@@ -282,13 +318,13 @@ const CoinsScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Top up modal */}
+      {/* ✅ Topup Modal */}
       <Modal visible={topupOpen} transparent animationType="slide" onRequestClose={() => setTopupOpen(false)}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}>
           <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 16 }}>
             <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-[15px] font-semibold text-[#111827]">Top Up</Text>
-              <Pressable onPress={() => setTopupOpen(false)}>
+              <Text className="text-[15px] font-semibold text-[#111827]">{t("coins.modal.title")}</Text>
+              <Pressable onPress={() => setTopupOpen(false)} hitSlop={10}>
                 <Ionicons name="close" size={22} color="#111827" />
               </Pressable>
             </View>
@@ -296,10 +332,10 @@ const CoinsScreen: React.FC = () => {
             {loadingPkgs ? (
               <View style={{ paddingVertical: 18, alignItems: "center" }}>
                 <ActivityIndicator />
-                <Text className="mt-2 text-[13px] text-gray-400">Loading packages…</Text>
+                <Text className="mt-2 text-[13px] text-gray-400">{t("coins.states.loadingPackages")}</Text>
               </View>
             ) : packages.length === 0 ? (
-              <Text className="text-[13px] text-gray-400">No packages</Text>
+              <Text className="text-[13px] text-gray-400">{t("coins.states.noPackages")}</Text>
             ) : (
               <View style={{ gap: 10 }}>
                 {packages.map((p) => {
@@ -321,12 +357,16 @@ const CoinsScreen: React.FC = () => {
                       }}
                     >
                       <View>
-                        <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>{p.coins} coins</Text>
-                        <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>Package: {p.id}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: "900", color: "#111827" }}>
+                          {t("coins.labels.pkgCoins", { coins: p.coins })}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                          {t("coins.labels.pkgId", { id: p.id })}
+                        </Text>
                       </View>
 
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#FB923C" }}>{p.priceLabel}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "900", color: "#FB923C" }}>{p.priceLabel}</Text>
                         {busy ? <ActivityIndicator /> : <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />}
                       </View>
                     </Pressable>
@@ -335,14 +375,144 @@ const CoinsScreen: React.FC = () => {
               </View>
             )}
 
-            <Text className="text-[11px] text-gray-400 mt-3">
-              Note: This top-up works only if backend is in TEST mode (COIN_TOPUP_MODE=TEST). Real payments will be added next.
-            </Text>
+            <Text className="text-[11px] text-gray-400 mt-3">{t("coins.modal.note")}</Text>
           </View>
         </View>
       </Modal>
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  // same segmented style as PointsScreen
+  segmentWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 999,
+    padding: 4,
+  },
+  segmentBtn: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    minWidth: 88,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segmentBtnActive: {
+    backgroundColor: "#111827",
+  },
+  segmentBtnInactive: {
+    backgroundColor: "transparent",
+  },
+  segmentTextActive: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 13,
+  },
+  segmentTextInactive: {
+    color: "#6B7280",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+
+  balanceCard: {
+    borderRadius: 24,
+    padding: 16,
+    marginTop: 8,
+  },
+  balanceValue: {
+    color: "#fff",
+    fontSize: 34,
+    fontWeight: "900",
+  },
+  balanceUnit: {
+    marginLeft: 6,
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  balanceLabel: {
+    marginTop: 6,
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  topupBtn: {
+    backgroundColor: "rgba(255,255,255,0.95)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  topupText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FB923C",
+  },
+
+  filterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+    gap: 8,
+  },
+  filterText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#111827",
+  },
+
+  refreshPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  refreshText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#111827",
+  },
+
+  row: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  rowTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  rowMeta: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    fontWeight: "700",
+  },
+  deltaPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  deltaText: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+});
 
 export default CoinsScreen;

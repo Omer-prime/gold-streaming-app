@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
+import { t } from "../i18n";
 
 const AuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -16,9 +17,11 @@ const AuthScreen: React.FC = () => {
         <Pressable onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
+
         <Text className="flex-1 text-center text-[16px] font-semibold text-[#111827]">
-          Auth
+          {t("auth.title")}
         </Text>
+
         <View style={{ width: 22 }} />
       </View>
 
@@ -44,35 +47,28 @@ const AuthScreen: React.FC = () => {
         >
           <View className="flex-1">
             <Text className="text-[14px] font-semibold text-white">
-              My authentication
+              {t("auth.card.title")}
             </Text>
             <Text className="mt-1 text-[12px] text-indigo-100">
-              In order to ensure the safety of your account and assets,
-              we recommend you to authenticate.
+              {t("auth.card.subtitle")}
             </Text>
           </View>
-          <MaterialCommunityIcons
-            name="check-decagram"
-            size={40}
-            color="#FACC15"
-          />
+          <MaterialCommunityIcons name="check-decagram" size={40} color="#FACC15" />
         </LinearGradient>
 
         {/* Cards */}
         <View className="mt-4 px-4 space-y-3">
-          {/* 👉 Face Authentication -> Real-person intro screen */}
           <AuthRow
-            title="Face Authentication"
-            description="Please complete authentication process first."
-            buttonLabel="Go"
+            title={t("auth.rows.faceAuthTitle")}
+            description={t("auth.rows.faceAuthDesc")}
+            buttonLabel={t("auth.rows.faceAuthBtn")}
             onPress={() => navigation.navigate("RealPersonAuth" as never)}
           />
 
-          {/* 👉 Bind phone -> existing BindPhone route */}
           <AuthRow
-            title="Bind a phone"
-            description="Bind your phone to secure your account."
-            buttonLabel="Bind"
+            title={t("auth.rows.bindPhoneTitle")}
+            description={t("auth.rows.bindPhoneDesc")}
+            buttonLabel={t("auth.rows.bindPhoneBtn")}
             onPress={() => navigation.navigate("BindPhone" as never)}
           />
         </View>
@@ -92,15 +88,11 @@ const AuthRow: React.FC<{
     className="rounded-2xl bg-white px-4 py-3 flex-row items-center justify-between"
   >
     <View className="flex-1 mr-3">
-      <Text className="text-[14px] font-semibold text-[#111827]">
-        {title}
-      </Text>
+      <Text className="text-[14px] font-semibold text-[#111827]">{title}</Text>
       <Text className="mt-1 text-[12px] text-gray-500">{description}</Text>
     </View>
     <View className="px-4 py-1.5 rounded-full bg-[#6366F1]">
-      <Text className="text-[12px] font-semibold text-white">
-        {buttonLabel}
-      </Text>
+      <Text className="text-[12px] font-semibold text-white">{buttonLabel}</Text>
     </View>
   </Pressable>
 );

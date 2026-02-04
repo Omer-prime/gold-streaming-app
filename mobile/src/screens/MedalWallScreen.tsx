@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, ScrollView, Image, RefreshControl } from "react-native";
+import { View, Text, ScrollView, Image, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -7,6 +7,7 @@ import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/nativ
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import { getMedalWall, type MedalDTO } from "../services/medals.service";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList>;
 
@@ -18,8 +19,6 @@ const MedalWallScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<any>();
 
-  // ✅ Pass userId when navigating to this screen:
-  // navigation.navigate("MedalWall", { userId: currentUser.id })
   const userId: string = route?.params?.userId ?? "";
 
   const [loading, setLoading] = useState(false);
@@ -38,7 +37,7 @@ const MedalWallScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     if (!userId) {
-      setError("Missing userId. Pass { userId } when navigating to MedalWall.");
+      setError(t("medalWall.errors.missingUserId"));
       return;
     }
 
@@ -50,7 +49,7 @@ const MedalWallScreen: React.FC = () => {
       setSummary({ obtainedCount: data.summary.obtainedCount, total: data.summary.total });
       setMedals(data.medals);
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Failed to load medals");
+      setError(e?.response?.data?.message || e?.message || t("medalWall.errors.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -91,11 +90,18 @@ const MedalWallScreen: React.FC = () => {
       >
         {/* Header */}
         <View className="flex-row items-center px-4 py-3">
-          <Ionicons name="chevron-back" size={22} color="#F9FAFB" onPress={navigation.goBack} />
-          <Text className="flex-1 text-center text-[17px] font-semibold text-[#F9FAFB]">
-            Medal Wall
+          <Pressable
+            onPress={navigation.goBack}
+            className="mr-3 h-9 w-9 items-center justify-center rounded-full"
+          >
+            <Ionicons name="chevron-back" size={20} color="#F9FAFB" />
+          </Pressable>
+
+          <Text className="flex-1 text-center text-[18px] font-semibold text-[#F9FAFB]">
+            {t("medalWall.title")}
           </Text>
-          <View className="w-8 items-center justify-center">
+
+          <View className="h-9 w-9 items-center justify-center rounded-full">
             <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
           </View>
         </View>
@@ -106,7 +112,6 @@ const MedalWallScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          {/* Error */}
           {!!error && (
             <View className="mt-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
               <Text className="text-[12px] text-red-200">{error}</Text>
@@ -128,20 +133,23 @@ const MedalWallScreen: React.FC = () => {
                 {displayName}
               </Text>
               <Text className="mt-0.5 text-[11px] text-[#E5E7EB]">
-                Obtain: {summary?.obtainedCount ?? 0}/{summary?.total ?? medals.length}
-                {loading ? " • Loading..." : ""}
+                {t("medalWall.obtain", {
+                  obtained: summary?.obtainedCount ?? 0,
+                  total: summary?.total ?? medals.length,
+                })}
+                {loading ? ` • ${t("medalWall.loading")}` : ""}
               </Text>
             </View>
 
             <Text className="text-[12px] font-semibold text-[#FACC15]">
-              Level: {user?.level ?? 0}
+              {t("medalWall.level", { level: user?.level ?? 0 })}
             </Text>
           </View>
 
           {/* Title */}
           <View className="mt-6 mb-3 items-center">
             <Text className="text-[13px] font-semibold text-[#FACC15]">
-              Achievement Medal
+              {t("medalWall.achievementTitle")}
             </Text>
           </View>
 
@@ -151,7 +159,9 @@ const MedalWallScreen: React.FC = () => {
               const isLocked = !medal.obtained;
               const prog = medal.progress;
               const pct =
-                prog && prog.target > 0 ? clamp(Math.round((prog.current / prog.target) * 100), 0, 100) : null;
+                prog && prog.target > 0
+                  ? clamp(Math.round((prog.current / prog.target) * 100), 0, 100)
+                  : null;
 
               return (
                 <View key={medal.key} className="w-1/2 px-1 mb-3">
@@ -167,11 +177,7 @@ const MedalWallScreen: React.FC = () => {
                   >
                     <View className="h-10 w-10 rounded-full bg-white/15 items-center justify-center mb-2 border border-white/10">
                       {medal.iconKind === "IMAGE_URL" ? (
-                        <Image
-                          source={{ uri: medal.icon }}
-                          style={{ width: 24, height: 24 }}
-                          resizeMode="contain"
-                        />
+                        <Image source={{ uri: medal.icon }} style={{ width: 24, height: 24 }} resizeMode="contain" />
                       ) : (
                         <Ionicons name={medal.icon as any} size={22} color="#F9FAFB" />
                       )}
@@ -185,7 +191,6 @@ const MedalWallScreen: React.FC = () => {
                       {medal.title}
                     </Text>
 
-                    {/* lock + progress */}
                     {isLocked ? (
                       <View className="mt-2 flex-row items-center">
                         <Ionicons name="lock-closed-outline" size={14} color="#94A3B8" />
@@ -198,7 +203,9 @@ const MedalWallScreen: React.FC = () => {
                     ) : (
                       <View className="mt-2 flex-row items-center">
                         <Ionicons name="checkmark-circle-outline" size={14} color="#FACC15" />
-                        <Text className="ml-1 text-[10px] text-[#FACC15]">Unlocked</Text>
+                        <Text className="ml-1 text-[10px] text-[#FACC15]">
+                          {t("medalWall.unlocked")}
+                        </Text>
                       </View>
                     )}
                   </LinearGradient>
@@ -207,11 +214,10 @@ const MedalWallScreen: React.FC = () => {
             })}
           </View>
 
-          {/* Empty state */}
           {medals.length === 0 && !loading && !error && (
             <View className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
               <Text className="text-[12px] text-slate-300">
-                No medals found. Add DB medals (HonorItem type MEDAL) or ensure API returns computed medals.
+                {t("medalWall.empty")}
               </Text>
             </View>
           )}

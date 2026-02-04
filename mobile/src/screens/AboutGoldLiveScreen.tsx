@@ -1,20 +1,22 @@
 // src/screens/AboutGoldLiveScreen.tsx
 import React from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
-import { Alert } from "react-native";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "AboutGoldLive">;
+
+
 
 const AboutGoldLiveScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
 
   const handleItemPress = (label: string) => {
-    Alert.alert(label, `${label} page will be added later for Gold Live.`);
+    Alert.alert(label, t("aboutGoldLive.alerts.comingSoon", { label }));
   };
 
   return (
@@ -28,7 +30,7 @@ const AboutGoldLiveScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
         <Text className="text-[18px] font-semibold text-[#111827]">
-          About Gold Live
+          {t("aboutGoldLive.title")}
         </Text>
       </View>
 
@@ -40,36 +42,34 @@ const AboutGoldLiveScreen: React.FC = () => {
         {/* App logo & version */}
         <View className="items-center mt-6 mb-6">
           <View className="h-80 w-80 items-center justify-center">
-            {/* simple GL badge – replace with real logo later */}
             <View className="h-24 w-24 rounded-3xl bg-[#4F46E5] items-center justify-center">
               <Text className="text-[28px] font-bold text-white">GL</Text>
             </View>
           </View>
           <Text className="mt-3 text-[13px] text-[#6B7280]">
-            GOLD LIVE 1.0.0
+            {t("aboutGoldLive.versionText")}
           </Text>
         </View>
 
-        {/* Info rows */}
         <InfoRow
-          label="Privacy Policy"
-          onPress={() => handleItemPress("Privacy Policy")}
+          label={t("aboutGoldLive.items.privacyPolicy")}
+          onPress={() => handleItemPress(t("aboutGoldLive.items.privacyPolicy"))}
         />
         <InfoRow
-          label="Terms Of Service"
-          onPress={() => handleItemPress("Terms Of Service")}
+          label={t("aboutGoldLive.items.termsOfService")}
+          onPress={() => handleItemPress(t("aboutGoldLive.items.termsOfService"))}
         />
         <InfoRow
-          label="Live Agreement"
-          onPress={() => handleItemPress("Live Agreement")}
+          label={t("aboutGoldLive.items.liveAgreement")}
+          onPress={() => handleItemPress(t("aboutGoldLive.items.liveAgreement"))}
         />
         <InfoRow
-          label="User Recharge Agreement"
-          onPress={() => handleItemPress("User Recharge Agreement")}
+          label={t("aboutGoldLive.items.userRechargeAgreement")}
+          onPress={() => handleItemPress(t("aboutGoldLive.items.userRechargeAgreement"))}
         />
         <InfoRow
-          label="No Child Endangerment Policy"
-          onPress={() => handleItemPress("No Child Endangerment Policy")}
+          label={t("aboutGoldLive.items.noChildEndangermentPolicy")}
+          onPress={() => handleItemPress(t("aboutGoldLive.items.noChildEndangermentPolicy"))}
         />
       </ScrollView>
     </SafeAreaView>

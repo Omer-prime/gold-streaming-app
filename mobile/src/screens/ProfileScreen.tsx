@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -17,30 +17,78 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
+import { t } from "../i18n";
 
 type ProfileNav = NativeStackNavigationProp<ProfileStackParamList>;
 
+const USER_ID_KEY = "gl_user_id";
+
 function getApiBase() {
-  // Prefer one env var across the app
   const raw =
     (process.env.EXPO_PUBLIC_API_URL ??
       process.env.EXPO_PUBLIC_API_BASE_URL ??
       "").trim();
   const base = raw.replace(/\/+$/, "");
-
-  // Keep your current LAN fallback (works on physical device if same WiFi)
   return base || "http://192.168.10.25:3000";
 }
 
+// ✅ robust: supports relative URLs, http(s), AND fixes localhost/127.0.0.1 coming from backend,
+// plus keeps file:// and content:// as-is (for local previews).
 function toAbsoluteUrl(url?: string | null) {
   if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  const base = getApiBase().replace(/\/$/, "");
+
+  if (url.startsWith("file://") || url.startsWith("content://") || url.startsWith("data:")) {
+    return url;
+  }
+
+  const base = getApiBase().replace(/\/+$/, "");
+
+  // absolute http(s)
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    // if backend mistakenly returns localhost, rewrite to your base
+    if (url.includes("localhost:") || url.includes("127.0.0.1:")) {
+      try {
+        const u = new URL(url);
+        return `${base}${u.pathname}`;
+      } catch {
+        // fallback: try to take path after .com/.pk etc not possible; just return as-is
+        return url;
+      }
+    }
+    return url;
+  }
+
+  // relative
   const path = url.startsWith("/") ? url : `/${url}`;
   return `${base}${path}`;
 }
 
-const USER_ID_KEY = "gl_user_id";
+async function fetchJsonLoose(url: string, init?: RequestInit) {
+  const res = await fetch(url, {
+    ...init,
+    headers: { Accept: "application/json", ...(init?.headers ?? {}) },
+  });
+
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+
+  if (!res.ok) {
+    const msg = json?.error || (text?.trim() ? text.trim() : `Request failed (HTTP ${res.status})`);
+    throw new Error(`${msg} (HTTP ${res.status}) • ${url}`);
+  }
+
+  if (!json) {
+    const preview = (text || "").replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new Error(`API returned non-JSON. Preview: ${preview || "(empty)"} • ${url}`);
+  }
+
+  return json;
+}
 
 // ✅ Assets (MUST match exact filenames in /assets/profile)
 const ICONS: Record<string, ImageSourcePropType> = {
@@ -87,51 +135,135 @@ type ProfileApiResponse = {
   };
 };
 
+type OwnedItem = {
+  id: string;
+  type: string;
+  title: string;
+  mediaUrl?: string | null;
+  thumbnailUrl?: string | null;
+  mediaUrlFull?: string | null;      // can be wrong (localhost)
+  thumbnailUrlFull?: string | null;  // can be wrong (localhost)
+  isEquipped: boolean;
+};
+
+type OwnedResponse = {
+  userId: string;
+  equippedIds: Record<string, string | null>;
+  items: OwnedItem[];
+};
+
+type EquippedProfileLook = {
+  avatarOverrideUrl: string | null;
+  avatarFrameUrl: string | null;
+  avatarFrameName: string | null;
+};
+
+function pickBestMedia(it?: OwnedItem | null) {
+  if (!it) return null;
+  // ✅ prefer RELATIVE first to avoid backend localhost full urls
+  return (
+    it.thumbnailUrl ||
+    it.mediaUrl ||
+    it.thumbnailUrlFull ||
+    it.mediaUrlFull ||
+    null
+  );
+}
+
+function findEquippedItem(owned: OwnedResponse, type: string) {
+  const items = Array.isArray(owned.items) ? owned.items : [];
+  const id = owned.equippedIds?.[type] ?? null;
+
+  if (id) {
+    const byId = items.find((x) => x.id === id);
+    if (byId) return byId;
+  }
+
+  return items.find((x) => String(x.type) === type && !!x.isEquipped) || null;
+}
+
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<ProfileNav>();
 
   const [profile, setProfile] = useState<ProfileApiResponse | null>(null);
+  const [look, setLook] = useState<EquippedProfileLook>({
+    avatarOverrideUrl: null,
+    avatarFrameUrl: null,
+    avatarFrameName: null,
+  });
+
   const [loading, setLoading] = useState(true);
   const [hasUser, setHasUser] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+
+  // ✅ FIXED: use the REAL endpoint that exists
+  const loadEquippedItems = useCallback(async (userId: string) => {
+    const base = getApiBase();
+    const ownedUrl = `${base}/api/profile/store/owned?userId=${encodeURIComponent(userId)}`;
+    const owned = (await fetchJsonLoose(ownedUrl)) as OwnedResponse;
+
+    const frame = findEquippedItem(owned, "AVATAR_FRAME");
+    const frameUrlRaw = pickBestMedia(frame);
+    const frameUrlAbs = toAbsoluteUrl(frameUrlRaw);
+
+    // (optional) if you ever add real avatar items later, this will work
+    const avatarTypes = ["AVATAR", "AVATAR_IMAGE", "PROFILE_AVATAR", "AVATAR_SKIN"];
+    let avatar: OwnedItem | null = null;
+    for (const tp of avatarTypes) {
+      avatar = findEquippedItem(owned, tp);
+      if (avatar) break;
+    }
+    const avatarUrlRaw = pickBestMedia(avatar);
+    const avatarUrlAbs = toAbsoluteUrl(avatarUrlRaw);
+
+    setLook({
+      avatarOverrideUrl: avatarUrlAbs || null,
+      avatarFrameUrl: frameUrlAbs || null,
+      avatarFrameName: frame?.title ? String(frame.title) : null,
+    });
+  }, []);
 
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
+      setErrorText(null);
+
       const userId = await AsyncStorage.getItem(USER_ID_KEY);
 
       if (!userId) {
         setHasUser(false);
         setProfile(null);
+        setLook({ avatarOverrideUrl: null, avatarFrameUrl: null, avatarFrameName: null });
         return;
       }
 
       const base = getApiBase();
-      const res = await fetch(
-        `${base}/api/profile/me?userId=${encodeURIComponent(userId)}`
-      );
+      const url = `${base}/api/profile/me?userId=${encodeURIComponent(userId)}`;
 
-      if (!res.ok) {
+      const json = (await fetchJsonLoose(url)) as ProfileApiResponse;
+
+      if (!json?.user) {
         setHasUser(false);
         setProfile(null);
-        return;
-      }
-
-      const json = (await res.json()) as ProfileApiResponse;
-      if (!json.user) {
-        setHasUser(false);
-        setProfile(null);
+        setLook({ avatarOverrideUrl: null, avatarFrameUrl: null, avatarFrameName: null });
       } else {
         setHasUser(true);
         setProfile(json);
+
+        // ✅ Load equipped avatar/frame (no more 404)
+        loadEquippedItems(userId).catch((e) => {
+          console.log("loadEquippedItems error", e?.message || e);
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("loadProfile error", err);
+      setErrorText(err?.message || t("profile.errors.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadEquippedItems]);
 
   const loadUnreadNotifications = useCallback(async () => {
     try {
@@ -139,15 +271,10 @@ const ProfileScreen: React.FC = () => {
       if (!userId) return;
 
       const base = getApiBase();
-      const res = await fetch(
-        `${base}/api/notifications/unread-count?userId=${encodeURIComponent(
-          userId
-        )}`
-      );
-      if (!res.ok) return;
+      const url = `${base}/api/notifications/unread-count?userId=${encodeURIComponent(userId)}`;
 
-      const json = await res.json();
-      setUnreadCount(typeof json.count === "number" ? json.count : 0);
+      const json = await fetchJsonLoose(url);
+      setUnreadCount(typeof json?.count === "number" ? json.count : 0);
     } catch (err) {
       console.error("loadUnreadNotifications error", err);
     }
@@ -155,8 +282,16 @@ const ProfileScreen: React.FC = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-      loadProfile();
-      loadUnreadNotifications();
+      let active = true;
+
+      (async () => {
+        if (!active) return;
+        await Promise.all([loadProfile(), loadUnreadNotifications()]);
+      })();
+
+      return () => {
+        active = false;
+      };
     }, [loadProfile, loadUnreadNotifications])
   );
 
@@ -168,31 +303,40 @@ const ProfileScreen: React.FC = () => {
 
   const user = profile?.user ?? null;
 
-  const displayName = user?.nickname || user?.username || "Guest";
+  const displayName = user?.nickname || user?.username || t("profile.labels.guest");
   const displayId = user?.id ? user.id.slice(-7) : "--------";
   const completion = user?.profileCompletion ?? 0;
   const vipLevel = user?.vipLevel ?? 0;
   const level = user?.level ?? 1;
 
-  const coins = profile?.wallet.balance ?? 0;
-  const points = profile?.stats.points ?? 0;
+  const coins = profile?.wallet?.balance ?? 0;
+  const points = profile?.stats?.points ?? 0;
 
-  const friends = profile?.stats.friends ?? 0;
-  const following = profile?.stats.following ?? 0;
-  const followers = profile?.stats.followers ?? 0;
-  const visitors = profile?.stats.visitors ?? 0;
+  const friends = profile?.stats?.friends ?? 0;
+  const following = profile?.stats?.following ?? 0;
+  const followers = profile?.stats?.followers ?? 0;
+  const visitors = profile?.stats?.visitors ?? 0;
 
   const initials = getInitials(displayName);
+
+  // ✅ Items feature: avatar override + avatar frame
+  const finalAvatarUrl = useMemo(() => {
+    return toAbsoluteUrl(look.avatarOverrideUrl || user?.avatarUrl || null);
+  }, [look.avatarOverrideUrl, user?.avatarUrl]);
+
+  const finalFrameUrl = useMemo(() => {
+    return toAbsoluteUrl(look.avatarFrameUrl || null);
+  }, [look.avatarFrameUrl]);
 
   if (!hasUser) {
     return (
       <SafeAreaView className="flex-1 bg-[#F3F4F6]" edges={["top"]}>
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-[18px] font-semibold text-[#111827] mb-2">
-            You’re logged out
+            {t("profile.loggedOut.title")}
           </Text>
           <Text className="text-[12px] text-[#6B7280] text-center mb-4">
-            Please login again to view your profile.
+            {t("profile.loggedOut.subtitle")}
           </Text>
           <Pressable
             className="px-5 py-2.5 rounded-full bg-[#6C4DFF]"
@@ -203,7 +347,7 @@ const ProfileScreen: React.FC = () => {
             }}
           >
             <Text className="text-white text-[14px] font-semibold">
-              Go to Login
+              {t("profile.actions.goToLogin")}
             </Text>
           </Pressable>
         </View>
@@ -219,7 +363,7 @@ const ProfileScreen: React.FC = () => {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator />
           <Text className="mt-2 text-xs text-gray-500">
-            Loading your profile...
+            {t("profile.states.loading")}
           </Text>
         </View>
       ) : (
@@ -233,7 +377,9 @@ const ProfileScreen: React.FC = () => {
         >
           {/* Header */}
           <View className="bg-white px-4 pt-3 pb-2 flex-row items-center justify-between">
-            <Text className="text-[22px] font-semibold text-[#111827]">Me</Text>
+            <Text className="text-[22px] font-semibold text-[#111827]">
+              {t("profile.header.title")}
+            </Text>
 
             <View className="flex-row items-center">
               <Pressable
@@ -262,24 +408,34 @@ const ProfileScreen: React.FC = () => {
             </View>
           </View>
 
+          {!!errorText && (
+            <View className="px-4 mt-3">
+              <View className="rounded-2xl bg-red-50 border border-red-200 px-3 py-2">
+                <Text className="text-[11px] text-red-600">{errorText}</Text>
+                <Pressable
+                  onPress={() => loadProfile()}
+                  className="mt-2 self-start rounded-full bg-red-600 px-3 py-1"
+                >
+                  <Text className="text-[11px] text-white font-semibold">
+                    {t("profile.states.retry")}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
           {/* User card */}
           <View className="px-4 mt-3">
             <Pressable
               className="rounded-3xl bg-white px-4 py-4 flex-row items-center active:opacity-95"
               onPress={() => navigation.navigate("MyProfile")}
             >
-              <View className="h-14 w-14 rounded-full bg-[#F97316] items-center justify-center overflow-hidden">
-                {user?.avatarUrl ? (
-                  <Image
-                    source={{ uri: toAbsoluteUrl(user.avatarUrl) ?? user.avatarUrl }}
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                ) : (
-                  <Text className="text-white font-semibold text-[18px]">
-                    {initials}
-                  </Text>
-                )}
-              </View>
+              <AvatarWithFrame
+                size={56}
+                initials={initials}
+                avatarUrl={finalAvatarUrl}
+                frameUrl={finalFrameUrl}
+              />
 
               <View className="flex-1 ml-3">
                 <View className="flex-row items-center flex-wrap">
@@ -291,14 +447,14 @@ const ProfileScreen: React.FC = () => {
                     <View className="flex-row items-center rounded-full bg-[#FACC15] px-2 py-0.5 mr-1">
                       <MaterialCommunityIcons name="crown" size={12} color="#92400E" />
                       <Text className="ml-1 text-[10px] font-semibold text-[#92400E]">
-                        VIP {vipLevel}
+                        {t("profile.labels.vipLevel", { level: vipLevel })}
                       </Text>
                     </View>
                   )}
 
                   <View className="rounded-full bg-[#EEF2FF] px-2 py-0.5">
                     <Text className="text-[10px] font-semibold text-[#4F46E5]">
-                      LV.{level}
+                      {t("profile.labels.levelShort", { level })}
                     </Text>
                   </View>
                 </View>
@@ -306,11 +462,13 @@ const ProfileScreen: React.FC = () => {
                 <View className="mt-1 flex-row items-center flex-wrap">
                   <View className="flex-row items-center mr-3">
                     <View className="h-2 w-2 rounded-full bg-[#22C55E] mr-1" />
-                    <Text className="text-[11px] text-[#4B5563]">Online</Text>
+                    <Text className="text-[11px] text-[#4B5563]">
+                      {t("profile.labels.online")}
+                    </Text>
                   </View>
 
                   <Text className="text-[11px] text-[#9CA3AF] mr-3">
-                    ID {displayId}
+                    {t("profile.labels.id", { id: displayId })}
                   </Text>
 
                   {user?.country && (
@@ -320,6 +478,12 @@ const ProfileScreen: React.FC = () => {
                     </Text>
                   )}
                 </View>
+
+                {!!look.avatarFrameName && (
+                  <Text className="mt-1 text-[11px] text-[#6B7280]">
+                    Frame: {look.avatarFrameName}
+                  </Text>
+                )}
               </View>
 
               <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -327,22 +491,24 @@ const ProfileScreen: React.FC = () => {
           </View>
 
           {/* Profile completion */}
-          <View className="px-4 mt-3">
-            <View className="rounded-2xl bg-[#FEF2F2] px-4 py-3 flex-row items-center">
-              <Ionicons name="alert-circle-outline" size={18} color="#F97373" />
-              <Text className="ml-2 flex-1 text-[12px] text-[#B91C1C]">
-                Your profile is {completion}% completed. Finish it to make friends easier in Gold Live.
-              </Text>
+          {completion < 100 && (
+            <View className="px-4 mt-3">
+              <View className="rounded-2xl bg-[#FEF2F2] px-4 py-3 flex-row items-center">
+                <Ionicons name="alert-circle-outline" size={18} color="#F97373" />
+                <Text className="ml-2 flex-1 text-[12px] text-[#B91C1C]">
+                  {t("profile.completion.text", { completion })}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Stats */}
           <View className="px-4 mt-3">
             <View className="rounded-2xl bg-white py-3 flex-row justify-around">
-              <StatItem label="Friends" value={friends.toString()} />
-              <StatItem label="Following" value={following.toString()} />
-              <StatItem label="Followers" value={followers.toString()} />
-              <StatItem label="Visitors" value={visitors.toString()} />
+              <StatItem label={t("profile.stats.friends")} value={friends.toString()} />
+              <StatItem label={t("profile.stats.following")} value={following.toString()} />
+              <StatItem label={t("profile.stats.followers")} value={followers.toString()} />
+              <StatItem label={t("profile.stats.visitors")} value={visitors.toString()} />
             </View>
           </View>
 
@@ -355,7 +521,9 @@ const ProfileScreen: React.FC = () => {
               >
                 <View className="flex-row items-center justify-between">
                   <View>
-                    <Text className="text-[12px] text-[#7C5A00]">Coins</Text>
+                    <Text className="text-[12px] text-[#7C5A00]">
+                      {t("profile.wallet.coins")}
+                    </Text>
                     <Text className="mt-1 text-[18px] font-semibold text-[#111827]">
                       {coins}
                     </Text>
@@ -370,7 +538,9 @@ const ProfileScreen: React.FC = () => {
               >
                 <View className="flex-row items-center justify-between">
                   <View>
-                    <Text className="text-[12px] text-[#8A1256]">Points</Text>
+                    <Text className="text-[12px] text-[#8A1256]">
+                      {t("profile.wallet.points")}
+                    </Text>
                     <Text className="mt-1 text-[18px] font-semibold text-[#111827]">
                       {points}
                     </Text>
@@ -394,35 +564,46 @@ const ProfileScreen: React.FC = () => {
                     <MaterialCommunityIcons name="crown" size={18} color="#B45309" />
                   </View>
                   <Text className="text-[12px] font-semibold text-[#92400E]" numberOfLines={2}>
-                    VIP • Upgrade to VIP and Enjoy Exclusive Benefits
+                    {t("profile.vipCard.cta")}
                   </Text>
                 </View>
-                <Text className="text-[12px] font-semibold text-[#EA580C]">View &gt;</Text>
+                <Text className="text-[12px] font-semibold text-[#EA580C]">
+                  {t("profile.actions.view")}
+                </Text>
               </Pressable>
 
               <View className="px-4 pt-4 pb-5">
                 <View className="flex-row justify-between mb-4">
-                  <FeatureTile label="Reward" onPress={() => navigation.navigate("Reward")} image={ICONS.reward} />
-                  <FeatureTile label="Ranking" onPress={() => navigation.navigate("Ranking")} image={ICONS.ranking} />
-                  <FeatureTile label="Store" onPress={() => navigation.navigate("Store")} image={ICONS.store} />
-                  <FeatureTile label="Invite" onPress={() => navigation.navigate("Invite")} image={ICONS.invite} />
+                  <FeatureTile label={t("profile.tiles.reward")} onPress={() => navigation.navigate("Reward")} image={ICONS.reward} />
+                  <FeatureTile label={t("profile.tiles.ranking")} onPress={() => navigation.navigate("Ranking")} image={ICONS.ranking} />
+                  <FeatureTile label={t("profile.tiles.store")} onPress={() => navigation.navigate("Store")} image={ICONS.store} />
+                  <FeatureTile label={t("profile.tiles.invite")} onPress={() => navigation.navigate("Invite")} image={ICONS.invite} />
                 </View>
 
                 <View className="flex-row justify-between">
                   <FeatureTile
-                    label="Guardian"
+                    label={t("profile.tiles.guardian")}
                     image={ICONS.guardian}
                     onPress={() => {
                       if (!user?.id) {
-                        Alert.alert("Missing user", "Please login again.");
+                        Alert.alert(t("profile.alerts.missingUserTitle"), t("profile.alerts.missingUserMsg"));
                         return;
                       }
-                      // ✅ IMPORTANT: pass userId param
                       navigation.navigate("Guardian", { userId: user.id });
                     }}
                   />
-                  <FeatureTile label="Fan club" onPress={() => navigation.navigate("FanClub")} image={ICONS.fanClub} />
-                  <FeatureTile label="Medal Wall" onPress={() => navigation.navigate("MedalWall")} image={ICONS.medalWall} />
+                  <FeatureTile label={t("profile.tiles.fanClub")} onPress={() => navigation.navigate("FanClub")} image={ICONS.fanClub} />
+                  <FeatureTile
+                    label={t("profile.tiles.medalWall")}
+                    image={ICONS.medalWall}
+                    onPress={() => {
+                      if (!user?.id) {
+                        Alert.alert(t("profile.alerts.missingUserTitle"), t("profile.alerts.missingUserMsg"));
+                        return;
+                      }
+                      navigation.navigate("MedalWall", { userId: user.id });
+                    }}
+                  />
                   <View className="w-14" />
                 </View>
               </View>
@@ -437,9 +618,11 @@ const ProfileScreen: React.FC = () => {
               end={{ x: 1, y: 0 }}
               style={{ borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12 }}
             >
-              <Text className="text-[12px] font-semibold text-white">NOTICE</Text>
+              <Text className="text-[12px] font-semibold text-white">
+                {t("profile.notice.title")}
+              </Text>
               <Text className="mt-1 text-[11px] text-[#E0E7FF]">
-                User conduct standards and prohibited activities in Gold Live.
+                {t("profile.notice.subtitle")}
               </Text>
             </LinearGradient>
           </View>
@@ -454,7 +637,9 @@ const ProfileScreen: React.FC = () => {
                 <View className="h-9 w-9 rounded-2xl bg-[#F3F4F6] items-center justify-center mr-3">
                   <Image source={ICONS.liveData} style={{ width: 18, height: 18 }} resizeMode="contain" />
                 </View>
-                <Text className="text-[14px] text-[#111827]">Live data</Text>
+                <Text className="text-[14px] text-[#111827]">
+                  {t("profile.rows.liveData")}
+                </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
             </Pressable>
@@ -463,17 +648,21 @@ const ProfileScreen: React.FC = () => {
           {/* Settings list */}
           <View className="px-4 mt-3 mb-4">
             <View className="rounded-3xl bg-white px-4 py-4">
-              <SettingsRow label="Help" iconImage={ICONS.help} onPress={() => navigation.navigate("Help")} />
+              <SettingsRow label={t("profile.rows.help")} iconImage={ICONS.help} onPress={() => navigation.navigate("Help")} />
               <Divider />
-              <SettingsRow label="My Agency" iconImage={ICONS.myAgency} onPress={() => navigation.navigate("MyAgency")} />
+              <SettingsRow label={t("profile.rows.myAgency")} iconImage={ICONS.myAgency} onPress={() => navigation.navigate("MyAgency")} />
               <Divider />
-              <SettingsRow label="Level" iconImage={ICONS.level} onPress={() => navigation.navigate("Level")} />
+              <SettingsRow label={t("profile.rows.level")} iconImage={ICONS.level} onPress={() => navigation.navigate("Level")} />
               <Divider />
-              <SettingsRow label="Auth" iconImage={ICONS.auth} onPress={() => navigation.navigate("Auth")} />
+              <SettingsRow label={t("profile.rows.auth")} iconImage={ICONS.auth} onPress={() => navigation.navigate("Auth")} />
               <Divider />
-              <SettingsRow label="Backpack" iconImage={ICONS.backpack} onPress={() => navigation.navigate("Backpack")} />
+              <SettingsRow
+                label={t("profile.rows.backpack")}
+                iconImage={ICONS.backpack}
+                onPress={() => navigation.navigate("Backpack")}
+              />
               <Divider />
-              <SettingsRow label="Follow Us" iconImage={ICONS.followUs} onPress={() => navigation.navigate("FollowUs")} />
+              <SettingsRow label={t("profile.rows.followUs")} iconImage={ICONS.followUs} onPress={() => navigation.navigate("FollowUs")} />
             </View>
           </View>
         </ScrollView>
@@ -520,10 +709,7 @@ const SettingsRow: React.FC<{
   iconImage: ImageSourcePropType;
   onPress?: () => void;
 }> = ({ label, iconImage, onPress }) => (
-  <Pressable
-    onPress={onPress}
-    className="flex-row items-center justify-between py-2.5 active:opacity-90"
-  >
+  <Pressable onPress={onPress} className="flex-row items-center justify-between py-2.5 active:opacity-90">
     <View className="flex-row items-center">
       <View className="h-9 w-9 rounded-2xl bg-[#EEF2FF] items-center justify-center mr-3">
         <Image source={iconImage} style={{ width: 18, height: 18 }} resizeMode="contain" />
@@ -536,10 +722,55 @@ const SettingsRow: React.FC<{
 
 const Divider: React.FC = () => <View className="h-px bg-[#E5E7EB] my-1" />;
 
+const AvatarWithFrame: React.FC<{
+  size: number;
+  avatarUrl: string | null;
+  frameUrl: string | null;
+  initials: string;
+}> = ({ size, avatarUrl, frameUrl, initials }) => {
+  const frameSize = Math.round(size * 1.35);
+
+  return (
+    <View style={{ width: frameSize, height: frameSize, alignItems: "center", justifyContent: "center" }}>
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          overflow: "hidden",
+          backgroundColor: "#F97316",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={{ width: "100%", height: "100%" }} />
+        ) : (
+          <Text style={{ color: "white", fontWeight: "700", fontSize: Math.max(16, Math.round(size * 0.32)) }}>
+            {initials}
+          </Text>
+        )}
+      </View>
+
+      {!!frameUrl && (
+        <Image
+          source={{ uri: frameUrl }}
+          style={{
+            position: "absolute",
+            width: frameSize,
+            height: frameSize,
+          }}
+          resizeMode="contain"
+        />
+      )}
+    </View>
+  );
+};
+
 function getInitials(name: string) {
   const trimmed = name.trim();
   if (!trimmed) return "GL";
-  const parts = trimmed.split(" ");
+  const parts = trimmed.split(" ").filter(Boolean);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }

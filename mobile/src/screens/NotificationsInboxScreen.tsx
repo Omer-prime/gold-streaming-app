@@ -2,18 +2,19 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
-  ScrollView,
   Pressable,
   TextInput,
   ActivityIndicator,
   RefreshControl,
   Platform,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config";
+import { t } from "../i18n";
 
 type NotificationItem = {
   id: string;
@@ -22,8 +23,55 @@ type NotificationItem = {
   body: string;
   createdAt: string;
   readAt: string | null;
-  adminNotificationId?: string | null; // ✅ we store momentId here
+  adminNotificationId?: string | null; // momentId here
 };
+
+function safeTimeLabel(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  // Keep it compact (no seconds)
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function typeBadgeLabel(typeRaw: string) {
+  const type = String(typeRaw || "").toUpperCase();
+
+  // You can extend mapping anytime (keeps UI clean)
+  if (type.includes("LIVE_APPLICATION")) return "VERIFICATION";
+  if (type.includes("MOMENT_LIKE")) return "LIKE";
+  if (type.includes("MOMENT_COMMENT")) return "COMMENT";
+  if (type.includes("ADMIN")) return "ADMIN";
+  if (type.includes("SYSTEM")) return "SYSTEM";
+
+  // fallback short label
+  const cleaned = type.replace(/[^A-Z0-9_]/g, "").replace(/_+/g, "_");
+  const first = cleaned.split("_").slice(0, 2).join("_");
+  return first || "INFO";
+}
+
+function typeIconName(typeRaw: string): keyof typeof Ionicons.glyphMap {
+  const type = String(typeRaw || "").toUpperCase();
+  if (type.includes("LIVE_APPLICATION")) return "shield-checkmark-outline";
+  if (type.includes("MOMENT_LIKE")) return "heart-outline";
+  if (type.includes("MOMENT_COMMENT")) return "chatbubble-ellipses-outline";
+  if (type.includes("ADMIN")) return "megaphone-outline";
+  return "notifications-outline";
+}
+
+function typeIconBg(typeRaw: string) {
+  const type = String(typeRaw || "").toUpperCase();
+  if (type.includes("LIVE_APPLICATION")) return "#EEF2FF"; // indigo-50
+  if (type.includes("MOMENT_LIKE")) return "#FFF1F2"; // rose-50
+  if (type.includes("MOMENT_COMMENT")) return "#F0FDFA"; // teal-50
+  if (type.includes("ADMIN")) return "#FFFBEB"; // amber-50
+  return "#F1F5F9"; // slate-100
+}
 
 export default function NotificationsInboxScreen() {
   const navigation = useNavigation<any>();
@@ -41,7 +89,7 @@ export default function NotificationsInboxScreen() {
       const userId = await AsyncStorage.getItem("gl_user_id");
       if (!userId) {
         setItems([]);
-        setErr("Missing userId (gl_user_id) in AsyncStorage");
+        setErr(t("newMessageNotification.errors.missingUserId", { key: "gl_user_id" }));
         return;
       }
 
@@ -53,7 +101,7 @@ export default function NotificationsInboxScreen() {
 
       if (!res.ok) {
         setItems([]);
-        setErr(json?.error || "Failed to load notifications");
+        setErr(json?.error || t("newMessageNotification.errors.loadFailed"));
         return;
       }
 
@@ -62,7 +110,7 @@ export default function NotificationsInboxScreen() {
     } catch (e) {
       console.error("Notifications inbox load error", e);
       setItems([]);
-      setErr("Network error while loading notifications");
+      setErr(t("newMessageNotification.errors.network"));
     } finally {
       setLoading(false);
     }
@@ -120,20 +168,19 @@ export default function NotificationsInboxScreen() {
     async (item: NotificationItem) => {
       await markRead(item.id);
 
-      // ✅ Like/Comment notification => open that post comments screen
       if (
         (item.type === "moment_like" || item.type === "moment_comment") &&
         item.adminNotificationId
       ) {
         navigation.navigate("Profile", {
           screen: "MomentComments",
-          params: { momentId: item.adminNotificationId, ownerName: "Post" },
+          params: {
+            momentId: item.adminNotificationId,
+            ownerName: t("notificationsInbox.postOwnerName"),
+          },
         });
         return;
       }
-
-      // fallback
-      // you can add other actions here later (admin notifications, etc.)
     },
     [markRead, navigation]
   );
@@ -151,87 +198,106 @@ export default function NotificationsInboxScreen() {
 
   const hasUnread = items.some((n) => !n.readAt);
 
-  return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+  const ListHeader = (
+    <View>
+      {/* Header */}
       <View className="flex-row items-center justify-between px-4 pt-3 pb-2 border-b border-gray-100">
         <View className="flex-row items-center">
           <Pressable
             onPress={() => navigation.goBack()}
             className="mr-3 h-9 w-9 items-center justify-center rounded-full"
+            style={{ backgroundColor: "#F8FAFC" }}
           >
             <Ionicons name="chevron-back" size={20} color="#111827" />
           </Pressable>
+
           <Text className="text-[18px] font-semibold text-[#111827]">
-            Notifications
+            {t("newMessageNotification.title")}
           </Text>
         </View>
 
         {hasUnread && (
-          <Pressable onPress={markAllRead}>
+          <Pressable
+            onPress={markAllRead}
+            className="px-3 py-2 rounded-full"
+            style={{ backgroundColor: "#F5F3FF" }}
+          >
             <Text className="text-[12px] font-semibold text-[#6C4DFF]">
-              Mark all read
+              {t("newMessageNotification.actions.markAllRead")}
             </Text>
           </Pressable>
         )}
       </View>
 
-      <View className="px-4 pt-3">
+      {/* Search */}
+      <View className="px-4 pt-3 pb-2">
         <View
-          className="flex-row items-center rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2"
-          style={{ elevation: 2 }}
+          className="flex-row items-center rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-3"
+          style={{
+            height: 44,
+            ...(Platform.OS === "ios"
+              ? {
+                  shadowColor: "#000",
+                  shadowOpacity: 0.04,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 6 },
+                }
+              : {}),
+          }}
         >
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={18} color="#9CA3AF" />
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search notifications..."
+            placeholder={t("newMessageNotification.inboxSearchPlaceholder")}
             placeholderTextColor="#9CA3AF"
             autoCorrect={false}
             autoCapitalize="none"
             style={{
-              marginLeft: 8,
+              marginLeft: 10,
               flex: 1,
               fontSize: 13,
               color: "#111827",
-              paddingVertical: Platform.OS === "android" ? 0 : 6,
+              paddingVertical: Platform.OS === "android" ? 0 : 8,
             }}
           />
+
           {search.length > 0 && (
-            <Pressable onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+            <Pressable onPress={() => setSearch("")} hitSlop={10}>
+              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
             </Pressable>
           )}
         </View>
-      </View>
 
-      <ScrollView
-        className="flex-1"
+        {err && <Text className="mt-2 text-[11px] text-red-500">{err}</Text>}
+      </View>
+    </View>
+  );
+
+  return (
+    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+      <FlatList
+        data={filtered}
+        keyExtractor={(it) => it.id}
+        ListHeaderComponent={ListHeader}
         contentContainerStyle={{ paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
-      >
-        {err && (
-          <View className="px-4 pt-3">
-            <Text className="text-[11px] text-red-500">{err}</Text>
-          </View>
+        ListEmptyComponent={
+          loading ? (
+            <View className="px-4 py-10">
+              <ActivityIndicator size="small" color="#6C4DFF" />
+            </View>
+          ) : (
+            <View className="px-4 py-10">
+              <Text className="text-[12px] text-[#9CA3AF]">{t("newMessageNotification.empty")}</Text>
+            </View>
+          )
+        }
+        renderItem={({ item }) => (
+          <NotificationCard item={item} onPress={() => openNotification(item)} />
         )}
-
-        {loading && items.length === 0 ? (
-          <View className="px-4 py-6">
-            <ActivityIndicator size="small" color="#6C4DFF" />
-          </View>
-        ) : filtered.length === 0 ? (
-          <View className="px-4 py-6">
-            <Text className="text-[12px] text-[#9CA3AF]">
-              No notifications yet.
-            </Text>
-          </View>
-        ) : (
-          filtered.map((n) => (
-            <NotificationCard key={n.id} item={n} onPress={() => openNotification(n)} />
-          ))
-        )}
-      </ScrollView>
+      />
     </SafeAreaView>
   );
 }
@@ -240,42 +306,105 @@ const NotificationCard: React.FC<{
   item: NotificationItem;
   onPress: () => void;
 }> = ({ item, onPress }) => {
-  const timeLabel = new Date(item.createdAt).toLocaleString();
   const isUnread = !item.readAt;
+  const timeLabel = safeTimeLabel(item.createdAt);
+  const badge = typeBadgeLabel(item.type);
+  const icon = typeIconName(item.type);
+  const iconBg = typeIconBg(item.type);
 
   return (
     <View className="px-4 pt-2">
       <Pressable
         onPress={onPress}
-        className="flex-row rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 active:opacity-80"
+        className="rounded-2xl border px-3 py-3 active:opacity-80"
+        style={{
+          borderColor: "#EEF2F7",
+          backgroundColor: isUnread ? "#F8FAFF" : "#FFFFFF",
+        }}
       >
-        <View className="mr-2 mt-2">
-          {isUnread && (
+        <View className="flex-row">
+          {/* Left icon + unread dot */}
+          <View style={{ width: 44, alignItems: "center" }}>
             <View
-              style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#F97316" }}
-            />
-          )}
-        </View>
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: iconBg,
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1,
+                borderColor: "#EEF2F7",
+              }}
+            >
+              <Ionicons name={icon} size={18} color="#111827" />
+            </View>
 
-        <View style={{ flex: 1 }}>
-          <View className="flex-row items-center justify-between">
-            <Text className="text-[14px] text-[#111827]" numberOfLines={2}>
-              {item.title}
-            </Text>
-            <Text className="ml-2 text-[10px] text-[#9CA3AF]">{item.type}</Text>
+            {isUnread && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  right: 4,
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: "#F97316",
+                  borderWidth: 2,
+                  borderColor: isUnread ? "#F8FAFF" : "#FFFFFF",
+                }}
+              />
+            )}
           </View>
 
-          {!!item.body && (
-            <Text className="mt-1 text-[12px] text-[#6B7280]" numberOfLines={3}>
-              {item.body}
-            </Text>
-          )}
+          {/* Content */}
+          <View style={{ flex: 1, paddingLeft: 10 }}>
+            <View className="flex-row items-start justify-between">
+              <Text
+                className="text-[14px] font-semibold text-[#111827]"
+                numberOfLines={2}
+                style={{ flex: 1, paddingRight: 10 }}
+              >
+                {item.title}
+              </Text>
 
-          <Text className="mt-1 text-[11px] text-[#9CA3AF]">{timeLabel}</Text>
-        </View>
+              {/* Type badge (prevents long type text breaking layout) */}
+              <View
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 999,
+                  backgroundColor: "#F1F5F9",
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                  maxWidth: 120,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "700",
+                    color: "#64748B",
+                    letterSpacing: 0.3,
+                  }}
+                  numberOfLines={1}
+                >
+                  {badge}
+                </Text>
+              </View>
+            </View>
 
-        <View className="ml-2 mt-2">
-          <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+            {!!item.body && (
+              <Text className="mt-1 text-[12px] text-[#6B7280]" numberOfLines={2}>
+                {item.body}
+              </Text>
+            )}
+
+            <View className="mt-2 flex-row items-center justify-between">
+              <Text className="text-[11px] text-[#9CA3AF]">{timeLabel}</Text>
+              <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+            </View>
+          </View>
         </View>
       </Pressable>
     </View>

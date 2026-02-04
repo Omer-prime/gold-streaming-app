@@ -7,11 +7,11 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { t } from "../i18n";
 
-type Nav = NativeStackNavigationProp<
-  ProfileStackParamList,
-  "PrivilegeSettings"
->;
+type Nav = NativeStackNavigationProp<ProfileStackParamList, "PrivilegeSettings">;
+
+
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.10.25:3000";
@@ -31,15 +31,18 @@ const PrivilegeSettingsScreen: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const userId = await AsyncStorage.getItem("gl_user_id");
+        const userId =
+          (await AsyncStorage.getItem("gl_user_id")) ??
+          (await AsyncStorage.getItem("userId"));
+
         if (!userId) return;
+
         const res = await fetch(
-          `${API_BASE_URL}/api/settings/privileges?userId=${encodeURIComponent(
-            userId
-          )}`
+          `${API_BASE_URL}/api/settings/privileges?userId=${encodeURIComponent(userId)}`
         );
         if (!res.ok) return;
         const json = await res.json();
+
         setInvisibleVisitor(!!json.invisibleVisitor);
         setMysteryLive(!!json.mysteryLive);
         setMysteryRank(!!json.mysteryRank);
@@ -61,7 +64,10 @@ const PrivilegeSettingsScreen: React.FC = () => {
 
     const save = async () => {
       try {
-        const userId = await AsyncStorage.getItem("gl_user_id");
+        const userId =
+          (await AsyncStorage.getItem("gl_user_id")) ??
+          (await AsyncStorage.getItem("userId"));
+
         if (!userId) return;
 
         await fetch(`${API_BASE_URL}/api/settings/privileges`, {
@@ -104,7 +110,7 @@ const PrivilegeSettingsScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
         <Text className="text-[18px] font-semibold text-[#111827]">
-          Privilege settings
+          {t("privilegeSettings.title")}
         </Text>
       </View>
 
@@ -114,38 +120,38 @@ const PrivilegeSettingsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <ToggleRow
-          label="Invisible visitor"
-          description="Visit others without leaving a record, and others also can't see who visited the homepage."
+          label={t("privilegeSettings.items.invisibleVisitor.label")}
+          description={t("privilegeSettings.items.invisibleVisitor.description")}
           value={invisibleVisitor}
           onValueChange={setInvisibleVisitor}
         />
         <ToggleRow
-          label="Mystery man in LIVE room"
-          description="Only the gift recipient can see your identity in LIVE rooms."
+          label={t("privilegeSettings.items.mysteryLive.label")}
+          description={t("privilegeSettings.items.mysteryLive.description")}
           value={mysteryLive}
           onValueChange={setMysteryLive}
         />
         <ToggleRow
-          label="Mystery man on rank"
-          description="Your gifts won't appear on the host's fan ranking."
+          label={t("privilegeSettings.items.mysteryRank.label")}
+          description={t("privilegeSettings.items.mysteryRank.description")}
           value={mysteryRank}
           onValueChange={setMysteryRank}
         />
         <ToggleRow
-          label="Invisible Online"
-          description="Always maintain an invisible status, enter live broadcast rooms invisibly."
+          label={t("privilegeSettings.items.invisibleOnline.label")}
+          description={t("privilegeSettings.items.invisibleOnline.description")}
           value={invisibleOnline}
           onValueChange={setInvisibleOnline}
         />
         <ToggleRow
-          label="Exclusive Email Notification"
-          description="Receive exclusive email notifications after customer service replies."
+          label={t("privilegeSettings.items.exclusiveEmail.label")}
+          description={t("privilegeSettings.items.exclusiveEmail.description")}
           value={exclusiveEmail}
           onValueChange={setExclusiveEmail}
         />
         <ToggleRow
-          label="Hide livestream level"
-          description="Once turned on, others will not be able to see your livestream level on your profile."
+          label={t("privilegeSettings.items.hideLiveLevel.label")}
+          description={t("privilegeSettings.items.hideLiveLevel.description")}
           value={hideLiveLevel}
           onValueChange={setHideLiveLevel}
         />

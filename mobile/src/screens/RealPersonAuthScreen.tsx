@@ -4,12 +4,12 @@ import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { t } from "../i18n";
 
 const RealPersonAuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
 
   const handleStart = () => {
-    // go to green face scan screen
     navigation.navigate("FaceScan" as never);
   };
 
@@ -22,7 +22,7 @@ const RealPersonAuthScreen: React.FC = () => {
         </Pressable>
         <View className="flex-1 items-center">
           <Text className="text-[16px] font-semibold text-[#111827]">
-            Auth
+            {t("realPersonAuth.title")}
           </Text>
         </View>
         <View className="w-6" />
@@ -32,17 +32,15 @@ const RealPersonAuthScreen: React.FC = () => {
         {/* Big avatar circle */}
         <View className="items-center mb-8">
           <View className="h-32 w-32 rounded-full bg-[#EEF2FF] items-center justify-center mb-4">
-            <MaterialCommunityIcons
-              name="face-recognition"
-              size={46}
-              color="#6366F1"
-            />
+            <MaterialCommunityIcons name="face-recognition" size={46} color="#6366F1" />
           </View>
+
           <Text className="text-[18px] font-semibold text-[#111827] text-center">
-            Real-person verification will begin soon.
+            {t("realPersonAuth.hero.title")}
           </Text>
+
           <Text className="mt-2 text-[13px] text-[#6B7280] text-center">
-            Please ensure you are the user
+            {t("realPersonAuth.hero.subtitle")}
           </Text>
         </View>
 
@@ -53,7 +51,7 @@ const RealPersonAuthScreen: React.FC = () => {
               <Ionicons name="eye-outline" size={20} color="#6366F1" />
             </View>
             <Text className="text-[11px] text-[#6B7280] text-center">
-              Avoid cover
+              {t("realPersonAuth.tips.avoidCover")}
             </Text>
           </View>
 
@@ -62,20 +60,16 @@ const RealPersonAuthScreen: React.FC = () => {
               <Ionicons name="sunny-outline" size={20} color="#6366F1" />
             </View>
             <Text className="text-[11px] text-[#6B7280] text-center">
-              Keep enough light
+              {t("realPersonAuth.tips.enoughLight")}
             </Text>
           </View>
 
           <View className="items-center flex-1">
             <View className="h-10 w-10 rounded-full bg-[#EEF2FF] items-center justify-center mb-2">
-              <MaterialCommunityIcons
-                name="account-cancel-outline"
-                size={20}
-                color="#6366F1"
-              />
+              <MaterialCommunityIcons name="account-cancel-outline" size={20} color="#6366F1" />
             </View>
             <Text className="text-[11px] text-[#6B7280] text-center">
-              Minors are prohibited
+              {t("realPersonAuth.tips.minorsProhibited")}
             </Text>
           </View>
         </View>
@@ -83,12 +77,9 @@ const RealPersonAuthScreen: React.FC = () => {
 
       {/* Bottom CTA */}
       <View className="px-6 pb-6">
-        <Pressable
-          className="rounded-full bg-[#6366F1] py-3"
-          onPress={handleStart}
-        >
+        <Pressable className="rounded-full bg-[#6366F1] py-3" onPress={handleStart}>
           <Text className="text-center text-[14px] font-semibold text-white">
-            Start to certificate
+            {t("realPersonAuth.actions.start")}
           </Text>
         </Pressable>
       </View>

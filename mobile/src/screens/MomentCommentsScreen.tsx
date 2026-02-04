@@ -13,14 +13,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import type {
-  NativeStackNavigationProp,
-} from "@react-navigation/native-stack";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { API_BASE_URL } from "../config";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
+import { t} from "../i18n";
 
 type CommentUser = {
   id: string;
@@ -45,6 +44,8 @@ type MomentCommentsRoute = RouteProp<
 >;
 
 const MomentCommentsScreen: React.FC = () => {
+
+
   const navigation = useNavigation<MomentCommentsNav>();
   const route = useRoute<MomentCommentsRoute>();
 
@@ -86,7 +87,7 @@ const MomentCommentsScreen: React.FC = () => {
         createdAt: c.createdAt,
         user: {
           id: c.user?.id,
-          userName: c.user?.userName ?? "User",
+          userName: c.user?.userName ?? t("common.userFallback"),
           avatarUrl: c.user?.avatarUrl ?? null,
         },
       }));
@@ -97,7 +98,7 @@ const MomentCommentsScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [momentId]);
+  }, [momentId, t]);
 
   useEffect(() => {
     loadComments();
@@ -111,18 +112,15 @@ const MomentCommentsScreen: React.FC = () => {
     try {
       setSending(true);
 
-      const res = await fetch(
-        `${API_BASE_URL}/api/profile/moments/comments`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: myUserId,
-            momentId,
-            text: trimmed,
-          }),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/api/profile/moments/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: myUserId,
+          momentId,
+          text: trimmed,
+        }),
+      });
 
       if (!res.ok) {
         console.error("send comment error", await res.text());
@@ -139,7 +137,7 @@ const MomentCommentsScreen: React.FC = () => {
           createdAt: c.createdAt,
           user: {
             id: c.user?.id,
-            userName: c.user?.userName ?? "You",
+            userName: c.user?.userName ?? t("common.you"),
             avatarUrl: c.user?.avatarUrl ?? null,
           },
         };
@@ -183,8 +181,9 @@ const MomentCommentsScreen: React.FC = () => {
             >
               <Ionicons name="chevron-back" size={22} color="#111827" />
             </Pressable>
+
             <Text className="text-[16px] font-semibold text-gray-900">
-              {ownerName}'s moments
+              {t("momentComments.title", { owner: ownerName })}
             </Text>
           </View>
 
@@ -196,7 +195,7 @@ const MomentCommentsScreen: React.FC = () => {
           ) : comments.length === 0 ? (
             <View className="flex-1 items-center justify-center px-6">
               <Text className="text-[13px] text-gray-500 text-center">
-                No comments yet. Be the first to reply!
+                {t("momentComments.empty")}
               </Text>
             </View>
           ) : (
@@ -209,12 +208,12 @@ const MomentCommentsScreen: React.FC = () => {
             />
           )}
 
-          {/* Input bar – stays above keyboard */}
+          {/* Input bar */}
           <View className="flex-row items-center px-3 py-2 border-t border-gray-200 bg-white">
             <TextInput
               value={input}
               onChangeText={setInput}
-              placeholder="Write a comment..."
+              placeholder={t("momentComments.placeholder")}
               placeholderTextColor="#9CA3AF"
               multiline
               className="flex-1 bg-[#F3F4F6] rounded-full px-3 py-2 text-[13px] text-gray-900"

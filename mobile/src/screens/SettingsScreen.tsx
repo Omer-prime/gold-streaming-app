@@ -1,5 +1,5 @@
 // src/screens/SettingsScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,9 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../navigation/ProfileStackNavigator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// ✅ use your i18n helper (same as LanguageSettingScreen)
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "Settings">;
 
@@ -40,8 +43,10 @@ const SettingsScreen: React.FC = () => {
         );
         if (!res.ok) return;
         const json = await res.json();
+
         setSecurity({
-          securityLevel: (json.securityLevel as SecurityInfo["securityLevel"]) || "Low",
+          securityLevel:
+            (json.securityLevel as SecurityInfo["securityLevel"]) || "Low",
         });
       } catch (e) {
         console.warn("loadSecurity error", e);
@@ -60,61 +65,67 @@ const SettingsScreen: React.FC = () => {
       ? "#F97316"
       : "#EF4444";
 
+  const securityLevelText = useMemo(() => {
+    if (loadingSecurity) return t("common.loading");
+    if (security.securityLevel === "High") return t("settings.security.levelHigh");
+    if (security.securityLevel === "Medium") return t("settings.security.levelMedium");
+    return t("settings.security.levelLow");
+  }, [loadingSecurity, security.securityLevel]);
+
+  const securitySubLabel = useMemo(() => {
+    // "Security level: High"
+    return `${t("settings.security.levelPrefix")} ${securityLevelText}`;
+  }, [securityLevelText]);
+
   const handleClearCache = () => {
     Alert.alert(
-      "Clear cache",
-      "App cache cleared (this does not log you out).",
-      [
-        {
-          text: "OK",
-        },
-      ]
+      t("settings.actions.clearCacheTitle"),
+      t("settings.actions.clearCacheMsg"),
+      [{ text: t("common.ok") }]
     );
-    // If you add custom cache keys later, you can clear them here.
+  };
+
+  const doResetToLogin = async () => {
+    await AsyncStorage.multiRemove([
+      "gl_user_id",
+      "gl_auth_token",
+      "gl_profile_completed",
+    ]);
+    // @ts-ignore – root navigator has Login route
+    navigation.getParent()?.reset({
+      index: 0,
+      routes: [{ name: "Login" }],
+    });
   };
 
   const handleSwitchAccount = () => {
-    Alert.alert("Switch account", "Do you want to switch account?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Switch",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.multiRemove([
-            "gl_user_id",
-            "gl_auth_token",
-            "gl_profile_completed",
-          ]);
-          // @ts-ignore – root navigator has Login route
-          navigation.getParent()?.reset({
-            index: 0,
-            routes: [{ name: "Login" }],
-          });
+    Alert.alert(
+      t("settings.actions.switchAccountTitle"),
+      t("settings.actions.switchAccountMsg"),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("settings.actions.switch"),
+          style: "destructive",
+          onPress: doResetToLogin,
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to log out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Log Out",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.multiRemove([
-            "gl_user_id",
-            "gl_auth_token",
-            "gl_profile_completed",
-          ]);
-          // @ts-ignore – root navigator has Login route
-          navigation.getParent()?.reset({
-            index: 0,
-            routes: [{ name: "Login" }],
-          });
+    Alert.alert(
+      t("settings.actions.logoutTitle"),
+      t("settings.actions.logoutMsg"),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("settings.actions.logout"),
+          style: "destructive",
+          onPress: doResetToLogin,
         },
-      },
-    ]);
+      ]
+    );
   };
 
   return (
@@ -128,7 +139,7 @@ const SettingsScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
         <Text className="text-[18px] font-semibold text-[#111827]">
-          Settings
+          {t("settings.title")}
         </Text>
       </View>
 
@@ -140,24 +151,20 @@ const SettingsScreen: React.FC = () => {
         {/* Account & Security card */}
         <View className="rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB] mb-4 overflow-hidden">
           <SettingsRow
-            label="Account and security"
-            subLabel={
-              loadingSecurity
-                ? "Security level: ..."
-                : `Security level: ${security.securityLevel}`
-            }
+            label={t("settings.items.accountAndSecurity")}
+            subLabel={securitySubLabel}
             subLabelColor={securityColor}
-            showDangerDot={security.securityLevel === "Low"}
+            showDangerDot={!loadingSecurity && security.securityLevel === "Low"}
             onPress={() => navigation.navigate("AccountSecurity")}
           />
           <Divider />
           <SettingsRow
-            label="Security Password"
+            label={t("settings.items.securityPassword")}
             onPress={() => navigation.navigate("SecurityPassword")}
           />
           <Divider />
           <SettingsRow
-            label="Language Setting"
+            label={t("settings.items.languageSetting")}
             onPress={() => navigation.navigate("LanguageSetting")}
           />
         </View>
@@ -165,36 +172,42 @@ const SettingsScreen: React.FC = () => {
         {/* Middle block */}
         <View className="rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB] mb-4 overflow-hidden">
           <SettingsRow
-            label="Blacklist"
+            label={t("settings.items.blacklist")}
             onPress={() => navigation.navigate("Blacklist")}
           />
           <Divider />
           <SettingsRow
-            label="Privilege settings"
+            label={t("settings.items.privilegeSettings")}
             onPress={() => navigation.navigate("PrivilegeSettings")}
           />
           <Divider />
           <SettingsRow
-            label="New messages notification"
+            label={t("settings.items.newMessagesNotification")}
             onPress={() => navigation.navigate("NewMessageNotification")}
           />
           <Divider />
           <SettingsRow
-            label="Privacy"
+            label={t("settings.items.privacy")}
             onPress={() => navigation.navigate("PrivacySettings")}
           />
         </View>
 
         {/* Version / about / cache */}
         <View className="rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB] mb-6 overflow-hidden">
-          <SettingsRow label="Version" trailingText="1.0.0 (Gold Live)" />
+          <SettingsRow
+            label={t("settings.items.version")}
+            trailingText={t("settings.versionText")}
+          />
           <Divider />
           <SettingsRow
-            label="About Gold Live"
+            label={t("settings.items.aboutGoldLive")}
             onPress={() => navigation.navigate("AboutGoldLive")}
           />
           <Divider />
-          <SettingsRow label="Clear Cache" onPress={handleClearCache} />
+          <SettingsRow
+            label={t("settings.items.clearCache")}
+            onPress={handleClearCache}
+          />
         </View>
 
         {/* Buttons */}
@@ -203,7 +216,7 @@ const SettingsScreen: React.FC = () => {
           onPress={handleSwitchAccount}
         >
           <Text className="text-[14px] font-semibold text-red-500">
-            Switch account
+            {t("settings.actions.switchAccountBtn")}
           </Text>
         </Pressable>
 
@@ -211,7 +224,9 @@ const SettingsScreen: React.FC = () => {
           className="h-11 rounded-full bg-[#3B82F6] items-center justify-center"
           onPress={handleLogout}
         >
-          <Text className="text-[14px] font-semibold text-white">Log Out</Text>
+          <Text className="text-[14px] font-semibold text-white">
+            {t("settings.actions.logoutBtn")}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -255,6 +270,7 @@ const SettingsRow: React.FC<RowProps> = ({
         </View>
       ) : null}
     </View>
+
     <View className="flex-row items-center">
       {trailingText ? (
         <Text className="mr-2 text-[12px] text-[#6B7280]">

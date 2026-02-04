@@ -1,6 +1,6 @@
 // src/navigation/MainTabsNavigator.tsx
 import React, { useEffect, useState } from "react";
-import { View, Text, Image } from "react-native";
+import { View, Text, Image, Platform } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import type { NavigatorScreenParams } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -30,26 +30,49 @@ const ICONS = {
   Profile: require("../../assets/profil.png"),
 };
 
-function TabImg({
+const DOT = "#2563EB";
+
+function TabIcon({
   source,
   focused,
-  size = 26,
+  size = 34,
 }: {
   source: any;
   focused: boolean;
   size?: number;
 }) {
   return (
-    <Image
-      source={source}
-      resizeMode="contain"
+    <View
       style={{
-        width: size,
-        height: size,
-        opacity: focused ? 1 : 0.45,
-        transform: [{ scale: focused ? 1.06 : 1 }],
+        width: 66,
+        height: 56,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "transparent",
       }}
-    />
+    >
+      <Image
+        source={source}
+        resizeMode="contain"
+        fadeDuration={0}
+        style={{
+          width: size,
+          height: size,
+          opacity: focused ? 1 : 0.65, // ✅ active/inactive without tinting the image
+          transform: [{ scale: focused ? 1.08 : 1 }],
+        }}
+      />
+
+      <View
+        style={{
+          marginTop: 6,
+          width: focused ? 18 : 6,
+          height: 4,
+          borderRadius: 999,
+          backgroundColor: focused ? DOT : "transparent",
+        }}
+      />
+    </View>
   );
 }
 
@@ -97,11 +120,11 @@ const MainTabsNavigator: React.FC = () => {
         tabBarShowLabel: false,
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          height: 66,
+          height: Platform.OS === "ios" ? 88 : 76,
           paddingTop: 8,
-          paddingBottom: 10,
+          paddingBottom: Platform.OS === "ios" ? 24 : 12,
           borderTopWidth: 1,
-          borderTopColor: "#E5E7EB",
+          borderTopColor: "#F1F5F9",
           backgroundColor: "#FFFFFF",
         },
       }}
@@ -110,7 +133,9 @@ const MainTabsNavigator: React.FC = () => {
         name="Home"
         component={HomeStackNavigator}
         options={{
-          tabBarIcon: ({ focused }) => <TabImg source={ICONS.Home} focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon source={ICONS.Home} focused={focused} size={34} />
+          ),
         }}
       />
 
@@ -118,7 +143,9 @@ const MainTabsNavigator: React.FC = () => {
         name="Party"
         component={PartyScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabImg source={ICONS.Party} focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon source={ICONS.Party} focused={focused} size={34} />
+          ),
         }}
       />
 
@@ -126,7 +153,9 @@ const MainTabsNavigator: React.FC = () => {
         name="Explore"
         component={ExploreStackNavigator}
         options={{
-          tabBarIcon: ({ focused }) => <TabImg source={ICONS.Explore} focused={focused} size={28} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon source={ICONS.Explore} focused={focused} size={36} />
+          ),
         }}
       />
 
@@ -136,24 +165,26 @@ const MainTabsNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={{ position: "relative" }}>
-              <TabImg source={ICONS.Chat} focused={focused} />
+              <TabIcon source={ICONS.Chat} focused={focused} size={34} />
 
               {unreadNotifications > 0 && (
                 <View
                   style={{
                     position: "absolute",
-                    right: -6,
-                    top: -6,
-                    minWidth: 16,
-                    height: 16,
-                    borderRadius: 8,
-                    paddingHorizontal: 4,
+                    right: 10,
+                    top: 4,
+                    minWidth: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    paddingHorizontal: 5,
                     backgroundColor: "#EF4444",
                     justifyContent: "center",
                     alignItems: "center",
+                    borderWidth: 2,
+                    borderColor: "#FFFFFF",
                   }}
                 >
-                  <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "800" }} numberOfLines={1}>
+                  <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "800" }}>
                     {unreadNotifications > 99 ? "99+" : unreadNotifications}
                   </Text>
                 </View>
@@ -173,7 +204,9 @@ const MainTabsNavigator: React.FC = () => {
         name="Profile"
         component={ProfileStackNavigator}
         options={{
-          tabBarIcon: ({ focused }) => <TabImg source={ICONS.Profile} focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon source={ICONS.Profile} focused={focused} size={34} />
+          ),
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {

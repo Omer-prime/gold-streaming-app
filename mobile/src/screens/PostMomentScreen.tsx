@@ -20,6 +20,7 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/nativ
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { API_BASE_URL } from "../config";
+import { t } from "../i18n";
 
 type PostMomentParams = {
   PostMoment: {
@@ -52,7 +53,12 @@ export default function PostMomentScreen() {
   const [topics, setTopics] = useState<ApiTopic[]>([]);
 
   const recommendedTopics = useMemo(() => {
-    if (topics.length > 0) return topics.map((t) => `#${t.title}`);
+    if (topics.length > 0) return topics.map((tt) => `#${tt.title}`);
+
+    const fallback = t("postMoment.recommendedFallback") as any;
+    if (Array.isArray(fallback)) return fallback;
+
+    // hard fallback (should not be needed if en.ts is updated)
     return [
       "#Rocket Host Video Collection",
       "#Outfit Of The Day(OOTD)",
@@ -95,7 +101,7 @@ export default function PostMomentScreen() {
   const ensureLibraryPerm = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Please allow access so you can upload.");
+      Alert.alert(t("postMoment.permissions.title"), t("postMoment.permissions.libraryMsg"));
       return false;
     }
     return true;
@@ -104,7 +110,7 @@ export default function PostMomentScreen() {
   const ensureCameraPerm = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Please allow camera access.");
+      Alert.alert(t("postMoment.permissions.title"), t("postMoment.permissions.cameraMsg"));
       return false;
     }
     return true;
@@ -167,16 +173,16 @@ export default function PostMomentScreen() {
 
   // ✅ Popo-style sheet: Add photos / Add videos / Cancel
   const handleAddPress = () => {
-    Alert.alert("Add", "Choose media type", [
-      { text: "Add photos", onPress: pickImageFromLibrary },
-      { text: "Add videos", onPress: pickVideoFromLibrary },
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("postMoment.sheets.title"), t("postMoment.sheets.message"), [
+      { text: t("postMoment.sheets.addPhotos"), onPress: pickImageFromLibrary },
+      { text: t("postMoment.sheets.addVideos"), onPress: pickVideoFromLibrary },
+      { text: t("common.cancel"), style: "cancel" },
     ]);
   };
 
   const uploadPickedMedia = async (picked: MediaPicked) => {
     const userId = await AsyncStorage.getItem("gl_user_id");
-    if (!userId) throw new Error("Not logged in");
+    if (!userId) throw new Error(t("postMoment.errors.notLoggedIn"));
 
     const fd = new FormData();
     fd.append("kind", picked.kind);
@@ -185,9 +191,7 @@ export default function PostMomentScreen() {
       picked.asset.fileName ??
       (picked.kind === "video" ? `moment-${Date.now()}.mp4` : `moment-${Date.now()}.jpg`);
 
-    const mime =
-      picked.asset.mimeType ??
-      (picked.kind === "video" ? "video/mp4" : "image/jpeg");
+    const mime = picked.asset.mimeType ?? (picked.kind === "video" ? "video/mp4" : "image/jpeg");
 
     fd.append(
       "file",
@@ -206,7 +210,7 @@ export default function PostMomentScreen() {
     const json = await res.json().catch(() => null);
 
     if (!res.ok) {
-      throw new Error(json?.error || "Upload failed");
+      throw new Error(json?.error || t("postMoment.errors.uploadFailed"));
     }
 
     return String(json?.url ?? "");
@@ -217,7 +221,7 @@ export default function PostMomentScreen() {
 
     const trimmed = text.trim();
     if (!trimmed && !media) {
-      Alert.alert("Nothing to post", "Please write something or add a photo/video.");
+      Alert.alert(t("postMoment.alerts.nothingTitle"), t("postMoment.alerts.nothingMsg"));
       return;
     }
 
@@ -226,7 +230,7 @@ export default function PostMomentScreen() {
 
       const userId = await AsyncStorage.getItem("gl_user_id");
       if (!userId) {
-        Alert.alert("Not logged in", "Please login again.");
+        Alert.alert(t("postMoment.alerts.notLoggedInTitle"), t("postMoment.alerts.notLoggedInMsg"));
         return;
       }
 
@@ -235,7 +239,7 @@ export default function PostMomentScreen() {
 
       if (media) {
         const url = await uploadPickedMedia(media);
-        if (!url) throw new Error("Upload returned empty URL");
+        if (!url) throw new Error(t("postMoment.errors.uploadEmpty"));
 
         if (media.kind === "image") imageUrl = url;
         if (media.kind === "video") videoUrl = url;
@@ -256,21 +260,19 @@ export default function PostMomentScreen() {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        Alert.alert("Error", json?.error || "Failed to post moment.");
+        Alert.alert(t("postMoment.alerts.errorTitle"), json?.error || t("postMoment.alerts.postFailed"));
         return;
       }
 
       Alert.alert(
-        "Posted",
-        media?.kind === "video"
-          ? "Your video will appear in the Video tab."
-          : "Your post will appear in Square."
+        t("postMoment.alerts.postedTitle"),
+        media?.kind === "video" ? t("postMoment.alerts.postedVideo") : t("postMoment.alerts.postedSquare")
       );
 
       navigation.goBack();
     } catch (err: any) {
       console.error("Post moment error", err);
-      Alert.alert("Error", err?.message || "Network error while posting moment.");
+      Alert.alert(t("postMoment.alerts.errorTitle"), err?.message || t("postMoment.errors.networkPost"));
     } finally {
       setPosting(false);
     }
@@ -278,43 +280,34 @@ export default function PostMomentScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 py-3">
           <Pressable onPress={() => navigation.goBack()} hitSlop={8} className="pr-2">
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </Pressable>
 
-          <Text className="text-[16px] font-semibold text-[#111827]">Post moments</Text>
+          <Text className="text-[16px] font-semibold text-[#111827]">{t("postMoment.title")}</Text>
 
           <Pressable
             className="px-3 py-1 rounded-full bg-[#6366F1] flex-row items-center justify-center"
             onPress={handlePost}
             disabled={posting}
           >
-            {posting && (
-              <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
-            )}
+            {posting && <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />}
             <Text className="text-[13px] text-white font-semibold">
-              {posting ? "Posting..." : "Post"}
+              {posting ? t("postMoment.actions.posting") : t("postMoment.actions.post")}
             </Text>
           </Pressable>
         </View>
 
         <View className="flex-1">
-          <ScrollView
-            className="flex-1"
-            contentContainerStyle={{ paddingBottom: 80 }}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
             <View className="px-4 mt-2">
               {topicTitleFromRoute && (
                 <View className="mb-2 self-start rounded-full bg-[#EEF2FF] px-3 py-1">
                   <Text className="text-[11px] text-[#4F46E5]">
-                    Posting to #{topicTitleFromRoute}
+                    {t("postMoment.labels.postingTo", { topic: topicTitleFromRoute })}
                   </Text>
                 </View>
               )}
@@ -324,14 +317,12 @@ export default function PostMomentScreen() {
                 onChangeText={(val) => {
                   if (val.length <= 250) setText(val);
                 }}
-                placeholder="Say something to record this moment..."
+                placeholder={t("postMoment.placeholders.input")}
                 placeholderTextColor="#9CA3AF"
                 multiline
                 className="text-[14px] text-[#111827] min-h-[80px]"
               />
-              <Text className="text-[11px] text-[#9CA3AF] text-right">
-                {text.length}/250
-              </Text>
+              <Text className="text-[11px] text-[#9CA3AF] text-right">{text.length}/250</Text>
 
               {/* Media picker */}
               <View className="mt-4">
@@ -345,10 +336,7 @@ export default function PostMomentScreen() {
                 ) : (
                   <View className="relative h-24 w-24 rounded-md overflow-hidden bg-[#F3F4F6]">
                     {media.kind === "image" ? (
-                      <Image
-                        source={{ uri: media.asset.uri }}
-                        style={{ width: "100%", height: "100%" }}
-                      />
+                      <Image source={{ uri: media.asset.uri }} style={{ width: "100%", height: "100%" }} />
                     ) : (
                       <Video
                         source={{ uri: media.asset.uri }}
@@ -382,14 +370,12 @@ export default function PostMomentScreen() {
             {/* Recommended topics */}
             <View className="px-4 mt-5">
               <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-[13px] text-[#6B7280]">
-                  Recommended topics
-                </Text>
+                <Text className="text-[13px] text-[#6B7280]">{t("postMoment.labels.recommended")}</Text>
                 {topicLoading ? (
-                  <Text className="text-[11px] text-[#9CA3AF]">Loading…</Text>
+                  <Text className="text-[11px] text-[#9CA3AF]">{t("common.loadingText")}</Text>
                 ) : (
                   <Pressable onPress={loadTopics}>
-                    <Text className="text-[11px] text-[#6C4DFF]">Refresh</Text>
+                    <Text className="text-[11px] text-[#6C4DFF]">{t("postMoment.actions.refresh")}</Text>
                   </Pressable>
                 )}
               </View>

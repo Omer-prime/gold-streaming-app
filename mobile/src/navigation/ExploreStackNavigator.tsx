@@ -8,13 +8,17 @@ import LiveRoomScreen from "../screens/LiveRoomScreen";
 
 import RealPersonAuthScreen from "../screens/RealPersonAuthScreen";
 import FaceScanScreen from "../screens/FaceScanScreen";
+import LiveCoverScreen from "../screens/LiveCoverScreen";
+import CoinsScreen from "../screens/CoinsScreen";
 
 export type ExploreStackParamList = {
   ExploreMain: undefined;
   LiveApplication: undefined;
+  LiveCoverScreen: undefined;
 
   RealPersonAuth: undefined;
   FaceScan: undefined;
+  Coins: undefined;
 
   HostLiveRoom: undefined;
   LiveRoom: {
@@ -32,12 +36,14 @@ export default function ExploreStackNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ExploreMain" component={ExploreScreen} />
       <Stack.Screen name="LiveApplication" component={LiveApplicationScreen} />
+      <Stack.Screen name="LiveCoverScreen" component={LiveCoverScreen} />
 
       <Stack.Screen name="RealPersonAuth" component={RealPersonAuthScreen} />
       <Stack.Screen name="FaceScan" component={FaceScanScreen} />
 
       <Stack.Screen name="HostLiveRoom" component={HostLiveRoomScreen} />
       <Stack.Screen name="LiveRoom" component={LiveRoomScreen} />
+      <Stack.Screen name="Coins" component={CoinsScreen} />
     </Stack.Navigator>
   );
 }

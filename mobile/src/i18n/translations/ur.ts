@@ -1,30 +1,30 @@
 // src/i18n/ur.ts
 export default {
     common: {
-    ok: "ٹھیک ہے",
-    cancel: "منسوخ",
-    loading: "...",
-    loadingText: "لوڈ ہو رہا ہے…",
+        ok: "ٹھیک ہے",
+        cancel: "منسوخ",
+        loading: "...",
+        loadingText: "لوڈ ہو رہا ہے…",
 
-    error: "ایرر",
-    success: "کامیابی",
-    done: "ہو گیا",
-    failed: "ناکام",
+        error: "ایرر",
+        success: "کامیابی",
+        done: "ہو گیا",
+        failed: "ناکام",
 
-    edit: "ایڈٹ",
-    block: "بلاک",
-    remove: "ہٹائیں",
-    you: "آپ",
+        edit: "ایڈٹ",
+        block: "بلاک",
+        remove: "ہٹائیں",
+        you: "آپ",
 
-    sendCode: "کوڈ بھیجیں",
-    verifyAndBind: "ویریفائی اور بائنڈ کریں",
-    bind: "بائنڈ",
-    unbind: "اَن بائنڈ",
-    changePhoneNumber: "فون نمبر تبدیل کریں",
-    userFallback: "یوزر",
+        sendCode: "کوڈ بھیجیں",
+        verifyAndBind: "ویریفائی اور بائنڈ کریں",
+        bind: "بائنڈ",
+        unbind: "اَن بائنڈ",
+        changePhoneNumber: "فون نمبر تبدیل کریں",
+        userFallback: "یوزر",
 
-    codeSent: "کوڈ بھیج دیا گیا",
-  },
+        codeSent: "کوڈ بھیج دیا گیا",
+    },
 
     errors: {
         userNotFound: "یوزر نہیں ملا، براہِ کرم دوبارہ لاگ اِن کریں۔",
@@ -474,44 +474,44 @@ export default {
     },
 
     store: {
-    title: "اسٹور",
-    popular: "مقبول",
-    states: {
-      loading: "اسٹور لوڈ ہو رہا ہے…",
-      empty: "کوئی آئٹم نہیں ملا",
+        title: "اسٹور",
+        popular: "مقبول",
+        states: {
+            loading: "اسٹور لوڈ ہو رہا ہے…",
+            empty: "کوئی آئٹم نہیں ملا",
+        },
+        actions: {
+            refresh: "ریفریش",
+            all: "سب >",
+            recharge: "ری چارج",
+        },
+        labels: {
+            coins: "کوائنز",
+            preview: "پری ویو",
+            balance: "آپ کا بیلنس",
+            balanceHint: "اسٹور آئٹمز فوراً خریدنے کے لیے کوائنز ری چارج کریں۔",
+            durationDays: "{{days}} دن",
+            permanent: "مستقل",
+        },
+        errors: {
+            missingUser: "userId موجود نہیں۔ براہِ کرم دوبارہ لاگ اِن کریں۔",
+        },
+        purchase: {
+            confirmTitle: "خرید کی تصدیق",
+            confirmMsg: '"{{title}}" کو {{price}} کوائنز میں خریدیں؟',
+            successTitle: "خرید لیا گیا",
+            successMsg: "آئٹم آپ کے اکاؤنٹ میں شامل کر دیا گیا ہے۔",
+            failedTitle: "خرید ناکام",
+            failedMsg: "براہِ کرم دوبارہ کوشش کریں۔",
+            insufficientTitle: "کوائنز ناکافی ہیں",
+            insufficientMsg: "یہ آئٹم خریدنے کے لیے کوائنز ری چارج کریں۔",
+            actions: {
+                buy: "ابھی خریدیں",
+                buying: "خرید ہو رہی ہے...",
+                recharge: "ری چارج",
+            },
+        },
     },
-    actions: {
-      refresh: "ریفریش",
-      all: "سب >",
-      recharge: "ری چارج",
-    },
-    labels: {
-      coins: "کوائنز",
-      preview: "پری ویو",
-      balance: "آپ کا بیلنس",
-      balanceHint: "اسٹور آئٹمز فوراً خریدنے کے لیے کوائنز ری چارج کریں۔",
-      durationDays: "{{days}} دن",
-      permanent: "مستقل",
-    },
-    errors: {
-      missingUser: "userId موجود نہیں۔ براہِ کرم دوبارہ لاگ اِن کریں۔",
-    },
-    purchase: {
-      confirmTitle: "خرید کی تصدیق",
-      confirmMsg: '"{{title}}" کو {{price}} کوائنز میں خریدیں؟',
-      successTitle: "خرید لیا گیا",
-      successMsg: "آئٹم آپ کے اکاؤنٹ میں شامل کر دیا گیا ہے۔",
-      failedTitle: "خرید ناکام",
-      failedMsg: "براہِ کرم دوبارہ کوشش کریں۔",
-      insufficientTitle: "کوائنز ناکافی ہیں",
-      insufficientMsg: "یہ آئٹم خریدنے کے لیے کوائنز ری چارج کریں۔",
-      actions: {
-        buy: "ابھی خریدیں",
-        buying: "خرید ہو رہی ہے...",
-        recharge: "ری چارج",
-      },
-    },
-  },
 
     invite: {
         title: "انویٹیشن بونس",
@@ -1087,75 +1087,75 @@ export default {
     },
 
     outfit: {
-    title: "میرا آؤٹ فِٹ",
+        title: "میرا آؤٹ فِٹ",
 
-    tabs: {
-      backpack: "بیگ پیک گفٹس",
-      avatar: "اوتار فریم",
-      party: "پارٹی تھیم",
-    },
+        tabs: {
+            backpack: "بیگ پیک گفٹس",
+            avatar: "اوتار فریم",
+            party: "پارٹی تھیم",
+        },
 
-    states: {
-      loading: "آپ کی آئٹمز لوڈ ہو رہی ہیں…",
-    },
+        states: {
+            loading: "آپ کی آئٹمز لوڈ ہو رہی ہیں…",
+        },
 
-    actions: {
-      retry: "دوبارہ کوشش کریں",
-      equip: "پہنیں",
-      unequip: "اتاریں",
-    },
+        actions: {
+            retry: "دوبارہ کوشش کریں",
+            equip: "پہنیں",
+            unequip: "اتاریں",
+        },
 
-    errors: {
-      loginRequired: "لاگ اِن ضروری ہے (gl_user_id نہیں ملا).",
-      loadFailed: "آؤٹ فِٹ آئٹمز لوڈ نہیں ہو سکیں",
-    },
+        errors: {
+            loginRequired: "لاگ اِن ضروری ہے (gl_user_id نہیں ملا).",
+            loadFailed: "آؤٹ فِٹ آئٹمز لوڈ نہیں ہو سکیں",
+        },
 
-    empty: {
-      backpack: "ابھی تک کوئی بیگ پیک گفٹس نہیں",
-      avatar: "ابھی تک کوئی اوتار فریم نہیں",
-      party: "ابھی تک کوئی پارٹی تھیم نہیں",
-      hint:
-        "اسٹور سے آئٹمز خریدیں۔ یہ صفحہ صرف وہی آئٹمز دکھاتا ہے جو آپ کے پاس ہیں (UserStoreItem).",
-    },
+        empty: {
+            backpack: "ابھی تک کوئی بیگ پیک گفٹس نہیں",
+            avatar: "ابھی تک کوئی اوتار فریم نہیں",
+            party: "ابھی تک کوئی پارٹی تھیم نہیں",
+            hint:
+                "اسٹور سے آئٹمز خریدیں۔ یہ صفحہ صرف وہی آئٹمز دکھاتا ہے جو آپ کے پاس ہیں (UserStoreItem).",
+        },
 
-    labels: {
-      permanent: "مستقل",
-      limited: "محدود",
-      expired: "میعاد ختم",
-      oneDayLeft: "1 دن باقی",
-      daysLeft: "{{count}} دن باقی",
+        labels: {
+            permanent: "مستقل",
+            limited: "محدود",
+            expired: "میعاد ختم",
+            oneDayLeft: "1 دن باقی",
+            daysLeft: "{{count}} دن باقی",
 
-      owned: "ملکیت",
-      item: "آئٹم",
+            owned: "ملکیت",
+            item: "آئٹم",
 
-      equipped: "پہنا ہوا",
-      tapToUse: "پہنانے/اتارنے کے لیے ٹَیپ کریں",
+            equipped: "پہنا ہوا",
+            tapToUse: "پہنانے/اتارنے کے لیے ٹَیپ کریں",
+        },
     },
-  },
-   giftGallery: {
-    title: "گفٹ گیلری",
-    states: {
-      loading: "لوڈ ہو رہا ہے…",
+    giftGallery: {
+        title: "گفٹ گیلری",
+        states: {
+            loading: "لوڈ ہو رہا ہے…",
+        },
+        errors: {
+            notLoggedIn: "یوزر نہیں ملا، براہِ کرم دوبارہ لاگ اِن کریں۔",
+            loadFailed: "گفٹ گیلری لوڈ نہیں ہو سکی۔",
+            network: "نیٹ ورک ایرر۔ براہِ کرم دوبارہ کوشش کریں۔",
+        },
+        summary: {
+            totalValue: "گفٹس کی کل ویلیو",
+            totalGifts: "{{count}} گفٹس",
+            uniqueGifts: "{{count}} اقسام",
+        },
+        actions: {
+            goToPoints: "پوائنٹس پر جائیں",
+        },
+        labels: {
+            coins: "کوائنز",
+            qtyLine: "x{{qty}} • ہر ایک {{unit}} کوائنز",
+        },
+        empty: "ابھی تک کوئی گفٹس موصول نہیں ہوئے۔",
     },
-    errors: {
-      notLoggedIn: "یوزر نہیں ملا، براہِ کرم دوبارہ لاگ اِن کریں۔",
-      loadFailed: "گفٹ گیلری لوڈ نہیں ہو سکی۔",
-      network: "نیٹ ورک ایرر۔ براہِ کرم دوبارہ کوشش کریں۔",
-    },
-    summary: {
-      totalValue: "گفٹس کی کل ویلیو",
-      totalGifts: "{{count}} گفٹس",
-      uniqueGifts: "{{count}} اقسام",
-    },
-    actions: {
-      goToPoints: "پوائنٹس پر جائیں",
-    },
-    labels: {
-      coins: "کوائنز",
-      qtyLine: "x{{qty}} • ہر ایک {{unit}} کوائنز",
-    },
-    empty: "ابھی تک کوئی گفٹس موصول نہیں ہوئے۔",
-  },
 
     followUs: {
         title: "ہمیں فالو کریں",
@@ -1278,48 +1278,48 @@ export default {
     },
 
     coins: {
-    title: "کوائنز",
-    pointsTab: "پوائنٹس",
-    labels: {
-      remainingCoins: "باقی کوائنز",
-      balanceAfter: "بیلنس: {{balance}}",
-      pkgCoins: "{{coins}} کوائنز",
-      pkgId: "پیکیج: {{id}}",
-      coinsUnit: "COINS",
+        title: "کوائنز",
+        pointsTab: "پوائنٹس",
+        labels: {
+            remainingCoins: "باقی کوائنز",
+            balanceAfter: "بیلنس: {{balance}}",
+            pkgCoins: "{{coins}} کوائنز",
+            pkgId: "پیکیج: {{id}}",
+            coinsUnit: "COINS",
+        },
+        actions: { topUp: "ٹاپ اَپ", refresh: "ریفریش" },
+        filters: { all: "سب", topups: "ٹاپ اَپس", spent: "خرچ شدہ" },
+        states: {
+            loading: "لوڈ ہو رہا ہے…",
+            empty: "کوئی ہسٹری نہیں",
+            scrollMore: "مزید کے لیے اسکرول کریں…",
+            end: "اختتام",
+            loadingPackages: "پیکیجز لوڈ ہو رہے ہیں…",
+            noPackages: "کوئی پیکیج نہیں",
+        },
+        types: { topup: "ٹاپ اَپ", giftSent: "گفٹ بھیجا گیا" },
+        modal: {
+            title: "ٹاپ اَپ",
+            note:
+                "نوٹ: یہ ٹاپ اَپ صرف ٹیسٹ موڈ کے لیے ہے۔ اصلی ادائیگیاں بعد میں شامل کی جائیں گی۔",
+        },
+        alerts: {
+            walletErrorTitle: "والٹ ایرر",
+            historyErrorTitle: "ہسٹری ایرر",
+            topupErrorTitle: "ٹاپ اَپ ایرر",
+            loginRequiredTitle: "لاگ اِن ضروری ہے",
+            topupFailedTitle: "ٹاپ اَپ ناکام",
+            successTitle: "کامیابی",
+            addedCoinsMsg: "{{coins}} کوائنز شامل کر دیے گئے",
+        },
+        errors: {
+            loadWallet: "والٹ لوڈ نہیں ہو سکا",
+            loadHistory: "ہسٹری لوڈ نہیں ہو سکی",
+            loadMore: "مزید لوڈ نہیں ہو سکا",
+            loadPackages: "پیکیجز لوڈ نہیں ہو سکے",
+            topupFailed: "ٹاپ اَپ ناکام",
+        },
     },
-    actions: { topUp: "ٹاپ اَپ", refresh: "ریفریش" },
-    filters: { all: "سب", topups: "ٹاپ اَپس", spent: "خرچ شدہ" },
-    states: {
-      loading: "لوڈ ہو رہا ہے…",
-      empty: "کوئی ہسٹری نہیں",
-      scrollMore: "مزید کے لیے اسکرول کریں…",
-      end: "اختتام",
-      loadingPackages: "پیکیجز لوڈ ہو رہے ہیں…",
-      noPackages: "کوئی پیکیج نہیں",
-    },
-    types: { topup: "ٹاپ اَپ", giftSent: "گفٹ بھیجا گیا" },
-    modal: {
-      title: "ٹاپ اَپ",
-      note:
-        "نوٹ: یہ ٹاپ اَپ صرف ٹیسٹ موڈ کے لیے ہے۔ اصلی ادائیگیاں بعد میں شامل کی جائیں گی۔",
-    },
-    alerts: {
-      walletErrorTitle: "والٹ ایرر",
-      historyErrorTitle: "ہسٹری ایرر",
-      topupErrorTitle: "ٹاپ اَپ ایرر",
-      loginRequiredTitle: "لاگ اِن ضروری ہے",
-      topupFailedTitle: "ٹاپ اَپ ناکام",
-      successTitle: "کامیابی",
-      addedCoinsMsg: "{{coins}} کوائنز شامل کر دیے گئے",
-    },
-    errors: {
-      loadWallet: "والٹ لوڈ نہیں ہو سکا",
-      loadHistory: "ہسٹری لوڈ نہیں ہو سکی",
-      loadMore: "مزید لوڈ نہیں ہو سکا",
-      loadPackages: "پیکیجز لوڈ نہیں ہو سکے",
-      topupFailed: "ٹاپ اَپ ناکام",
-    },
-  },
 
     liveApplication: {
         title: "لائیو اپلیکیشن",
@@ -1633,18 +1633,44 @@ export default {
 
     visitProfile: {
         titleFallback: "پروفائل",
-        states: {
-            notFound: "پروفائل نہیں ملا۔",
-            noMoments: "ابھی تک کوئی مومنٹس نہیں۔",
-        },
         labels: {
-            id: "ID: {{id}}",
+            id: "آئی ڈی: {{id}}",
             followers: "فالورز",
             following: "فالوئنگ",
         },
         actions: {
             follow: "فالو کریں",
             following: "فالوئنگ",
+            pleaseWait: "براہ کرم انتظار کریں...",
+            unblock: "ان بلاک کریں",
+        },
+        states: {
+            notFound: "یوزر نہیں ملا۔",
+            noMoments: "ابھی تک کوئی مومنٹس نہیں۔",
+            blockedChip: "آپ نے اس یوزر کو بلاک کیا ہے",
+            blockedBody: "آپ نے اس یوزر کو بلاک کیا ہے۔ مومنٹس دیکھنے کے لیے ان بلاک کریں۔",
+        },
+        menu: {
+            title: "آپشنز",
+            blockTitle: "یوزر کو بلاک کریں",
+            blockMsg:
+                "آپ کو اب ان کا مواد نظر نہیں آئے گا اور ممکن ہے وہ آپ سے انٹرایکٹ نہ کر سکے۔",
+            block: "بلاک کریں",
+            unblock: "ان بلاک کریں",
+        },
+        alerts: {
+            loginRequired: "لاگ اِن ضروری ہے۔",
+            loginToBlock: "یوزرز کو بلاک کرنے کے لیے لاگ اِن ضروری ہے۔",
+            blockedTitle: "بلاک ہو گیا",
+            blockedFollowMsg: "فالو کرنے کے لیے پہلے اس یوزر کو ان بلاک کریں۔",
+            navigationErrorTitle: "نیویگیشن ایرر",
+            profileTabMissing:
+                "پروفائل ٹیب نہیں ملا۔ یقینی بنائیں کہ آپ کے باٹم ٹیبز میں 'Profile' موجود ہو۔",
+            errorTitle: "ایرر",
+        },
+        errors: {
+            blockFailed: "یوزر کو بلاک نہیں کیا جا سکا",
+            unblockFailed: "یوزر کو ان بلاک نہیں کیا جا سکا",
         },
     },
 
@@ -1718,102 +1744,102 @@ export default {
         ],
     },
 
-     points: {
-    title: "پوائنٹس",
-    coinsTab: "کوائنز",
-    actions: {
-      details: "تفصیل",
-      withdraw: "ابھی وِڈرا کریں",
-      exchange: "پوائنٹس کو کوائنز میں تبدیل کریں",
-      exchanging: "تبدیل ہو رہا ہے...",
-      refresh: "ریفریش",
+    points: {
+        title: "پوائنٹس",
+        coinsTab: "کوائنز",
+        actions: {
+            details: "تفصیل",
+            withdraw: "ابھی وِڈرا کریں",
+            exchange: "پوائنٹس کو کوائنز میں تبدیل کریں",
+            exchanging: "تبدیل ہو رہا ہے...",
+            refresh: "ریفریش",
+        },
+        labels: {
+            available: "دستیاب پوائنٹس",
+            total: "کل: {{count}}",
+            unconfirmed: "غیر تصدیق شدہ: {{count}}",
+            income: "آمدنی",
+            last30: "گزشتہ 30 دن",
+        },
+        income: {
+            livestream: "لائیو اسٹریم",
+            party: "پارٹی",
+            platformRewards: "پلیٹ فارم ریوارڈز",
+        },
+        states: {
+            loading: "لوڈ ہو رہا ہے…",
+        },
+        hints: {
+            exchangeRate:
+                "ایکسچینج ریٹ بعد میں بیک اینڈ سے تبدیل کیا جا سکتا ہے (POINTS_PER_COIN).",
+        },
+        alerts: {
+            errorTitle: "ایرر",
+            successTitle: "کامیابی",
+            loginRequiredTitle: "لاگ اِن ضروری ہے",
+            loginRequiredMsg: "براہِ کرم دوبارہ لاگ اِن کریں۔",
+            detailsSoon: "تفصیل والی اسکرین جلد شامل کر دی جائے گی۔",
+            withdrawSoon: "وِڈرا فیچر جلد شامل کر دیا جائے گا۔",
+            exchangeFailedTitle: "تبدیلی ناکام",
+            exchangeSuccessMsg: "{{points}} پوائنٹس → {{coins}} کوائنز میں تبدیل ہو گئے۔",
+        },
+        errors: {
+            loadFailed: "پوائنٹس لوڈ نہیں ہو سکے",
+            exchangeFailed: "پوائنٹس تبدیل نہیں ہو سکے",
+        },
+        ranges: {
+            title: "رینج منتخب کریں",
+            last7: "گزشتہ 7 دن",
+            last30: "گزشتہ 30 دن",
+            last90: "گزشتہ 90 دن",
+        },
+        withdraw: {
+            title: "پوائنٹس وِڈرا کریں",
+            available: "دستیاب: {{points}} پوائنٹس",
+            fields: {
+                points: "وِڈرا کے لیے پوائنٹس",
+                method: "طریقہ",
+                account: "اکاؤنٹ کی تفصیل",
+            },
+            placeholders: {
+                account: "مثال: 03xx-xxxxxxx / IBAN / اکاؤنٹ نام",
+            },
+            actions: {
+                submit: "درخواست جمع کریں",
+                submitting: "جمع ہو رہا ہے...",
+            },
+            note:
+                "وِڈرا کی درخواستیں منظوری کے لیے ایڈمن کے پاس جاتی ہیں۔ پروسیس ہونے تک پوائنٹس روکے جا سکتے ہیں۔",
+            alerts: {
+                successTitle: "جمع ہو گئی",
+                successMsg: "آپ کی وِڈرا درخواست جمع ہو گئی ہے۔",
+                failedTitle: "وِڈرا ناکام",
+            },
+            errors: {
+                invalidPoints: "براہِ کرم پوائنٹس کی درست مقدار درج کریں۔",
+                accountRequired: "براہِ کرم اکاؤنٹ کی تفصیل درج کریں۔",
+                failed: "وِڈرا درخواست جمع نہیں ہو سکی۔",
+            },
+        },
+        details: {
+            title: "پوائنٹس کی تفصیل",
+            intro: "پلیٹ فارم پر پوائنٹس ایسے کام کرتے ہیں:",
+            lines: {
+                available: "دستیاب پوائنٹس وہ ہیں جنہیں آپ تبدیل یا وِڈرا کر سکتے ہیں۔",
+                unconfirmed:
+                    "غیر تصدیق شدہ پوائنٹس ابھی ویریفائی ہو رہے ہیں اور بدل سکتے ہیں۔",
+                total: "کل پوائنٹس میں دستیاب + غیر تصدیق شدہ شامل ہوتے ہیں۔",
+                income:
+                    "آمدنی میں منتخب رینج کے دوران پوائنٹس کہاں سے آئے، یہ دکھایا جاتا ہے۔",
+                exchange:
+                    "ایکسچینج پوائنٹس کو کوائنز میں بدلتا ہے۔ پلیٹ فارم رولز کے مطابق ریٹ تبدیل ہو سکتا ہے۔",
+                withdraw:
+                    "وِڈرا درخواستیں ادائیگی سے پہلے ریویو ہوتی ہیں۔ اکاؤنٹ کی تفصیل درست رکھیں۔",
+            },
+            footer:
+                "اگر کوئی مسئلہ ہو تو اپنی پروفائل اسکرین سے سپورٹ سے رابطہ کریں۔",
+        },
     },
-    labels: {
-      available: "دستیاب پوائنٹس",
-      total: "کل: {{count}}",
-      unconfirmed: "غیر تصدیق شدہ: {{count}}",
-      income: "آمدنی",
-      last30: "گزشتہ 30 دن",
-    },
-    income: {
-      livestream: "لائیو اسٹریم",
-      party: "پارٹی",
-      platformRewards: "پلیٹ فارم ریوارڈز",
-    },
-    states: {
-      loading: "لوڈ ہو رہا ہے…",
-    },
-    hints: {
-      exchangeRate:
-        "ایکسچینج ریٹ بعد میں بیک اینڈ سے تبدیل کیا جا سکتا ہے (POINTS_PER_COIN).",
-    },
-    alerts: {
-      errorTitle: "ایرر",
-      successTitle: "کامیابی",
-      loginRequiredTitle: "لاگ اِن ضروری ہے",
-      loginRequiredMsg: "براہِ کرم دوبارہ لاگ اِن کریں۔",
-      detailsSoon: "تفصیل والی اسکرین جلد شامل کر دی جائے گی۔",
-      withdrawSoon: "وِڈرا فیچر جلد شامل کر دیا جائے گا۔",
-      exchangeFailedTitle: "تبدیلی ناکام",
-      exchangeSuccessMsg: "{{points}} پوائنٹس → {{coins}} کوائنز میں تبدیل ہو گئے۔",
-    },
-    errors: {
-      loadFailed: "پوائنٹس لوڈ نہیں ہو سکے",
-      exchangeFailed: "پوائنٹس تبدیل نہیں ہو سکے",
-    },
-    ranges: {
-      title: "رینج منتخب کریں",
-      last7: "گزشتہ 7 دن",
-      last30: "گزشتہ 30 دن",
-      last90: "گزشتہ 90 دن",
-    },
-    withdraw: {
-      title: "پوائنٹس وِڈرا کریں",
-      available: "دستیاب: {{points}} پوائنٹس",
-      fields: {
-        points: "وِڈرا کے لیے پوائنٹس",
-        method: "طریقہ",
-        account: "اکاؤنٹ کی تفصیل",
-      },
-      placeholders: {
-        account: "مثال: 03xx-xxxxxxx / IBAN / اکاؤنٹ نام",
-      },
-      actions: {
-        submit: "درخواست جمع کریں",
-        submitting: "جمع ہو رہا ہے...",
-      },
-      note:
-        "وِڈرا کی درخواستیں منظوری کے لیے ایڈمن کے پاس جاتی ہیں۔ پروسیس ہونے تک پوائنٹس روکے جا سکتے ہیں۔",
-      alerts: {
-        successTitle: "جمع ہو گئی",
-        successMsg: "آپ کی وِڈرا درخواست جمع ہو گئی ہے۔",
-        failedTitle: "وِڈرا ناکام",
-      },
-      errors: {
-        invalidPoints: "براہِ کرم پوائنٹس کی درست مقدار درج کریں۔",
-        accountRequired: "براہِ کرم اکاؤنٹ کی تفصیل درج کریں۔",
-        failed: "وِڈرا درخواست جمع نہیں ہو سکی۔",
-      },
-    },
-    details: {
-      title: "پوائنٹس کی تفصیل",
-      intro: "پلیٹ فارم پر پوائنٹس ایسے کام کرتے ہیں:",
-      lines: {
-        available: "دستیاب پوائنٹس وہ ہیں جنہیں آپ تبدیل یا وِڈرا کر سکتے ہیں۔",
-        unconfirmed:
-          "غیر تصدیق شدہ پوائنٹس ابھی ویریفائی ہو رہے ہیں اور بدل سکتے ہیں۔",
-        total: "کل پوائنٹس میں دستیاب + غیر تصدیق شدہ شامل ہوتے ہیں۔",
-        income:
-          "آمدنی میں منتخب رینج کے دوران پوائنٹس کہاں سے آئے، یہ دکھایا جاتا ہے۔",
-        exchange:
-          "ایکسچینج پوائنٹس کو کوائنز میں بدلتا ہے۔ پلیٹ فارم رولز کے مطابق ریٹ تبدیل ہو سکتا ہے۔",
-        withdraw:
-          "وِڈرا درخواستیں ادائیگی سے پہلے ریویو ہوتی ہیں۔ اکاؤنٹ کی تفصیل درست رکھیں۔",
-      },
-      footer:
-        "اگر کوئی مسئلہ ہو تو اپنی پروفائل اسکرین سے سپورٹ سے رابطہ کریں۔",
-    },
-  },
 
     momentComments: {
         title: "{{owner}} کے مومنٹس",

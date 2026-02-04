@@ -1,31 +1,31 @@
 // src/i18n/ar.ts
 export default {
 
-  common: {
-    ok: "حسنًا",
-    cancel: "إلغاء",
-    loading: "...",
-    loadingText: "جارٍ التحميل…",
+    common: {
+        ok: "حسنًا",
+        cancel: "إلغاء",
+        loading: "...",
+        loadingText: "جارٍ التحميل…",
 
-    error: "خطأ",
-    success: "نجاح",
-    done: "تم",
-    failed: "فشل",
+        error: "خطأ",
+        success: "نجاح",
+        done: "تم",
+        failed: "فشل",
 
-    edit: "تعديل",
-    block: "حظر",
-    remove: "إزالة",
-    you: "أنت",
+        edit: "تعديل",
+        block: "حظر",
+        remove: "إزالة",
+        you: "أنت",
 
-    sendCode: "إرسال الرمز",
-    verifyAndBind: "تحقق وربط",
-    bind: "ربط",
-    unbind: "إلغاء الربط",
-    changePhoneNumber: "تغيير رقم الهاتف",
-    userFallback: "مستخدم",
+        sendCode: "إرسال الرمز",
+        verifyAndBind: "تحقق وربط",
+        bind: "ربط",
+        unbind: "إلغاء الربط",
+        changePhoneNumber: "تغيير رقم الهاتف",
+        userFallback: "مستخدم",
 
-    codeSent: "تم إرسال الرمز",
-  },
+        codeSent: "تم إرسال الرمز",
+    },
 
     errors: {
         userNotFound: "المستخدم غير موجود، يرجى تسجيل الدخول مرة أخرى.",
@@ -474,44 +474,44 @@ export default {
     },
 
     store: {
-    title: "المتجر",
-    popular: "الأكثر شيوعًا",
-    states: {
-      loading: "جارٍ تحميل المتجر…",
-      empty: "لم يتم العثور على عناصر",
+        title: "المتجر",
+        popular: "الأكثر شيوعًا",
+        states: {
+            loading: "جارٍ تحميل المتجر…",
+            empty: "لم يتم العثور على عناصر",
+        },
+        actions: {
+            refresh: "تحديث",
+            all: "الكل >",
+            recharge: "إعادة الشحن",
+        },
+        labels: {
+            coins: "عملات",
+            preview: "معاينة",
+            balance: "رصيدك",
+            balanceHint: "أعد شحن العملات لشراء عناصر المتجر فورًا.",
+            durationDays: "{{days}} يومًا",
+            permanent: "دائم",
+        },
+        errors: {
+            missingUser: "معرّف المستخدم مفقود. يرجى تسجيل الدخول مرة أخرى.",
+        },
+        purchase: {
+            confirmTitle: "تأكيد الشراء",
+            confirmMsg: 'شراء "{{title}}" مقابل {{price}} عملة؟',
+            successTitle: "تم الشراء",
+            successMsg: "تمت إضافة العنصر إلى حسابك.",
+            failedTitle: "فشل الشراء",
+            failedMsg: "يرجى المحاولة مرة أخرى.",
+            insufficientTitle: "لا توجد عملات كافية",
+            insufficientMsg: "أعد شحن العملات لشراء هذا العنصر.",
+            actions: {
+                buy: "اشترِ الآن",
+                buying: "جارٍ الشراء...",
+                recharge: "إعادة الشحن",
+            },
+        },
     },
-    actions: {
-      refresh: "تحديث",
-      all: "الكل >",
-      recharge: "إعادة الشحن",
-    },
-    labels: {
-      coins: "عملات",
-      preview: "معاينة",
-      balance: "رصيدك",
-      balanceHint: "أعد شحن العملات لشراء عناصر المتجر فورًا.",
-      durationDays: "{{days}} يومًا",
-      permanent: "دائم",
-    },
-    errors: {
-      missingUser: "معرّف المستخدم مفقود. يرجى تسجيل الدخول مرة أخرى.",
-    },
-    purchase: {
-      confirmTitle: "تأكيد الشراء",
-      confirmMsg: 'شراء "{{title}}" مقابل {{price}} عملة؟',
-      successTitle: "تم الشراء",
-      successMsg: "تمت إضافة العنصر إلى حسابك.",
-      failedTitle: "فشل الشراء",
-      failedMsg: "يرجى المحاولة مرة أخرى.",
-      insufficientTitle: "لا توجد عملات كافية",
-      insufficientMsg: "أعد شحن العملات لشراء هذا العنصر.",
-      actions: {
-        buy: "اشترِ الآن",
-        buying: "جارٍ الشراء...",
-        recharge: "إعادة الشحن",
-      },
-    },
-  },
 
     invite: {
         title: "مكافأة الدعوة",
@@ -1083,76 +1083,76 @@ export default {
         },
     },
 
-     outfit: {
-    title: "ملابسي",
+    outfit: {
+        title: "ملابسي",
 
-    tabs: {
-      backpack: "هدايا الحقيبة",
-      avatar: "إطار الصورة الرمزية",
-      party: "سمة الحفلة",
-    },
+        tabs: {
+            backpack: "هدايا الحقيبة",
+            avatar: "إطار الصورة الرمزية",
+            party: "سمة الحفلة",
+        },
 
-    states: {
-      loading: "جارٍ تحميل العناصر الخاصة بك…",
-    },
+        states: {
+            loading: "جارٍ تحميل العناصر الخاصة بك…",
+        },
 
-    actions: {
-      retry: "إعادة المحاولة",
-      equip: "تجهيز",
-      unequip: "إزالة التجهيز",
-    },
+        actions: {
+            retry: "إعادة المحاولة",
+            equip: "تجهيز",
+            unequip: "إزالة التجهيز",
+        },
 
-    errors: {
-      loginRequired: "مطلوب تسجيل الدخول (gl_user_id غير موجود).",
-      loadFailed: "فشل تحميل عناصر الملابس",
-    },
+        errors: {
+            loginRequired: "مطلوب تسجيل الدخول (gl_user_id غير موجود).",
+            loadFailed: "فشل تحميل عناصر الملابس",
+        },
 
-    empty: {
-      backpack: "لا توجد هدايا في الحقيبة بعد",
-      avatar: "لا توجد إطارات للصور الرمزية بعد",
-      party: "لا توجد سمات حفلات بعد",
-      hint:
-        "اشترِ عناصر من المتجر. تعرض هذه الصفحة فقط العناصر التي تملكها (UserStoreItem).",
-    },
+        empty: {
+            backpack: "لا توجد هدايا في الحقيبة بعد",
+            avatar: "لا توجد إطارات للصور الرمزية بعد",
+            party: "لا توجد سمات حفلات بعد",
+            hint:
+                "اشترِ عناصر من المتجر. تعرض هذه الصفحة فقط العناصر التي تملكها (UserStoreItem).",
+        },
 
-    labels: {
-      permanent: "دائم",
-      limited: "محدود",
-      expired: "منتهي الصلاحية",
-      oneDayLeft: "متبقّي يوم واحد",
-      daysLeft: "متبقّي {{count}} يومًا",
+        labels: {
+            permanent: "دائم",
+            limited: "محدود",
+            expired: "منتهي الصلاحية",
+            oneDayLeft: "متبقّي يوم واحد",
+            daysLeft: "متبقّي {{count}} يومًا",
 
-      owned: "مملوك",
-      item: "عنصر",
+            owned: "مملوك",
+            item: "عنصر",
 
-      equipped: "مُجهّز",
-      tapToUse: "اضغط للتجهيز/إزالة التجهيز",
+            equipped: "مُجهّز",
+            tapToUse: "اضغط للتجهيز/إزالة التجهيز",
+        },
     },
-  },
-  giftGallery: {
-    title: "معرض الهدايا",
-    states: {
-      loading: "جارٍ التحميل…",
+    giftGallery: {
+        title: "معرض الهدايا",
+        states: {
+            loading: "جارٍ التحميل…",
+        },
+        errors: {
+            notLoggedIn: "لم يتم العثور على المستخدم، يرجى تسجيل الدخول مرة أخرى.",
+            loadFailed: "فشل تحميل معرض الهدايا.",
+            network: "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
+        },
+        summary: {
+            totalValue: "إجمالي قيمة الهدايا",
+            totalGifts: "{{count}} هدية",
+            uniqueGifts: "{{count}} نوعًا",
+        },
+        actions: {
+            goToPoints: "الانتقال إلى النقاط",
+        },
+        labels: {
+            coins: "عملات",
+            qtyLine: "x{{qty}} • {{unit}} عملة لكل واحدة",
+        },
+        empty: "لم يتم استلام أي هدايا بعد.",
     },
-    errors: {
-      notLoggedIn: "لم يتم العثور على المستخدم، يرجى تسجيل الدخول مرة أخرى.",
-      loadFailed: "فشل تحميل معرض الهدايا.",
-      network: "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
-    },
-    summary: {
-      totalValue: "إجمالي قيمة الهدايا",
-      totalGifts: "{{count}} هدية",
-      uniqueGifts: "{{count}} نوعًا",
-    },
-    actions: {
-      goToPoints: "الانتقال إلى النقاط",
-    },
-    labels: {
-      coins: "عملات",
-      qtyLine: "x{{qty}} • {{unit}} عملة لكل واحدة",
-    },
-    empty: "لم يتم استلام أي هدايا بعد.",
-  },
     followUs: {
         title: "تابعنا",
 
@@ -1272,49 +1272,49 @@ export default {
         },
     },
 
-     coins: {
-    title: "العملات",
-    pointsTab: "النقاط",
-    labels: {
-      remainingCoins: "العملات المتبقية",
-      balanceAfter: "الرصيد: {{balance}}",
-      pkgCoins: "{{coins}} عملة",
-      pkgId: "الباقة: {{id}}",
-      coinsUnit: "عملات",
+    coins: {
+        title: "العملات",
+        pointsTab: "النقاط",
+        labels: {
+            remainingCoins: "العملات المتبقية",
+            balanceAfter: "الرصيد: {{balance}}",
+            pkgCoins: "{{coins}} عملة",
+            pkgId: "الباقة: {{id}}",
+            coinsUnit: "عملات",
+        },
+        actions: { topUp: "شحن", refresh: "تحديث" },
+        filters: { all: "الكل", topups: "عمليات الشحن", spent: "المصروف" },
+        states: {
+            loading: "جارٍ التحميل…",
+            empty: "لا يوجد سجل",
+            scrollMore: "مرّر للمزيد…",
+            end: "نهاية",
+            loadingPackages: "جارٍ تحميل الباقات…",
+            noPackages: "لا توجد باقات",
+        },
+        types: { topup: "شحن", giftSent: "إرسال هدية" },
+        modal: {
+            title: "شحن",
+            note:
+                "ملاحظة: هذا الشحن للاختبار فقط. سيتم إضافة المدفوعات الحقيقية لاحقًا.",
+        },
+        alerts: {
+            walletErrorTitle: "خطأ في المحفظة",
+            historyErrorTitle: "خطأ في السجل",
+            topupErrorTitle: "خطأ في الشحن",
+            loginRequiredTitle: "مطلوب تسجيل الدخول",
+            topupFailedTitle: "فشل الشحن",
+            successTitle: "نجاح",
+            addedCoinsMsg: "تمت إضافة {{coins}} عملة",
+        },
+        errors: {
+            loadWallet: "فشل تحميل المحفظة",
+            loadHistory: "فشل تحميل السجل",
+            loadMore: "فشل تحميل المزيد",
+            loadPackages: "فشل تحميل الباقات",
+            topupFailed: "فشل الشحن",
+        },
     },
-    actions: { topUp: "شحن", refresh: "تحديث" },
-    filters: { all: "الكل", topups: "عمليات الشحن", spent: "المصروف" },
-    states: {
-      loading: "جارٍ التحميل…",
-      empty: "لا يوجد سجل",
-      scrollMore: "مرّر للمزيد…",
-      end: "نهاية",
-      loadingPackages: "جارٍ تحميل الباقات…",
-      noPackages: "لا توجد باقات",
-    },
-    types: { topup: "شحن", giftSent: "إرسال هدية" },
-    modal: {
-      title: "شحن",
-      note:
-        "ملاحظة: هذا الشحن للاختبار فقط. سيتم إضافة المدفوعات الحقيقية لاحقًا.",
-    },
-    alerts: {
-      walletErrorTitle: "خطأ في المحفظة",
-      historyErrorTitle: "خطأ في السجل",
-      topupErrorTitle: "خطأ في الشحن",
-      loginRequiredTitle: "مطلوب تسجيل الدخول",
-      topupFailedTitle: "فشل الشحن",
-      successTitle: "نجاح",
-      addedCoinsMsg: "تمت إضافة {{coins}} عملة",
-    },
-    errors: {
-      loadWallet: "فشل تحميل المحفظة",
-      loadHistory: "فشل تحميل السجل",
-      loadMore: "فشل تحميل المزيد",
-      loadPackages: "فشل تحميل الباقات",
-      topupFailed: "فشل الشحن",
-    },
-  },
 
     liveApplication: {
         title: "طلب البث",
@@ -1627,10 +1627,6 @@ export default {
 
     visitProfile: {
         titleFallback: "الملف الشخصي",
-        states: {
-            notFound: "الملف الشخصي غير موجود.",
-            noMoments: "لا توجد لحظات بعد.",
-        },
         labels: {
             id: "المعرّف: {{id}}",
             followers: "المتابعون",
@@ -1639,6 +1635,36 @@ export default {
         actions: {
             follow: "متابعة",
             following: "يتابع",
+            pleaseWait: "يرجى الانتظار...",
+            unblock: "إلغاء الحظر",
+        },
+        states: {
+            notFound: "المستخدم غير موجود.",
+            noMoments: "لا توجد لحظات بعد.",
+            blockedChip: "لقد قمت بحظر هذا المستخدم",
+            blockedBody: "لقد قمت بحظر هذا المستخدم. قم بإلغاء الحظر لعرض لحظاته.",
+        },
+        menu: {
+            title: "الخيارات",
+            blockTitle: "حظر المستخدم",
+            blockMsg:
+                "لن ترى محتواه بعد الآن وقد لا يتمكن من التفاعل معك.",
+            block: "حظر",
+            unblock: "إلغاء الحظر",
+        },
+        alerts: {
+            loginRequired: "تسجيل الدخول مطلوب.",
+            loginToBlock: "تسجيل الدخول مطلوب لحظر المستخدمين.",
+            blockedTitle: "تم الحظر",
+            blockedFollowMsg: "قم بإلغاء حظر هذا المستخدم أولاً للمتابعة.",
+            navigationErrorTitle: "خطأ في التنقّل",
+            profileTabMissing:
+                "لم يتم العثور على تبويب الملف الشخصي. تأكد من أن تبويباتك السفلية تحتوي على 'Profile'.",
+            errorTitle: "خطأ",
+        },
+        errors: {
+            blockFailed: "فشل في حظر المستخدم",
+            unblockFailed: "فشل في إلغاء حظر المستخدم",
         },
     },
 
@@ -1713,179 +1739,179 @@ export default {
     },
 
     points: {
-    title: "النقاط",
-    coinsTab: "العملات",
-    actions: {
-      details: "التفاصيل",
-      withdraw: "اسحب الآن",
-      exchange: "استبدال النقاط بالعملات",
-      exchanging: "جارٍ الاستبدال...",
-      refresh: "تحديث",
+        title: "النقاط",
+        coinsTab: "العملات",
+        actions: {
+            details: "التفاصيل",
+            withdraw: "اسحب الآن",
+            exchange: "استبدال النقاط بالعملات",
+            exchanging: "جارٍ الاستبدال...",
+            refresh: "تحديث",
+        },
+        labels: {
+            available: "النقاط المتاحة",
+            total: "الإجمالي: {{count}}",
+            unconfirmed: "غير مؤكدة: {{count}}",
+            income: "الدخل",
+            last30: "آخر 30 يومًا",
+        },
+        income: {
+            livestream: "بث مباشر",
+            party: "حفلة",
+            platformRewards: "مكافآت المنصة",
+        },
+        states: {
+            loading: "جارٍ التحميل…",
+        },
+        hints: {
+            exchangeRate:
+                "يمكن تغيير سعر الصرف لاحقًا من الخلفية (POINTS_PER_COIN).",
+        },
+        alerts: {
+            errorTitle: "خطأ",
+            successTitle: "نجاح",
+            loginRequiredTitle: "مطلوب تسجيل الدخول",
+            loginRequiredMsg: "يرجى تسجيل الدخول مرة أخرى.",
+            detailsSoon: "سيتم إضافة شاشة التفاصيل قريبًا.",
+            withdrawSoon: "سيتم إضافة ميزة السحب قريبًا.",
+            exchangeFailedTitle: "فشل الاستبدال",
+            exchangeSuccessMsg: "تم استبدال {{points}} نقطة → {{coins}} عملة.",
+        },
+        errors: {
+            loadFailed: "فشل تحميل النقاط",
+            exchangeFailed: "فشل استبدال النقاط",
+        },
+        ranges: {
+            title: "اختر المدة",
+            last7: "آخر 7 أيام",
+            last30: "آخر 30 يومًا",
+            last90: "آخر 90 يومًا",
+        },
+        withdraw: {
+            title: "سحب النقاط",
+            available: "المتاح: {{points}} نقطة",
+            fields: {
+                points: "النقاط المراد سحبها",
+                method: "الطريقة",
+                account: "تفاصيل الحساب",
+            },
+            placeholders: {
+                account: "مثال: 03xx-xxxxxxx / IBAN / اسم الحساب",
+            },
+            actions: {
+                submit: "إرسال الطلب",
+                submitting: "جارٍ الإرسال...",
+            },
+            note:
+                "تذهب طلبات السحب إلى المشرف للموافقة. قد يتم تعليق النقاط حتى تتم المعالجة.",
+            alerts: {
+                successTitle: "تم الإرسال",
+                successMsg: "تم إرسال طلب السحب الخاص بك.",
+                failedTitle: "فشل السحب",
+            },
+            errors: {
+                invalidPoints: "يرجى إدخال مقدار نقاط صالح.",
+                accountRequired: "يرجى إدخال تفاصيل الحساب.",
+                failed: "تعذّر إرسال طلب السحب.",
+            },
+        },
+        details: {
+            title: "تفاصيل النقاط",
+            intro: "إليك كيفية عمل النقاط على المنصة:",
+            lines: {
+                available: "النقاط المتاحة هي النقاط التي يمكنك استبدالها أو سحبها.",
+                unconfirmed:
+                    "النقاط غير المؤكدة لا تزال قيد التحقق وقد تتغير.",
+                total: "إجمالي النقاط يشمل المتاحة + غير المؤكدة.",
+                income:
+                    "يعرض الدخل من أين جاءت نقاطك ضمن المدة المحددة.",
+                exchange:
+                    "الاستبدال يحول النقاط إلى عملات. قد يتغير سعر الاستبدال حسب قواعد المنصة.",
+                withdraw:
+                    "تتم مراجعة طلبات السحب قبل الدفع. تأكد من صحة تفاصيل حسابك.",
+            },
+            footer:
+                "إذا واجهت أي مشكلة، يرجى التواصل مع الدعم من شاشة الملف الشخصي.",
+        },
     },
-    labels: {
-      available: "النقاط المتاحة",
-      total: "الإجمالي: {{count}}",
-      unconfirmed: "غير مؤكدة: {{count}}",
-      income: "الدخل",
-      last30: "آخر 30 يومًا",
-    },
-    income: {
-      livestream: "بث مباشر",
-      party: "حفلة",
-      platformRewards: "مكافآت المنصة",
-    },
-    states: {
-      loading: "جارٍ التحميل…",
-    },
-    hints: {
-      exchangeRate:
-        "يمكن تغيير سعر الصرف لاحقًا من الخلفية (POINTS_PER_COIN).",
-    },
-    alerts: {
-      errorTitle: "خطأ",
-      successTitle: "نجاح",
-      loginRequiredTitle: "مطلوب تسجيل الدخول",
-      loginRequiredMsg: "يرجى تسجيل الدخول مرة أخرى.",
-      detailsSoon: "سيتم إضافة شاشة التفاصيل قريبًا.",
-      withdrawSoon: "سيتم إضافة ميزة السحب قريبًا.",
-      exchangeFailedTitle: "فشل الاستبدال",
-      exchangeSuccessMsg: "تم استبدال {{points}} نقطة → {{coins}} عملة.",
-    },
-    errors: {
-      loadFailed: "فشل تحميل النقاط",
-      exchangeFailed: "فشل استبدال النقاط",
-    },
-    ranges: {
-      title: "اختر المدة",
-      last7: "آخر 7 أيام",
-      last30: "آخر 30 يومًا",
-      last90: "آخر 90 يومًا",
-    },
-    withdraw: {
-      title: "سحب النقاط",
-      available: "المتاح: {{points}} نقطة",
-      fields: {
-        points: "النقاط المراد سحبها",
-        method: "الطريقة",
-        account: "تفاصيل الحساب",
-      },
-      placeholders: {
-        account: "مثال: 03xx-xxxxxxx / IBAN / اسم الحساب",
-      },
-      actions: {
-        submit: "إرسال الطلب",
-        submitting: "جارٍ الإرسال...",
-      },
-      note:
-        "تذهب طلبات السحب إلى المشرف للموافقة. قد يتم تعليق النقاط حتى تتم المعالجة.",
-      alerts: {
-        successTitle: "تم الإرسال",
-        successMsg: "تم إرسال طلب السحب الخاص بك.",
-        failedTitle: "فشل السحب",
-      },
-      errors: {
-        invalidPoints: "يرجى إدخال مقدار نقاط صالح.",
-        accountRequired: "يرجى إدخال تفاصيل الحساب.",
-        failed: "تعذّر إرسال طلب السحب.",
-      },
-    },
-    details: {
-      title: "تفاصيل النقاط",
-      intro: "إليك كيفية عمل النقاط على المنصة:",
-      lines: {
-        available: "النقاط المتاحة هي النقاط التي يمكنك استبدالها أو سحبها.",
-        unconfirmed:
-          "النقاط غير المؤكدة لا تزال قيد التحقق وقد تتغير.",
-        total: "إجمالي النقاط يشمل المتاحة + غير المؤكدة.",
-        income:
-          "يعرض الدخل من أين جاءت نقاطك ضمن المدة المحددة.",
-        exchange:
-          "الاستبدال يحول النقاط إلى عملات. قد يتغير سعر الاستبدال حسب قواعد المنصة.",
-        withdraw:
-          "تتم مراجعة طلبات السحب قبل الدفع. تأكد من صحة تفاصيل حسابك.",
-      },
-      footer:
-        "إذا واجهت أي مشكلة، يرجى التواصل مع الدعم من شاشة الملف الشخصي.",
-    },
-  },
 
-momentComments: {
-    title: "لحظات {{owner}}",
-    empty: "لا توجد تعليقات بعد. كن أول من يرد!",
-    placeholder: "اكتب تعليقاً...",
-},
+    momentComments: {
+        title: "لحظات {{owner}}",
+        empty: "لا توجد تعليقات بعد. كن أول من يرد!",
+        placeholder: "اكتب تعليقاً...",
+    },
 
-myGuardian: {
-    title: "حارسي",
-    empty: "لم تحرس أحداً بعد.",
-    actions: {
-        goBack: "العودة",
+    myGuardian: {
+        title: "حارسي",
+        empty: "لم تحرس أحداً بعد.",
+        actions: {
+            goBack: "العودة",
+        },
+        card: {
+            meta: "المستوى: {{tier}} • ينتهي: {{ends}}",
+        },
+        errors: {
+            missingUserId: "userId مفقود. يرجى تسجيل الدخول مرة أخرى.",
+            loadFailed: "فشل التحميل",
+        },
     },
-    card: {
-        meta: "المستوى: {{tier}} • ينتهي: {{ends}}",
-    },
-    errors: {
-        missingUserId: "userId مفقود. يرجى تسجيل الدخول مرة أخرى.",
-        loadFailed: "فشل التحميل",
-    },
-},
 
-myProfile: {
-    tabs: {
-        posts: "المنشورات",
+    myProfile: {
+        tabs: {
+            posts: "المنشورات",
+        },
+        items: {
+            giftGallery: "معرض الهدايا",
+            contribution: "المساهمة",
+        },
+        sections: {
+            personalInfo: "معلومات شخصية",
+        },
+        labels: {
+            idLine: "المعرّف: {{id}}",
+            followingFollowers: "يتابع {{following}} · المتابعون {{followers}}",
+            fansCount: "{{count}} معجب",
+            lit: "Lit: {{current}}/{{total}}",
+            participantsRank: "المشاركون في الترتيب: {{count}}",
+        },
+        defaults: {
+            bio: "كان/كانت كسولاً ولم يترك شيئاً وراءه.",
+        },
+        alerts: {
+            waitTitle: "يرجى الانتظار",
+            profileLoadingMsg: "لا يزال الملف الشخصي قيد التحميل.",
+        },
     },
-    items: {
-        giftGallery: "معرض الهدايا",
-        contribution: "المساهمة",
-    },
-    sections: {
-        personalInfo: "معلومات شخصية",
-    },
-    labels: {
-        idLine: "المعرّف: {{id}}",
-        followingFollowers: "يتابع {{following}} · المتابعون {{followers}}",
-        fansCount: "{{count}} معجب",
-        lit: "Lit: {{current}}/{{total}}",
-        participantsRank: "المشاركون في الترتيب: {{count}}",
-    },
-    defaults: {
-        bio: "كان/كانت كسولاً ولم يترك شيئاً وراءه.",
-    },
-    alerts: {
-        waitTitle: "يرجى الانتظار",
-        profileLoadingMsg: "لا يزال الملف الشخصي قيد التحميل.",
-    },
-},
 
-notificationsInbox: {
-    postOwnerName: "منشور",
-    inboxSearchPlaceholder: "ابحث في الإشعارات...",
-},
+    notificationsInbox: {
+        postOwnerName: "منشور",
+        inboxSearchPlaceholder: "ابحث في الإشعارات...",
+    },
 
-party: {
-    tabs: {
-        following: "يتابع",
-        party: "حفلة",
+    party: {
+        tabs: {
+            following: "يتابع",
+            party: "حفلة",
+        },
+        search: {
+            placeholder: "ابحث في غرف الحفلات",
+        },
+        filters: {
+            popular: "شائع",
+            pakistan: "باكستان",
+            philippines: "الفلبين",
+            more: "المزيد",
+        },
+        labels: {
+            defaultTag: "حفلة",
+        },
+        states: {
+            empty: "لم يتم العثور على غرف. جرّب تغيير الفلتر أو البحث.",
+        },
+        errors: {
+            loadFailed: "فشل تحميل غرف الحفلات",
+            network: "خطأ في الشبكة أثناء تحميل غرف الحفلات",
+        },
     },
-    search: {
-        placeholder: "ابحث في غرف الحفلات",
-    },
-    filters: {
-        popular: "شائع",
-        pakistan: "باكستان",
-        philippines: "الفلبين",
-        more: "المزيد",
-    },
-    labels: {
-        defaultTag: "حفلة",
-    },
-    states: {
-        empty: "لم يتم العثور على غرف. جرّب تغيير الفلتر أو البحث.",
-    },
-    errors: {
-        loadFailed: "فشل تحميل غرف الحفلات",
-        network: "خطأ في الشبكة أثناء تحميل غرف الحفلات",
-    },
-},
 
 };

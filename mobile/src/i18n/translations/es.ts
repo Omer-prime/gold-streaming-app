@@ -1639,22 +1639,48 @@ export default {
     },
   },
 
-  visitProfile: {
-    titleFallback: "Perfil",
-    states: {
-      notFound: "Perfil no encontrado.",
-      noMoments: "Aún no hay momentos.",
-    },
-    labels: {
-      id: "ID: {{id}}",
-      followers: "Seguidores",
-      following: "Siguiendo",
-    },
-    actions: {
-      follow: "Seguir",
-      following: "Siguiendo",
-    },
+visitProfile: {
+  titleFallback: "Perfil",
+  labels: {
+    id: "ID: {{id}}",
+    followers: "Seguidores",
+    following: "Siguiendo",
   },
+  actions: {
+    follow: "Seguir",
+    following: "Siguiendo",
+    pleaseWait: "Por favor espera...",
+    unblock: "Desbloquear",
+  },
+  states: {
+    notFound: "Usuario no encontrado.",
+    noMoments: "Aún no hay momentos.",
+    blockedChip: "Has bloqueado a este usuario",
+    blockedBody: "Has bloqueado a este usuario. Desbloquéalo para ver sus momentos.",
+  },
+  menu: {
+    title: "Opciones",
+    blockTitle: "Bloquear usuario",
+    blockMsg:
+      "Ya no verás su contenido y puede que no pueda interactuar contigo.",
+    block: "Bloquear",
+    unblock: "Desbloquear",
+  },
+  alerts: {
+    loginRequired: "Inicio de sesión requerido.",
+    loginToBlock: "Inicio de sesión requerido para bloquear usuarios.",
+    blockedTitle: "Bloqueado",
+    blockedFollowMsg: "Primero desbloquea a este usuario para seguirlo.",
+    navigationErrorTitle: "Error de navegación",
+    profileTabMissing:
+      "No se encontró la pestaña de Perfil. Asegúrate de que tus pestañas inferiores tengan 'Perfil'.",
+    errorTitle: "Error",
+  },
+  errors: {
+    blockFailed: "No se pudo bloquear al usuario",
+    unblockFailed: "No se pudo desbloquear al usuario",
+  },
+},
 
   realPersonAuth: {
     title: "Autenticación",

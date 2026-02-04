@@ -1627,22 +1627,48 @@ export default {
         },
     },
 
-    visitProfile: {
-        titleFallback: "Perfil",
-        states: {
-            notFound: "Perfil não encontrado.",
-            noMoments: "Ainda não há momentos.",
-        },
-        labels: {
-            id: "ID: {{id}}",
-            followers: "Seguidores",
-            following: "Seguindo",
-        },
-        actions: {
-            follow: "Seguir",
-            following: "Seguindo",
-        },
-    },
+   visitProfile: {
+  titleFallback: "Perfil",
+  labels: {
+    id: "ID: {{id}}",
+    followers: "Seguidores",
+    following: "A seguir",
+  },
+  actions: {
+    follow: "Seguir",
+    following: "A seguir",
+    pleaseWait: "Por favor, aguarde...",
+    unblock: "Desbloquear",
+  },
+  states: {
+    notFound: "Utilizador não encontrado.",
+    noMoments: "Ainda não há momentos.",
+    blockedChip: "Bloqueaste este utilizador",
+    blockedBody: "Bloqueaste este utilizador. Desbloqueia para ver os momentos.",
+  },
+  menu: {
+    title: "Opções",
+    blockTitle: "Bloquear utilizador",
+    blockMsg:
+      "Já não verás o conteúdo dele e ele poderá não conseguir interagir contigo.",
+    block: "Bloquear",
+    unblock: "Desbloquear",
+  },
+  alerts: {
+    loginRequired: "Início de sessão obrigatório.",
+    loginToBlock: "Início de sessão obrigatório para bloquear utilizadores.",
+    blockedTitle: "Bloqueado",
+    blockedFollowMsg: "Desbloqueia este utilizador primeiro para seguir.",
+    navigationErrorTitle: "Erro de navegação",
+    profileTabMissing:
+      "Separador de Perfil não encontrado. Certifica-te de que as tuas tabs inferiores têm 'Perfil'.",
+    errorTitle: "Erro",
+  },
+  errors: {
+    blockFailed: "Falha ao bloquear o utilizador",
+    unblockFailed: "Falha ao desbloquear o utilizador",
+  },
+},
 
     realPersonAuth: {
         title: "Autenticação",

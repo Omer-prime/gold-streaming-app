@@ -1,30 +1,30 @@
 // src/i18n/zh-Hant.ts
 export default {
-     common: {
-    ok: "確定",
-    cancel: "取消",
-    loading: "...",
-    loadingText: "載入中…",
+    common: {
+        ok: "確定",
+        cancel: "取消",
+        loading: "...",
+        loadingText: "載入中…",
 
-    error: "錯誤",
-    success: "成功",
-    done: "完成",
-    failed: "失敗",
+        error: "錯誤",
+        success: "成功",
+        done: "完成",
+        failed: "失敗",
 
-    edit: "編輯",
-    block: "封鎖",
-    remove: "移除",
-    you: "你",
+        edit: "編輯",
+        block: "封鎖",
+        remove: "移除",
+        you: "你",
 
-    sendCode: "傳送驗證碼",
-    verifyAndBind: "驗證並綁定",
-    bind: "綁定",
-    unbind: "解除綁定",
-    changePhoneNumber: "更改電話號碼",
-    userFallback: "使用者",
+        sendCode: "傳送驗證碼",
+        verifyAndBind: "驗證並綁定",
+        bind: "綁定",
+        unbind: "解除綁定",
+        changePhoneNumber: "更改電話號碼",
+        userFallback: "使用者",
 
-    codeSent: "已傳送驗證碼",
-  },
+        codeSent: "已傳送驗證碼",
+    },
 
     errors: {
         userNotFound: "找不到用戶，請重新登入。",
@@ -473,44 +473,44 @@ export default {
     },
 
     store: {
-    title: "商店",
-    popular: "熱門",
-    states: {
-      loading: "正在載入商店…",
-      empty: "找不到任何物品",
+        title: "商店",
+        popular: "熱門",
+        states: {
+            loading: "正在載入商店…",
+            empty: "找不到任何物品",
+        },
+        actions: {
+            refresh: "重新整理",
+            all: "全部 >",
+            recharge: "儲值",
+        },
+        labels: {
+            coins: "硬幣",
+            preview: "預覽",
+            balance: "你的餘額",
+            balanceHint: "先儲值硬幣即可立即購買商店物品。",
+            durationDays: "{{days}} 天",
+            permanent: "永久",
+        },
+        errors: {
+            missingUser: "缺少 userId。請重新登入。",
+        },
+        purchase: {
+            confirmTitle: "確認購買",
+            confirmMsg: "以 {{price}} 硬幣購買「{{title}}」？",
+            successTitle: "已購買",
+            successMsg: "物品已加入你的帳戶。",
+            failedTitle: "購買失敗",
+            failedMsg: "請再試一次。",
+            insufficientTitle: "硬幣不足",
+            insufficientMsg: "請先儲值硬幣再購買此物品。",
+            actions: {
+                buy: "立即購買",
+                buying: "購買中...",
+                recharge: "儲值",
+            },
+        },
     },
-    actions: {
-      refresh: "重新整理",
-      all: "全部 >",
-      recharge: "儲值",
-    },
-    labels: {
-      coins: "硬幣",
-      preview: "預覽",
-      balance: "你的餘額",
-      balanceHint: "先儲值硬幣即可立即購買商店物品。",
-      durationDays: "{{days}} 天",
-      permanent: "永久",
-    },
-    errors: {
-      missingUser: "缺少 userId。請重新登入。",
-    },
-    purchase: {
-      confirmTitle: "確認購買",
-      confirmMsg: "以 {{price}} 硬幣購買「{{title}}」？",
-      successTitle: "已購買",
-      successMsg: "物品已加入你的帳戶。",
-      failedTitle: "購買失敗",
-      failedMsg: "請再試一次。",
-      insufficientTitle: "硬幣不足",
-      insufficientMsg: "請先儲值硬幣再購買此物品。",
-      actions: {
-        buy: "立即購買",
-        buying: "購買中...",
-        recharge: "儲值",
-      },
-    },
-  },
 
     invite: {
         title: "邀請獎勵",
@@ -1083,75 +1083,75 @@ export default {
         },
     },
 
-      outfit: {
-    title: "我的裝扮",
+    outfit: {
+        title: "我的裝扮",
 
-    tabs: {
-      backpack: "背包禮物",
-      avatar: "頭像框",
-      party: "派對主題",
-    },
+        tabs: {
+            backpack: "背包禮物",
+            avatar: "頭像框",
+            party: "派對主題",
+        },
 
-    states: {
-      loading: "正在載入你的物品…",
-    },
+        states: {
+            loading: "正在載入你的物品…",
+        },
 
-    actions: {
-      retry: "重試",
-      equip: "裝備",
-      unequip: "卸下",
-    },
+        actions: {
+            retry: "重試",
+            equip: "裝備",
+            unequip: "卸下",
+        },
 
-    errors: {
-      loginRequired: "需要登入（找不到 gl_user_id）。",
-      loadFailed: "載入裝扮物品失敗",
-    },
+        errors: {
+            loginRequired: "需要登入（找不到 gl_user_id）。",
+            loadFailed: "載入裝扮物品失敗",
+        },
 
-    empty: {
-      backpack: "目前沒有背包禮物",
-      avatar: "目前沒有頭像框",
-      party: "目前沒有派對主題",
-      hint: "到商店購買物品。此頁只顯示你擁有的物品（UserStoreItem）。",
-    },
+        empty: {
+            backpack: "目前沒有背包禮物",
+            avatar: "目前沒有頭像框",
+            party: "目前沒有派對主題",
+            hint: "到商店購買物品。此頁只顯示你擁有的物品（UserStoreItem）。",
+        },
 
-    labels: {
-      permanent: "永久",
-      limited: "限時",
-      expired: "已過期",
-      oneDayLeft: "剩 1 天",
-      daysLeft: "剩 {{count}} 天",
+        labels: {
+            permanent: "永久",
+            limited: "限時",
+            expired: "已過期",
+            oneDayLeft: "剩 1 天",
+            daysLeft: "剩 {{count}} 天",
 
-      owned: "已擁有",
-      item: "物品",
+            owned: "已擁有",
+            item: "物品",
 
-      equipped: "已裝備",
-      tapToUse: "點擊以裝備/卸下",
+            equipped: "已裝備",
+            tapToUse: "點擊以裝備/卸下",
+        },
     },
-  },
-   giftGallery: {
-    title: "禮物圖鑑",
-    states: {
-      loading: "載入中…",
+    giftGallery: {
+        title: "禮物圖鑑",
+        states: {
+            loading: "載入中…",
+        },
+        errors: {
+            notLoggedIn: "找不到使用者，請重新登入。",
+            loadFailed: "載入禮物圖鑑失敗。",
+            network: "網路錯誤。請再試一次。",
+        },
+        summary: {
+            totalValue: "禮物總價值",
+            totalGifts: "{{count}} 個禮物",
+            uniqueGifts: "{{count}} 種類型",
+        },
+        actions: {
+            goToPoints: "前往點數",
+        },
+        labels: {
+            coins: "硬幣",
+            qtyLine: "x{{qty}} • 每個 {{unit}} 硬幣",
+        },
+        empty: "目前尚未收到任何禮物。",
     },
-    errors: {
-      notLoggedIn: "找不到使用者，請重新登入。",
-      loadFailed: "載入禮物圖鑑失敗。",
-      network: "網路錯誤。請再試一次。",
-    },
-    summary: {
-      totalValue: "禮物總價值",
-      totalGifts: "{{count}} 個禮物",
-      uniqueGifts: "{{count}} 種類型",
-    },
-    actions: {
-      goToPoints: "前往點數",
-    },
-    labels: {
-      coins: "硬幣",
-      qtyLine: "x{{qty}} • 每個 {{unit}} 硬幣",
-    },
-    empty: "目前尚未收到任何禮物。",
-  },
 
     followUs: {
         title: "關注我們",
@@ -1273,48 +1273,48 @@ export default {
         },
     },
 
-      coins: {
-    title: "硬幣",
-    pointsTab: "點數",
-    labels: {
-      remainingCoins: "剩餘硬幣",
-      balanceAfter: "餘額：{{balance}}",
-      pkgCoins: "{{coins}} 硬幣",
-      pkgId: "方案：{{id}}",
-      coinsUnit: "COINS",
+    coins: {
+        title: "硬幣",
+        pointsTab: "點數",
+        labels: {
+            remainingCoins: "剩餘硬幣",
+            balanceAfter: "餘額：{{balance}}",
+            pkgCoins: "{{coins}} 硬幣",
+            pkgId: "方案：{{id}}",
+            coinsUnit: "COINS",
+        },
+        actions: { topUp: "儲值", refresh: "重新整理" },
+        filters: { all: "全部", topups: "儲值", spent: "已花費" },
+        states: {
+            loading: "載入中…",
+            empty: "沒有紀錄",
+            scrollMore: "向下滑動查看更多…",
+            end: "結束",
+            loadingPackages: "正在載入方案…",
+            noPackages: "沒有方案",
+        },
+        types: { topup: "儲值", giftSent: "已送出禮物" },
+        modal: {
+            title: "儲值",
+            note: "注意：此儲值僅為測試模式。之後會加入真實付款。",
+        },
+        alerts: {
+            walletErrorTitle: "錢包錯誤",
+            historyErrorTitle: "紀錄錯誤",
+            topupErrorTitle: "儲值錯誤",
+            loginRequiredTitle: "需要登入",
+            topupFailedTitle: "儲值失敗",
+            successTitle: "成功",
+            addedCoinsMsg: "已新增 {{coins}} 硬幣",
+        },
+        errors: {
+            loadWallet: "載入錢包失敗",
+            loadHistory: "載入紀錄失敗",
+            loadMore: "載入更多失敗",
+            loadPackages: "載入方案失敗",
+            topupFailed: "儲值失敗",
+        },
     },
-    actions: { topUp: "儲值", refresh: "重新整理" },
-    filters: { all: "全部", topups: "儲值", spent: "已花費" },
-    states: {
-      loading: "載入中…",
-      empty: "沒有紀錄",
-      scrollMore: "向下滑動查看更多…",
-      end: "結束",
-      loadingPackages: "正在載入方案…",
-      noPackages: "沒有方案",
-    },
-    types: { topup: "儲值", giftSent: "已送出禮物" },
-    modal: {
-      title: "儲值",
-      note: "注意：此儲值僅為測試模式。之後會加入真實付款。",
-    },
-    alerts: {
-      walletErrorTitle: "錢包錯誤",
-      historyErrorTitle: "紀錄錯誤",
-      topupErrorTitle: "儲值錯誤",
-      loginRequiredTitle: "需要登入",
-      topupFailedTitle: "儲值失敗",
-      successTitle: "成功",
-      addedCoinsMsg: "已新增 {{coins}} 硬幣",
-    },
-    errors: {
-      loadWallet: "載入錢包失敗",
-      loadHistory: "載入紀錄失敗",
-      loadMore: "載入更多失敗",
-      loadPackages: "載入方案失敗",
-      topupFailed: "儲值失敗",
-    },
-  },
 
     liveApplication: {
         title: "直播申請",
@@ -1628,21 +1628,44 @@ export default {
 
     visitProfile: {
         titleFallback: "個人檔案",
-        states: {
-            notFound: "找不到個人檔案。",
-            noMoments: "還沒有動態。",
-        },
         labels: {
             id: "ID：{{id}}",
             followers: "粉絲",
-            following: "關注",
+            following: "追蹤中",
         },
         actions: {
-            follow: "關注",
-            following: "已關注",
+            follow: "追蹤",
+            following: "追蹤中",
+            pleaseWait: "請稍候...",
+            unblock: "解除封鎖",
+        },
+        states: {
+            notFound: "找不到使用者。",
+            noMoments: "尚無動態。",
+            blockedChip: "你已封鎖此使用者",
+            blockedBody: "你已封鎖此使用者。解除封鎖後即可查看他的動態。",
+        },
+        menu: {
+            title: "選項",
+            blockTitle: "封鎖使用者",
+            blockMsg: "你將不再看到他的內容，且他可能無法與你互動。",
+            block: "封鎖",
+            unblock: "解除封鎖",
+        },
+        alerts: {
+            loginRequired: "需要登入。",
+            loginToBlock: "需要登入才能封鎖使用者。",
+            blockedTitle: "已封鎖",
+            blockedFollowMsg: "請先解除封鎖此使用者才能追蹤。",
+            navigationErrorTitle: "導覽錯誤",
+            profileTabMissing: "找不到個人檔案分頁。請確認底部分頁中包含 'Profile'。",
+            errorTitle: "錯誤",
+        },
+        errors: {
+            blockFailed: "封鎖使用者失敗",
+            unblockFailed: "解除封鎖使用者失敗",
         },
     },
-
     realPersonAuth: {
         title: "認證",
         hero: {
@@ -1714,94 +1737,94 @@ export default {
     },
 
     points: {
-    title: "點數",
-    coinsTab: "硬幣",
-    actions: {
-      details: "詳情",
-      withdraw: "立即提領",
-      exchange: "以點數兌換硬幣",
-      exchanging: "兌換中...",
-      refresh: "重新整理",
+        title: "點數",
+        coinsTab: "硬幣",
+        actions: {
+            details: "詳情",
+            withdraw: "立即提領",
+            exchange: "以點數兌換硬幣",
+            exchanging: "兌換中...",
+            refresh: "重新整理",
+        },
+        labels: {
+            available: "可用點數",
+            total: "總計：{{count}}",
+            unconfirmed: "未確認：{{count}}",
+            income: "收入",
+            last30: "最近 30 天",
+        },
+        income: {
+            livestream: "直播",
+            party: "派對",
+            platformRewards: "平台獎勵",
+        },
+        states: {
+            loading: "載入中…",
+        },
+        hints: {
+            exchangeRate: "兌換比例之後可在後端調整（POINTS_PER_COIN）。",
+        },
+        alerts: {
+            errorTitle: "錯誤",
+            successTitle: "成功",
+            loginRequiredTitle: "需要登入",
+            loginRequiredMsg: "請重新登入。",
+            detailsSoon: "詳情頁將於稍後加入。",
+            withdrawSoon: "提領功能將於稍後加入。",
+            exchangeFailedTitle: "兌換失敗",
+            exchangeSuccessMsg: "已兌換 {{points}} 點 → {{coins}} 硬幣。",
+        },
+        errors: {
+            loadFailed: "載入點數失敗",
+            exchangeFailed: "兌換點數失敗",
+        },
+        ranges: {
+            title: "選擇區間",
+            last7: "最近 7 天",
+            last30: "最近 30 天",
+            last90: "最近 90 天",
+        },
+        withdraw: {
+            title: "提領點數",
+            available: "可用：{{points}} 點",
+            fields: {
+                points: "要提領的點數",
+                method: "方式",
+                account: "帳戶資料",
+            },
+            placeholders: {
+                account: "例如：03xx-xxxxxxx / IBAN / 帳戶名稱",
+            },
+            actions: {
+                submit: "送出申請",
+                submitting: "送出中...",
+            },
+            note: "提領申請會送交管理員審核。點數可能會先被保留直到處理完成。",
+            alerts: {
+                successTitle: "已送出",
+                successMsg: "你的提領申請已送出。",
+                failedTitle: "提領失敗",
+            },
+            errors: {
+                invalidPoints: "請輸入有效的點數數量。",
+                accountRequired: "請輸入帳戶資料。",
+                failed: "無法送出提領申請。",
+            },
+        },
+        details: {
+            title: "點數詳情",
+            intro: "以下為平台點數的運作方式：",
+            lines: {
+                available: "可用點數是你可以兌換或提領的點數。",
+                unconfirmed: "未確認點數仍在驗證中，可能會變動。",
+                total: "總點數包含可用 + 未確認點數。",
+                income: "收入會顯示在所選日期範圍內點數的來源。",
+                exchange: "兌換會把點數轉成硬幣。兌換比例可能依平台規則調整。",
+                withdraw: "提領申請會在付款前審核。請確保帳戶資料正確。",
+            },
+            footer: "若遇到任何問題，請在個人頁面聯絡客服。",
+        },
     },
-    labels: {
-      available: "可用點數",
-      total: "總計：{{count}}",
-      unconfirmed: "未確認：{{count}}",
-      income: "收入",
-      last30: "最近 30 天",
-    },
-    income: {
-      livestream: "直播",
-      party: "派對",
-      platformRewards: "平台獎勵",
-    },
-    states: {
-      loading: "載入中…",
-    },
-    hints: {
-      exchangeRate: "兌換比例之後可在後端調整（POINTS_PER_COIN）。",
-    },
-    alerts: {
-      errorTitle: "錯誤",
-      successTitle: "成功",
-      loginRequiredTitle: "需要登入",
-      loginRequiredMsg: "請重新登入。",
-      detailsSoon: "詳情頁將於稍後加入。",
-      withdrawSoon: "提領功能將於稍後加入。",
-      exchangeFailedTitle: "兌換失敗",
-      exchangeSuccessMsg: "已兌換 {{points}} 點 → {{coins}} 硬幣。",
-    },
-    errors: {
-      loadFailed: "載入點數失敗",
-      exchangeFailed: "兌換點數失敗",
-    },
-    ranges: {
-      title: "選擇區間",
-      last7: "最近 7 天",
-      last30: "最近 30 天",
-      last90: "最近 90 天",
-    },
-    withdraw: {
-      title: "提領點數",
-      available: "可用：{{points}} 點",
-      fields: {
-        points: "要提領的點數",
-        method: "方式",
-        account: "帳戶資料",
-      },
-      placeholders: {
-        account: "例如：03xx-xxxxxxx / IBAN / 帳戶名稱",
-      },
-      actions: {
-        submit: "送出申請",
-        submitting: "送出中...",
-      },
-      note: "提領申請會送交管理員審核。點數可能會先被保留直到處理完成。",
-      alerts: {
-        successTitle: "已送出",
-        successMsg: "你的提領申請已送出。",
-        failedTitle: "提領失敗",
-      },
-      errors: {
-        invalidPoints: "請輸入有效的點數數量。",
-        accountRequired: "請輸入帳戶資料。",
-        failed: "無法送出提領申請。",
-      },
-    },
-    details: {
-      title: "點數詳情",
-      intro: "以下為平台點數的運作方式：",
-      lines: {
-        available: "可用點數是你可以兌換或提領的點數。",
-        unconfirmed: "未確認點數仍在驗證中，可能會變動。",
-        total: "總點數包含可用 + 未確認點數。",
-        income: "收入會顯示在所選日期範圍內點數的來源。",
-        exchange: "兌換會把點數轉成硬幣。兌換比例可能依平台規則調整。",
-        withdraw: "提領申請會在付款前審核。請確保帳戶資料正確。",
-      },
-      footer: "若遇到任何問題，請在個人頁面聯絡客服。",
-    },
-  },
 
     momentComments: {
         title: "{{owner}} 的動態",

@@ -1,3 +1,4 @@
+// admin-api/src/app/api/search/users/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -7,24 +8,35 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
 
-    const q = (searchParams.get("q") ?? "").trim();
+    const qRaw = searchParams.get("q");
+    const q = (qRaw ?? "").trim();
     const userId = searchParams.get("userId") ?? undefined;
 
     const limit = Math.min(50, Math.max(5, Number(searchParams.get("limit")) || 20));
     const cursor = searchParams.get("cursor") ?? undefined;
 
-    if (!q || q.length < 1) {
-      return NextResponse.json({ items: [], nextCursor: null });
-    }
+    const baseWhere: any = {
+      role: { not: "ADMIN" },
+      ...(userId ? { id: { not: userId } } : {}),
+    };
+
+    const where =
+      q.length === 0
+        ? baseWhere
+        : {
+            ...baseWhere,
+            OR: [
+              { username: { contains: q, mode: "insensitive" } },
+              { nickname: { contains: q, mode: "insensitive" } },
+            ],
+          };
 
     const users = await prisma.user.findMany({
-      where: {
-        OR: [
-          { username: { contains: q, mode: "insensitive" } },
-          { nickname: { contains: q, mode: "insensitive" } },
-        ],
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      where,
+      orderBy:
+        q.length === 0
+          ? [{ isLive: "desc" }, { liveViewers: "desc" }, { followersCount: "desc" }, { createdAt: "desc" }]
+          : [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
       cursor: cursor ? { id: cursor } : undefined,
       skip: cursor ? 1 : undefined,
@@ -63,7 +75,7 @@ export async function GET(req: NextRequest) {
       id: u.id,
       username: u.username,
       nickname: u.nickname ?? null,
-      displayName: (u.nickname && u.nickname.trim().length > 0) ? u.nickname : u.username,
+      displayName: u.nickname && u.nickname.trim().length > 0 ? u.nickname : u.username,
       avatarUrl: u.avatarUrl ?? null,
       followersCount: u.followersCount ?? 0,
       isLive: !!u.isLive,

@@ -14,10 +14,7 @@ export async function GET(req: NextRequest) {
     const viewerId = searchParams.get("viewerId");
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "userId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
@@ -28,75 +25,46 @@ export async function GET(req: NextRequest) {
         nickname: true,
         avatarUrl: true,
         bio: true,
-        country: {
-          select: {
-            flagEmoji: true,
-            code: true,
-          },
-        },
+        role: true,
+        country: { select: { flagEmoji: true, code: true } },
       },
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Follower/following counts + isFollowing
-    let followerCount = 0;
-    let followingCount = 0;
+    // counts
+    const [followerCount, followingCount] = await Promise.all([
+      prisma.follow.count({ where: { followingId: userId } }),
+      prisma.follow.count({ where: { followerId: userId } }),
+    ]);
+
+    // isFollowing
     let isFollowing = false;
-
-    try {
-      const anyPrisma = prisma as any;
-
-      if (anyPrisma.userFollow?.count) {
-        followerCount = await anyPrisma.userFollow.count({
-          where: { followingId: userId },
-        });
-        followingCount = await anyPrisma.userFollow.count({
-          where: { followerId: userId },
-        });
-
-        if (viewerId && viewerId !== userId && anyPrisma.userFollow?.findFirst) {
-          const existing = await anyPrisma.userFollow.findFirst({
-            where: {
-              followerId: viewerId,
-              followingId: userId,
-            },
-          });
-          isFollowing = !!existing;
-        }
-      }
-    } catch {
-      // ignore errors, keep defaults
+    if (viewerId && viewerId !== userId) {
+      const existing = await prisma.follow.findUnique({
+        where: { followerId_followingId: { followerId: viewerId, followingId: userId } },
+        select: { id: true },
+      });
+      isFollowing = !!existing;
     }
-
-    const bio = (user as any).bio ?? null;
 
     return NextResponse.json({
       user: {
         id: user.id,
-        userName:
-          user.nickname && user.nickname.trim().length > 0
-            ? user.nickname
-            : user.username,
-        avatarUrl: user.avatarUrl,
+        userName: user.nickname && user.nickname.trim().length > 0 ? user.nickname : user.username,
+        avatarUrl: user.avatarUrl ?? null,
         countryFlag: user.country?.flagEmoji ?? null,
         countryCode: user.country?.code ?? null,
         followerCount,
         followingCount,
-        bio,
+        bio: user.bio ?? null,
         isFollowing,
       },
     });
   } catch (error) {
     console.error("[GET /api/profile/visit]", error);
-    return NextResponse.json(
-      { error: "Failed to load profile" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });
   }
 }

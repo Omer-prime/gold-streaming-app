@@ -3,17 +3,46 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
-  try {
-    const targetId = ctx.params.id;
-    const body = await req.json().catch(() => null);
+function firstParam(v: string | string[] | undefined) {
+  return Array.isArray(v) ? v[0] : v;
+}
 
-    const userId = String(body?.userId ?? "").trim(); // current logged in user id
-    const action = String(body?.action ?? "toggle"); // "toggle" | "follow" | "unfollow"
+export async function POST(
+  req: NextRequest,
+  ctx: { params: Record<string, string | string[] | undefined> }
+) {
+  try {
+    const params = ctx?.params ?? {};
+    const body = await req.json().catch(() => ({} as any));
+
+    // ✅ targetId can come from URL param, body, or query — no more “targetId required”
+    const rawParam =
+      firstParam(params["id"]) ??
+      firstParam(params["userId"]) ??
+      firstParam(params["uid"]);
+
+    const rawBody =
+      body?.targetId ??
+      body?.targetUserId ??
+      body?.followTargetId ??
+      body?.id;
+
+    const rawQuery =
+      req.nextUrl.searchParams.get("targetId") ??
+      req.nextUrl.searchParams.get("userId");
+
+    const targetId = String(rawParam ?? rawBody ?? rawQuery ?? "").trim();
+
+    const userId = String(
+      body?.userId ?? body?.viewerId ?? body?.followerId ?? ""
+    ).trim();
+
+    const action = String(body?.action ?? "toggle").trim(); // toggle | follow | unfollow
 
     if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
     if (!targetId) return NextResponse.json({ error: "targetId required" }, { status: 400 });
-    if (userId === targetId) return NextResponse.json({ error: "cannot follow self" }, { status: 400 });
+    if (userId === targetId)
+      return NextResponse.json({ error: "cannot follow self" }, { status: 400 });
 
     const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.follow.findUnique({
@@ -34,7 +63,6 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
         });
       }
 
-      // recompute counts safely
       const [followingCount, followersCount] = await Promise.all([
         tx.follow.count({ where: { followerId: userId } }),
         tx.follow.count({ where: { followingId: targetId } }),
@@ -48,7 +76,7 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
       return { isFollowing: shouldFollow, followingCount, followersCount };
     });
 
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, userId, targetId, ...result });
   } catch (e) {
     console.error("[POST /api/users/:id/follow]", e);
     return NextResponse.json({ error: "Failed to follow" }, { status: 500 });

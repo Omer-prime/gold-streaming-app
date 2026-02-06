@@ -426,6 +426,7 @@ model Moment {
   comments MomentComment[]
   likes    MomentLike[]
   saves    MomentSave[]
+  chatShares ChatMessage[] @relation("MomentChatShares")
 
   @@index([userId, createdAt])
   @@index([topicId])
@@ -509,13 +510,17 @@ model PKBattle {
 }
 
 model ChatThread {
-  id              String    @id @default(cuid())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id              String         @id @default(cuid())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   userAId         String
   userBId         String
   lastMessageText String?
   lastMessageAt   DateTime?
+
+  // ✅ NEW: request/accept flow
+  status          ChatThreadStatus @default(ACCEPTED)
+  requestedById   String?
 
   messages ChatMessage[]
   userA    User          @relation("ChatThreadUserA", fields: [userAId], references: [id])
@@ -525,23 +530,35 @@ model ChatThread {
   @@index([userAId])
   @@index([userBId])
   @@index([lastMessageAt])
+  @@index([status, updatedAt])
 }
-
 model ChatMessage {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   threadId  String
   senderId  String
+
+  // existing
   content   String
   isRead    Boolean  @default(false)
+
+  // ✅ NEW: message types + moment share support
+  type      ChatMessageType @default(TEXT)
+  momentId  String?
+  metaJson  Json?
 
   sender User       @relation(fields: [senderId], references: [id])
   thread ChatThread @relation(fields: [threadId], references: [id])
 
+  moment Moment? @relation("MomentChatShares", fields: [momentId], references: [id])
+
   @@index([threadId])
   @@index([senderId])
   @@index([createdAt])
+  @@index([momentId])
+  @@index([type, createdAt])
 }
+
 
 model AdminNotification {
   id            String               @id @default(cuid())
@@ -1335,4 +1352,14 @@ enum HelpFeedbackCategory {
   ACCOUNT
   STREAM
   REPORT
+}
+enum ChatThreadStatus {
+  REQUESTED
+  ACCEPTED
+  BLOCKED
+}
+
+enum ChatMessageType {
+  TEXT
+  MOMENT_SHARE
 }

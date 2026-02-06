@@ -13,6 +13,7 @@
       "backgroundColor": "#ffffff"
     },
     "plugins": [
+       "./plugins/withNewArchEnabled",
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
       "expo-localization",
@@ -23,7 +24,8 @@
       "bundleIdentifier": "com.omerprime.mobile",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "bitcode": false
     },
     "android": {
       "adaptiveIcon": {
@@ -32,15 +34,26 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.omerprime.mobile"
+      "package": "com.omerprime.mobile",
+      "permissions": [
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "ea91e10f-1208-487e-95d3-3e0858c669fa"
+        "projectId": "564d9b6e-e57b-4c5a-b5d2-40f8dad0eb96"
       }
-    }
+    },
+    "owner": "omerprime"
   }
 }

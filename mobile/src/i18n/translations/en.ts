@@ -1627,44 +1627,182 @@ export default {
 
     visitProfile: {
         titleFallback: "Profile",
-    labels: {
-      id: "ID: {{id}}",
-      followers: "Followers",
-      following: "Following",
+        labels: {
+            id: "ID: {{id}}",
+            followers: "Followers",
+            following: "Following",
+        },
+        actions: {
+            follow: "Follow",
+            following: "Following",
+            pleaseWait: "Please wait...",
+            unblock: "Unblock",
+        },
+        states: {
+            notFound: "User not found.",
+            noMoments: "No moments yet.",
+            blockedChip: "You blocked this user",
+            blockedBody: "You blocked this user. Unblock to view their moments.",
+        },
+        menu: {
+            title: "Options",
+            blockTitle: "Block user",
+            blockMsg: "You won’t see their content anymore and they may not be able to interact with you.",
+            block: "Block",
+            unblock: "Unblock",
+            chat: "Send message",
+            restrict: "Restrict",
+            unrestrict: "Unrestrict",
+            restrictedChatMsg: "You restricted this chat.",
+        },
+        chatList: {
+  title: "Message",
+  unclaimed: "Unclaimed...",
+  loggedOut: {
+    title: "You’re logged out",
+    subtitle: "Please log in again to view your messages.",
+  },
+  search: {
+    placeholder: "Search chats...",
+    cancel: "Cancel",
+  },
+  notifications: {
+    title: "Notifications",
+    unread: "{{count}} unread",
+    none: "No new notifications",
+  },
+  sections: {
+    requests: "Message requests ({{count}})",
+    chats: "Chats",
+    restricted: "Restricted",
+  },
+  badges: {
+    request: "REQUEST",
+    restricted: "RESTRICTED",
+  },
+  states: {
+    loading: "Loading conversations...",
+    noMessages: "No messages yet",
+    noSearch: "No chats matched your search.",
+    empty: "No chats yet. Start messaging your friends from their profile.",
+  },
+},
+
+chatRoom: {
+  loggedOut: {
+    title: "You’re logged out",
+    subtitle: "Please login again to use chat.",
+  },
+  labels: {
+    online: "Online",
+  },
+  states: {
+    loading: "Loading messages...",
+    empty: "Say hi to {{name}} 👋",
+  },
+  input: {
+    placeholder: "Type a message...",
+  },
+  request: {
+    incomingTitle: "Message request",
+    incomingBody: "{{name}} wants to message you.",
+    accept: "Accept",
+    decline: "Decline",
+    sentTitle: "Request sent",
+    sentBody: "Waiting for {{name}} to accept your request.",
+  },
+  restricted: {
+    title: "Restricted",
+    body: "You restricted this chat.",
+    unrestrict: "Unrestrict",
+  },
+  errors: {
+    loadFailed: "Failed to load messages",
+    sendFailed: "Send failed",
+  },
+},
+
+        alerts: {
+            loginRequired: "Login required.",
+            loginToBlock: "Login required to block users.",
+            blockedTitle: "Blocked",
+            blockedFollowMsg: "Unblock this user first to follow.",
+            navigationErrorTitle: "Navigation error",
+            profileTabMissing: "Profile tab not found. Make sure your bottom tabs have 'Profile'.",
+            errorTitle: "Error",
+        },
+        errors: {
+            blockFailed: "Failed to block user",
+            unblockFailed: "Failed to unblock user",
+        },
+
     },
-    actions: {
-      follow: "Follow",
-      following: "Following",
-      pleaseWait: "Please wait...",
-      unblock: "Unblock",
-    },
-    states: {
-      notFound: "User not found.",
-      noMoments: "No moments yet.",
-      blockedChip: "You blocked this user",
-      blockedBody: "You blocked this user. Unblock to view their moments.",
-    },
-    menu: {
-      title: "Options",
-      blockTitle: "Block user",
-      blockMsg: "You won’t see their content anymore and they may not be able to interact with you.",
-      block: "Block",
-      unblock: "Unblock",
-    },
-    alerts: {
-      loginRequired: "Login required.",
-      loginToBlock: "Login required to block users.",
-      blockedTitle: "Blocked",
-      blockedFollowMsg: "Unblock this user first to follow.",
-      navigationErrorTitle: "Navigation error",
-      profileTabMissing: "Profile tab not found. Make sure your bottom tabs have 'Profile'.",
-      errorTitle: "Error",
-    },
-    errors: {
-      blockFailed: "Failed to block user",
-      unblockFailed: "Failed to unblock user",
-    },
-    },
+chatList: {
+  title: "Message",
+  unclaimed: "Unclaimed...",
+  loggedOut: {
+    title: "You’re logged out",
+    subtitle: "Please log in again to view your messages.",
+  },
+  search: {
+    placeholder: "Search chats...",
+    cancel: "Cancel",
+  },
+  notifications: {
+    title: "Notifications",
+    unread: "{{count}} unread",
+    none: "No new notifications",
+  },
+  sections: {
+    requests: "Message requests ({{count}})",
+    chats: "Chats",
+    restricted: "Restricted",
+  },
+  badges: {
+    request: "REQUEST",
+    restricted: "RESTRICTED",
+  },
+  states: {
+    loading: "Loading conversations...",
+    noMessages: "No messages yet",
+    noSearch: "No chats matched your search.",
+    empty: "No chats yet. Start messaging your friends from their profile.",
+  },
+},
+
+chatRoom: {
+  loggedOut: {
+    title: "You’re logged out",
+    subtitle: "Please login again to use chat.",
+  },
+  labels: {
+    online: "Online",
+  },
+  states: {
+    loading: "Loading messages...",
+    empty: "Say hi to {{name}} 👋",
+  },
+  input: {
+    placeholder: "Type a message...",
+  },
+  request: {
+    incomingTitle: "Message request",
+    incomingBody: "{{name}} wants to message you.",
+    accept: "Accept",
+    decline: "Decline",
+    sentTitle: "Request sent",
+    sentBody: "Waiting for {{name}} to accept your request.",
+  },
+  restricted: {
+    title: "Restricted",
+    body: "You restricted this chat.",
+    unrestrict: "Unrestrict",
+  },
+  errors: {
+    loadFailed: "Failed to load messages",
+    sendFailed: "Send failed",
+  },
+},
 
     realPersonAuth: {
         title: "Auth",

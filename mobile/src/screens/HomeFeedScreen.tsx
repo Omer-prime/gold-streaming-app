@@ -62,6 +62,7 @@ export type SquarePost = {
   createdAt: string;
   likeCount: number;
   commentCount: number;
+  shareCount: number; // ✅ NEW
   isLikedByMe: boolean;
   topicTitle: string | null;
   commentsPreview?: { id: string; text: string; userName: string }[];
@@ -95,6 +96,24 @@ type SearchUser = {
   countryCode: string | null;
   countryFlag: string | null;
   isFollowing: boolean;
+};
+
+type ShareTargetUser = {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  countryFlag: string | null;
+};
+
+type SharePayload = {
+  momentId: string;
+  kind: "square" | "video";
+  userName: string;
+  text: string | null;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
 };
 
 const USER_ID_KEY = "gl_user_id";
@@ -155,20 +174,17 @@ function formatCount(n: number) {
  * This helper navigates to that nested stack safely.
  */
 function navigateToProfileNested(navigation: any, payload: any) {
-  // try parent navigators first (bottom tabs usually live there)
   let nav: any = navigation;
   while (nav) {
     const st = nav.getState?.();
     const routeNames: string[] =
       st?.routeNames ?? (Array.isArray(st?.routes) ? st.routes.map((r: any) => r.name) : []);
 
-    // your app uses "Profile" as the tab name
     if (routeNames.includes("Profile")) {
       nav.navigate("Profile", payload);
       return true;
     }
 
-    // fallback if someone used ProfileStack in tabs
     if (routeNames.includes("ProfileStack")) {
       nav.navigate("ProfileStack", payload);
       return true;
@@ -220,42 +236,173 @@ const HomeFeedScreen: React.FC = () => {
   const [videoLoading, setVideoLoading] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
 
+  // ✅ Share modal (Square + Video)
+  const [shareOpen, setShareOpen] = useState(false);
+  const [sharePayload, setSharePayload] = useState<SharePayload | null>(null);
+  const [shareTargets, setShareTargets] = useState<ShareTargetUser[]>([]);
+  const [shareTargetsLoading, setShareTargetsLoading] = useState(false);
+  const [shareTargetsErr, setShareTargetsErr] = useState<string | null>(null);
+
   useEffect(() => {
     AsyncStorage.getItem(USER_ID_KEY).then((id) => setMyUserId(id)).catch(() => {});
   }, []);
 
-  // ✅ VisitProfile exists in HomeStackNavigator already -> navigate locally (fixes your warning)
- const goUserProfileSmart = useCallback(
-  async (userId: string) => {
+  const ensureMyUserId = useCallback(async () => {
     const uid = myUserId ?? (await AsyncStorage.getItem(USER_ID_KEY));
-    const target = String(userId ?? "").trim();
+    if (uid && uid !== myUserId) setMyUserId(uid);
+    return uid;
+  }, [myUserId]);
 
-    if (!target) return;
+  const loadShareTargets = useCallback(async (force = false) => {
+    try {
+      const uid = await ensureMyUserId();
+      if (!uid) return;
 
-    // ✅ If it's me -> open Profile tab root (your own profile)
-    if (uid && uid === target) {
-      // safest: just switch to Profile tab (no nested screen name guessing)
-      let nav: any = navigation;
-      while (nav) {
-        const st = nav.getState?.();
-        const routeNames: string[] =
-          st?.routeNames ?? (Array.isArray(st?.routes) ? st.routes.map((r: any) => r.name) : []);
-        if (routeNames.includes("Profile")) {
-          nav.navigate("Profile");
+      if (!force && shareTargets.length > 0) return;
+
+      setShareTargetsErr(null);
+      setShareTargetsLoading(true);
+
+      const params = new URLSearchParams();
+      params.set("userId", uid);
+      params.set("limit", "60");
+
+      const res = await fetch(`${API_BASE_URL}/api/chat/share-targets?${params.toString()}`);
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) throw new Error(json?.error || "Failed");
+
+      const items = (json?.items ?? []) as ShareTargetUser[];
+      setShareTargets(Array.isArray(items) ? items : []);
+    } catch (e) {
+      console.error("loadShareTargets error", e);
+      setShareTargets([]);
+      setShareTargetsErr("Failed to load share users");
+    } finally {
+      setShareTargetsLoading(false);
+    }
+  }, [ensureMyUserId, shareTargets.length]);
+
+  const openShare = useCallback(
+    async (payload: SharePayload) => {
+      const uid = await ensureMyUserId();
+      if (!uid) {
+        Alert.alert(t("homeFeed.alerts.loginRequiredTitle"), "Login required to share.");
+        return;
+      }
+
+      setSharePayload(payload);
+      setShareOpen(true);
+      loadShareTargets(false);
+    },
+    [ensureMyUserId, loadShareTargets]
+  );
+
+  const closeShare = useCallback(() => {
+    setShareOpen(false);
+    setSharePayload(null);
+    setShareTargetsErr(null);
+  }, []);
+
+  const bumpLocalShareCount = useCallback((momentId: string, kind: "square" | "video") => {
+    if (kind === "square") {
+      setSquarePosts((cur) =>
+        cur.map((p) => (p.id === momentId ? { ...p, shareCount: Math.max(0, (p.shareCount || 0) + 1) } : p))
+      );
+    } else {
+      setVideoItems((cur) =>
+        cur.map((v) => (v.id === momentId ? { ...v, shareCount: Math.max(0, (v.shareCount || 0) + 1) } : v))
+      );
+    }
+  }, []);
+
+  const shareToOtherApps = useCallback(async (payload: SharePayload) => {
+    try {
+      const lines: string[] = [];
+      lines.push(`Gold Live • ${payload.userName}`);
+      if (payload.text) lines.push(payload.text);
+
+      const mediaUrl = payload.kind === "video" ? payload.videoUrl : payload.imageUrl;
+      if (mediaUrl) lines.push(mediaUrl);
+
+      await Share.share({ message: lines.filter(Boolean).join("\n") });
+    } catch {}
+  }, []);
+
+  const shareToUser = useCallback(
+    async (targetId: string, note: string) => {
+      const uid = await ensureMyUserId();
+      if (!uid) {
+        Alert.alert(t("homeFeed.alerts.loginRequiredTitle"), "Login required to share.");
+        return;
+      }
+      if (!sharePayload?.momentId) return;
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/chat/share-moment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: uid,
+            targetId,
+            momentId: sharePayload.momentId,
+            note: note?.trim() || "",
+          }),
+        });
+
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          Alert.alert("Share failed", json?.error || "Failed to share");
           return;
         }
-        nav = nav.getParent?.();
-      }
-      // last fallback
-      navigation.navigate("Profile");
-      return;
-    }
 
-    // ✅ Other user -> VisitProfile
-    navigation.navigate("VisitProfile", { userId: target });
-  },
-  [navigation, myUserId]
-);
+        bumpLocalShareCount(sharePayload.momentId, sharePayload.kind);
+
+        const st = String(json?.threadStatus || "");
+        if (st === "REQUESTED") {
+          Alert.alert("Sent", "Shared as a message request.");
+        } else {
+          Alert.alert("Sent", "Shared successfully.");
+        }
+
+        closeShare();
+      } catch (e) {
+        console.error("shareToUser error", e);
+        Alert.alert("Share failed", "Network error while sharing");
+      }
+    },
+    [ensureMyUserId, sharePayload, bumpLocalShareCount, closeShare]
+  );
+
+  // ✅ VisitProfile exists in HomeStackNavigator already -> navigate locally (fixes your warning)
+  const goUserProfileSmart = useCallback(
+    async (userId: string) => {
+      const uid = myUserId ?? (await AsyncStorage.getItem(USER_ID_KEY));
+      const target = String(userId ?? "").trim();
+
+      if (!target) return;
+
+      if (uid && uid === target) {
+        let nav: any = navigation;
+        while (nav) {
+          const st = nav.getState?.();
+          const routeNames: string[] =
+            st?.routeNames ?? (Array.isArray(st?.routes) ? st.routes.map((r: any) => r.name) : []);
+          if (routeNames.includes("Profile")) {
+            nav.navigate("Profile");
+            return;
+          }
+          nav = nav.getParent?.();
+        }
+        navigation.navigate("Profile");
+        return;
+      }
+
+      navigation.navigate("VisitProfile", { userId: target });
+    },
+    [navigation, myUserId]
+  );
 
   // ✅ MomentComments is inside Profile stack -> navigate via Profile tab
   const goMomentComments = useCallback(
@@ -275,6 +422,17 @@ const HomeFeedScreen: React.FC = () => {
     [navigation]
   );
 
+  // ✅ Trophy/Cup -> Ranking (same as Explore + Party)
+  const goRanking = useCallback(() => {
+    const ok = navigateToProfileNested(navigation, { screen: "Ranking" });
+    if (!ok) {
+      Alert.alert(
+        "Navigation error",
+        "Profile tab not found. Make sure your bottom tabs have a screen named 'Profile'."
+      );
+    }
+  }, [navigation]);
+
   const switchTab = (tab: HomeTopTab) => {
     setActiveTab(tab);
     setSearchMode(false);
@@ -284,8 +442,6 @@ const HomeFeedScreen: React.FC = () => {
   };
 
   const isVideoHeader = activeTab === "Video";
-
-  // ✅ search overlay works in ALL tabs now (Following fixed)
   const showUserSearch = searchMode;
 
   /* ---------------------------------------------------------------------- */
@@ -451,7 +607,7 @@ const HomeFeedScreen: React.FC = () => {
   /* ---------------------------------------------------------------------- */
   useEffect(() => {
     if (activeTab !== "Following") return;
-    if (searchMode) return; // ✅ don't refetch while searching
+    if (searchMode) return;
 
     let cancelled = false;
 
@@ -587,6 +743,7 @@ const HomeFeedScreen: React.FC = () => {
             createdAt: String(m.createdAt),
             likeCount: typeof m.likeCount === "number" && !isNaN(m.likeCount) ? m.likeCount : 0,
             commentCount: typeof m.commentCount === "number" && !isNaN(m.commentCount) ? m.commentCount : 0,
+            shareCount: typeof m.shareCount === "number" && !isNaN(m.shareCount) ? m.shareCount : 0, // ✅ NEW
             isLikedByMe: !!m.isLikedByMe,
             topicTitle: m.topicTitle ?? null,
             commentsPreview: Array.isArray(m.commentsPreview)
@@ -871,8 +1028,7 @@ const HomeFeedScreen: React.FC = () => {
               </View>
 
               <View className="flex-row items-center">
-                {/* ✅ NOW works on Following too */}
-                <Pressable onPress={() => setSearchMode(true)}>
+                <Pressable onPress={() => setSearchMode(true)} hitSlop={10}>
                   <Ionicons
                     name="search"
                     size={20}
@@ -880,7 +1036,7 @@ const HomeFeedScreen: React.FC = () => {
                   />
                 </Pressable>
 
-                <Pressable>
+                <Pressable onPress={goRanking} hitSlop={10}>
                   <Ionicons
                     name="trophy-outline"
                     size={22}
@@ -938,6 +1094,17 @@ const HomeFeedScreen: React.FC = () => {
                 onToggleLike={onToggleLikeSquare}
                 onPressProfile={goVisitProfile}
                 onOpenComments={(postId, ownerName) => goMomentComments(postId, ownerName)}
+                onSharePost={(post) =>
+                  openShare({
+                    momentId: post.id,
+                    kind: "square",
+                    userName: post.userName,
+                    text: post.text,
+                    imageUrl: post.imageUrl,
+                    videoUrl: null,
+                    thumbnailUrl: null,
+                  })
+                }
               />
             )}
 
@@ -949,10 +1116,33 @@ const HomeFeedScreen: React.FC = () => {
                 error={videoError}
                 onToggleLike={onToggleLikeVideo}
                 onOpenComments={(momentId, ownerName) => goMomentComments(momentId, ownerName)}
+                onShareVideo={(v) =>
+                  openShare({
+                    momentId: v.id,
+                    kind: "video",
+                    userName: v.userName,
+                    text: v.text,
+                    imageUrl: null,
+                    videoUrl: v.videoUrl,
+                    thumbnailUrl: v.thumbnailUrl,
+                  })
+                }
               />
             )}
           </>
         )}
+
+        <ShareMomentModal
+          visible={shareOpen}
+          payload={sharePayload}
+          targets={shareTargets}
+          loading={shareTargetsLoading}
+          error={shareTargetsErr}
+          onClose={closeShare}
+          onReload={() => loadShareTargets(true)}
+          onShareExternal={() => (sharePayload ? shareToOtherApps(sharePayload) : undefined)}
+          onSend={(targetId, note) => shareToUser(targetId, note)}
+        />
       </View>
     </SafeAreaView>
   );
@@ -1137,7 +1327,6 @@ const FollowingFeed: React.FC<{
       contentContainerStyle={{ paddingBottom: 96 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Country chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4 mt-3 mb-2">
         <Chip
           label={t("explore.chips.popular")}
@@ -1252,9 +1441,7 @@ const PartyCard: React.FC<{ room: PartyRoom; onPress?: (room: PartyRoom) => void
     onPress={() => onPress?.(room)}
   >
     <ImageBackground
-      source={
-        room.thumbnailUrl ? { uri: room.thumbnailUrl } : require("../../assets/placeholder-image.jpeg")
-      }
+      source={room.thumbnailUrl ? { uri: room.thumbnailUrl } : require("../../assets/placeholder-image.jpeg")}
       resizeMode="cover"
       style={{ width: 110, height: 90 }}
     />
@@ -1299,7 +1486,8 @@ const SquareFeed: React.FC<{
   onToggleLike: (post: SquarePost) => void;
   onPressProfile: (userId: string) => void;
   onOpenComments: (momentId: string, ownerName: string) => void;
-}> = ({ topics, posts, loading, error, searchActive, onToggleLike, onPressProfile, onOpenComments }) => {
+  onSharePost: (post: SquarePost) => void; // ✅ NEW
+}> = ({ topics, posts, loading, error, searchActive, onToggleLike, onPressProfile, onOpenComments, onSharePost }) => {
   const navigation = useNavigation<any>();
   const topicsPreview = useMemo(() => topics.slice(0, 3), [topics]);
   const hasMoreTopics = topics.length > 3;
@@ -1368,11 +1556,11 @@ const SquareFeed: React.FC<{
             onPressProfile={onPressProfile}
             onPressComments={() => onOpenComments(post.id, post.userName)}
             onToggleLike={onToggleLike}
+            onShare={() => onSharePost(post)} // ✅ NEW
           />
         ))}
       </ScrollView>
 
-      {/* Floating camera “Post” button */}
       <Pressable
         onPress={openPostMoment}
         className="absolute bottom-6 right-5 h-14 w-14 rounded-full bg-[#FF9800] items-center justify-center shadow-md shadow-black/30"
@@ -1406,7 +1594,8 @@ export const SquarePostCard: React.FC<{
   onPressProfile: (userId: string) => void;
   onPressComments: () => void;
   onToggleLike: (post: SquarePost) => void;
-}> = ({ post, onPressProfile, onPressComments, onToggleLike }) => {
+  onShare?: () => void; // ✅ NEW
+}> = ({ post, onPressProfile, onPressComments, onToggleLike, onShare }) => {
   const createdLabel = formatTimeAgo(post.createdAt);
 
   return (
@@ -1450,16 +1639,21 @@ export const SquarePostCard: React.FC<{
       <View className="mt-2 flex-row items-center">
         <Pressable className="mr-6 flex-row items-center" onPress={onPressComments}>
           <Ionicons name="chatbubble-ellipses-outline" size={18} color="#6B7280" />
-          <Text className="ml-1 text-[12px] text-gray-600">{post.commentCount}</Text>
+          <Text className="ml-1 text-[12px] text-gray-600">{formatCount(post.commentCount)}</Text>
         </Pressable>
 
-        <Pressable className="flex-row items-center" onPress={() => onToggleLike(post)}>
+        <Pressable className="mr-6 flex-row items-center" onPress={() => onToggleLike(post)}>
           <Ionicons
             name={post.isLikedByMe ? "heart" : "heart-outline"}
             size={18}
             color={post.isLikedByMe ? "#EF4444" : "#6B7280"}
           />
-          <Text className="ml-1 text-[12px] text-gray-600">{post.likeCount}</Text>
+          <Text className="ml-1 text-[12px] text-gray-600">{formatCount(post.likeCount)}</Text>
+        </Pressable>
+
+        <Pressable className="flex-row items-center" onPress={onShare}>
+          <Ionicons name="share-social-outline" size={18} color="#6B7280" />
+          <Text className="ml-1 text-[12px] text-gray-600">{formatCount(post.shareCount)}</Text>
         </Pressable>
       </View>
     </View>
@@ -1477,7 +1671,8 @@ const VideoFeed: React.FC<{
   error: string | null;
   onToggleLike: (item: VideoMoment) => void;
   onOpenComments: (momentId: string, ownerName: string) => void;
-}> = ({ headerHeight, items, loading, error, onToggleLike, onOpenComments }) => {
+  onShareVideo: (item: VideoMoment) => void; // ✅ NEW
+}> = ({ headerHeight, items, loading, error, onToggleLike, onOpenComments, onShareVideo }) => {
   const tabBarHeight = useBottomTabBarHeight();
   const { height: screenH } = Dimensions.get("window");
   const itemHeight = Math.max(200, screenH - headerHeight - tabBarHeight);
@@ -1539,11 +1734,7 @@ const VideoFeed: React.FC<{
           active={index === activeIndex}
           onToggleLike={() => onToggleLike(item)}
           onComment={() => onOpenComments(item.id, item.userName)}
-          onShare={async () => {
-            try {
-              await Share.share({ message: item.videoUrl });
-            } catch {}
-          }}
+          onShare={() => onShareVideo(item)}
         />
       )}
     />
@@ -1693,7 +1884,6 @@ const CountriesModal: React.FC<{
             overflow: "hidden",
           }}
         >
-          {/* header */}
           <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", flexDirection: "row", alignItems: "center" }}>
             <Text style={{ flex: 1, fontWeight: "900", fontSize: 15, color: "#111827" }}>
               {t("explore.chips.more")}
@@ -1703,7 +1893,6 @@ const CountriesModal: React.FC<{
             </Pressable>
           </View>
 
-          {/* search */}
           <View style={{ padding: 14, paddingBottom: 10 }}>
             <View
               style={{
@@ -1731,7 +1920,6 @@ const CountriesModal: React.FC<{
             </View>
           </View>
 
-          {/* list */}
           <FlatList
             data={countries}
             keyExtractor={(c) => c.id}
@@ -1765,6 +1953,192 @@ const CountriesModal: React.FC<{
               <View style={{ padding: 16 }}>
                 <Text style={{ color: "#6B7280", fontSize: 13 }}>{t("explore.states.empty")}</Text>
               </View>
+            }
+          />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+};
+
+/* ------------------------------ Share Modal ------------------------------ */
+const ShareMomentModal: React.FC<{
+  visible: boolean;
+  payload: SharePayload | null;
+  targets: ShareTargetUser[];
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+  onReload: () => void;
+  onShareExternal: () => void;
+  onSend: (targetId: string, note: string) => void;
+}> = ({ visible, payload, targets, loading, error, onClose, onReload, onShareExternal, onSend }) => {
+  const [q, setQ] = useState("");
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (!visible) {
+      setQ("");
+      setNote("");
+    }
+  }, [visible]);
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return targets;
+    return targets.filter(
+      (u) =>
+        (u.displayName || "").toLowerCase().includes(s) ||
+        (u.username || "").toLowerCase().includes(s)
+    );
+  }, [targets, q]);
+
+  const title = payload?.kind === "video" ? "Share video" : "Share post";
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)" }}>
+        <Pressable
+          onPress={() => {}}
+          style={{
+            marginTop: 90,
+            marginHorizontal: 14,
+            borderRadius: 18,
+            backgroundColor: "#fff",
+            overflow: "hidden",
+          }}
+        >
+          <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", flexDirection: "row", alignItems: "center" }}>
+            <Text style={{ flex: 1, fontWeight: "900", fontSize: 15, color: "#111827" }}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={18} color="#111827" />
+            </Pressable>
+          </View>
+
+          {/* Share to other apps */}
+          <View style={{ paddingHorizontal: 14, paddingTop: 12 }}>
+            <Pressable
+              onPress={onShareExternal}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                borderRadius: 14,
+                paddingVertical: 12,
+                paddingHorizontal: 12,
+                backgroundColor: "#F3F4F6",
+              }}
+            >
+              <Ionicons name="share-social-outline" size={18} color="#111827" />
+              <Text style={{ marginLeft: 10, fontSize: 13, fontWeight: "800", color: "#111827" }}>
+                Share to other apps
+              </Text>
+            </Pressable>
+
+            <View style={{ height: 10 }} />
+
+            <TextInput
+              value={note}
+              onChangeText={setNote}
+              placeholder="Optional message..."
+              placeholderTextColor="#9CA3AF"
+              style={{
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+                borderRadius: 14,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontSize: 13,
+                color: "#111827",
+              }}
+            />
+          </View>
+
+          {/* Targets */}
+          <View style={{ padding: 14, paddingBottom: 10 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#F3F4F6",
+                borderRadius: 999,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+              }}
+            >
+              <Ionicons name="search" size={16} color="#6B7280" />
+              <TextInput
+                value={q}
+                onChangeText={setQ}
+                placeholder="Search followers..."
+                placeholderTextColor="#9CA3AF"
+                style={{ flex: 1, marginLeft: 8, color: "#111827" }}
+              />
+              {!!q && (
+                <Pressable onPress={() => setQ("")} hitSlop={10}>
+                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                </Pressable>
+              )}
+            </View>
+
+            {!!error && !loading && (
+              <View style={{ marginTop: 10 }}>
+                <Text style={{ color: "#EF4444", fontSize: 12 }}>{error}</Text>
+                <Pressable onPress={onReload} style={{ marginTop: 6 }}>
+                  <Text style={{ color: "#6C4DFF", fontSize: 12, fontWeight: "800" }}>Retry</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {loading && (
+              <View style={{ marginTop: 10, flexDirection: "row", alignItems: "center" }}>
+                <ActivityIndicator size="small" color="#6C4DFF" />
+                <Text style={{ marginLeft: 8, color: "#6B7280", fontSize: 12 }}>Loading...</Text>
+              </View>
+            )}
+          </View>
+
+          <FlatList
+            data={filtered}
+            keyExtractor={(u) => u.id}
+            style={{ maxHeight: 420 }}
+            contentContainerStyle={{ paddingHorizontal: 6, paddingBottom: 12 }}
+            renderItem={({ item }) => (
+              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: 12 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#E5E7EB", overflow: "hidden" }}>
+                  {item.avatarUrl ? (
+                    <Image
+                      source={{ uri: normalizeMediaUrl(item.avatarUrl) ?? item.avatarUrl }}
+                      style={{ width: "100%", height: "100%" }}
+                      resizeMode="cover"
+                    />
+                  ) : null}
+                </View>
+
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "900", color: "#111827" }} numberOfLines={1}>
+                    {item.displayName} {item.countryFlag ? ` ${item.countryFlag}` : ""}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#6B7280" }} numberOfLines={1}>
+                    @{item.username}
+                  </Text>
+                </View>
+
+                <Pressable
+                  onPress={() => onSend(item.id, note)}
+                  style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: "#6C4DFF" }}
+                >
+                  <Text style={{ color: "#fff", fontSize: 12, fontWeight: "900" }}>Send</Text>
+                </Pressable>
+              </View>
+            )}
+            ListEmptyComponent={
+              !loading ? (
+                <View style={{ padding: 14 }}>
+                  <Text style={{ color: "#6B7280", fontSize: 12 }}>
+                    No users found.
+                  </Text>
+                </View>
+              ) : null
             }
           />
         </Pressable>

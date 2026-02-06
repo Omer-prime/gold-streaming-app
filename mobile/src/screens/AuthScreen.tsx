@@ -1,14 +1,50 @@
 // src/screens/AuthScreen.tsx
-import React from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import React, { useCallback } from "react";
+import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { t } from "../i18n";
 
+import AuthButton from "../components/AuthButton";
+import { useGoogleSignIn } from "../auth/googleSignIn";
+
+// If you have API_BASE_URL in ../config, use it later for backend exchange
+// import { API_BASE_URL } from "../config";
+
 const AuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+
+  const onGoogleIdToken = useCallback(async (idToken: string) => {
+    // ✅ Here you will call your backend later:
+    // const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({ idToken }),
+    // });
+    // const data = await res.json();
+    // if (!res.ok) throw new Error(data?.error || "Google login failed");
+    // Save token + user in AsyncStorage and navigate.
+
+    Alert.alert("Success", "Google login success (now connect backend).");
+  }, []);
+
+  const google = useGoogleSignIn({ onIdToken: onGoogleIdToken });
+
+  const onFacebookPress = () => {
+    Alert.alert(
+      "Next step",
+      "Facebook login needs Meta App setup + OAuth flow. We’ll do it after Google is done."
+    );
+  };
+
+  const onTikTokPress = () => {
+    Alert.alert(
+      "Next step",
+      "TikTok login needs TikTok developer app + backend token exchange."
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -70,6 +106,34 @@ const AuthScreen: React.FC = () => {
             description={t("auth.rows.bindPhoneDesc")}
             buttonLabel={t("auth.rows.bindPhoneBtn")}
             onPress={() => navigation.navigate("BindPhone" as never)}
+          />
+        </View>
+
+        {/* Social login */}
+        <View className="mt-6 px-4">
+          <Text className="mb-3 text-center text-[12px] text-gray-500">
+            Or continue with
+          </Text>
+
+          <AuthButton
+            provider="google"
+            label={google.loading ? "Connecting…" : "Continue with Google"}
+            onPress={google.signIn}
+            disabled={!google.requestReady || google.loading}
+          />
+
+          <AuthButton
+            provider="facebook"
+            label="Continue with Facebook"
+            onPress={onFacebookPress}
+            disabled={google.loading}
+          />
+
+          <AuthButton
+            provider="tiktok"
+            label="Continue with TikTok"
+            onPress={onTikTokPress}
+            disabled={google.loading}
           />
         </View>
       </ScrollView>

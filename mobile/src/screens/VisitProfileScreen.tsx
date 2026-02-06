@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   Alert,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -27,6 +28,13 @@ type PublicProfile = {
   followingCount: number;
   bio: string | null;
   isFollowing: boolean;
+};
+
+type ChatThreadStatus = "REQUESTED" | "ACCEPTED" | "BLOCKED";
+type ThreadMeta = {
+  id: string;
+  status: ChatThreadStatus;
+  requestedById: string | null;
 };
 
 function normalizeMediaUrl(url: string | null | undefined): string | null {
@@ -72,6 +80,40 @@ function navigateToProfileNested(navigation: any, payload: any) {
   return false;
 }
 
+function navigateToChatNested(navigation: any, payload: any) {
+  let nav: any = navigation;
+  while (nav) {
+    const st = nav.getState?.();
+    const routeNames: string[] =
+      st?.routeNames ??
+      (Array.isArray(st?.routes) ? st.routes.map((r: any) => r.name) : []);
+
+    // Common patterns: "Chat", "Chats", "ChatStack"
+    if (routeNames.includes("Chat")) {
+      nav.navigate("Chat", payload);
+      return true;
+    }
+    if (routeNames.includes("Chats")) {
+      nav.navigate("Chats", payload);
+      return true;
+    }
+    if (routeNames.includes("ChatStack")) {
+      nav.navigate("ChatStack", payload);
+      return true;
+    }
+
+    nav = nav.getParent?.();
+  }
+
+  // fallback attempt
+  try {
+    navigation.navigate("ChatRoom" as never, payload as never);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const VisitProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -90,10 +132,22 @@ const VisitProfileScreen: React.FC = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
 
-  // Block feature state
+  // Block feature state (full block)
   const [blockChecked, setBlockChecked] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
+
+  // ✅ NEW: custom popup (no Alert for menu)
+  const [optionsOpen, setOptionsOpen] = useState(false);
+
+  // ✅ NEW: confirm modal for block (no Alert)
+  const [confirmBlockOpen, setConfirmBlockOpen] = useState(false);
+
+  // ✅ NEW: chat restriction state (chat-only)
+  const [threadMeta, setThreadMeta] = useState<ThreadMeta | null>(null);
+  const [threadLoading, setThreadLoading] = useState(false);
+
+  const isChatRestricted = threadMeta?.status === "BLOCKED";
 
   useEffect(() => {
     AsyncStorage.getItem("gl_user_id")
@@ -102,7 +156,7 @@ const VisitProfileScreen: React.FC = () => {
   }, []);
 
   /* -------------------------------------------------------------------------- */
-  /*  CHECK BLOCK STATUS                                                       */
+  /*  CHECK BLOCK STATUS (full block)                                           */
   /* -------------------------------------------------------------------------- */
   useEffect(() => {
     let cancelled = false;
@@ -155,6 +209,37 @@ const VisitProfileScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
+  }, [myUserId, targetUserId]);
+
+  /* -------------------------------------------------------------------------- */
+  /*  LOAD THREAD META (chat restriction)                                       */
+  /* -------------------------------------------------------------------------- */
+  const loadThreadMeta = useCallback(async () => {
+    if (!myUserId || !targetUserId) {
+      setThreadMeta(null);
+      return;
+    }
+    try {
+      setThreadLoading(true);
+      const url = `${ADMIN_API_BASE_URL}/api/chat/thread?userId=${encodeURIComponent(
+        myUserId
+      )}&peerId=${encodeURIComponent(targetUserId)}`;
+
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setThreadMeta(null);
+        return;
+      }
+
+      setThreadMeta(json?.thread ?? null);
+    } catch (e) {
+      console.error("loadThreadMeta error", e);
+      setThreadMeta(null);
+    } finally {
+      setThreadLoading(false);
+    }
   }, [myUserId, targetUserId]);
 
   /* -------------------------------------------------------------------------- */
@@ -236,7 +321,8 @@ const VisitProfileScreen: React.FC = () => {
         imageUrl: normalizeMediaUrl(m.imageUrl ?? null),
         createdAt: String(m.createdAt),
         likeCount: typeof m.likeCount === "number" && !isNaN(m.likeCount) ? m.likeCount : 0,
-        commentCount: typeof m.commentCount === "number" && !isNaN(m.commentCount) ? m.commentCount : 0,
+        commentCount:
+          typeof m.commentCount === "number" && !isNaN(m.commentCount) ? m.commentCount : 0,
         isLikedByMe: !!m.isLikedByMe,
         topicTitle: m.topic?.title ?? null,
         commentsPreview: [],
@@ -269,133 +355,110 @@ const VisitProfileScreen: React.FC = () => {
   /* -------------------------------------------------------------------------- */
   /*  FOLLOW                                                                    */
   /* -------------------------------------------------------------------------- */
- const handleToggleFollow = async () => {
-  if (followLoading) return;
+  const handleToggleFollow = async () => {
+    if (followLoading) return;
 
-  const me = String(myUserId ?? "").trim();
-  if (!me) return;
+    const me = String(myUserId ?? "").trim();
+    if (!me) return;
 
-  const followTargetId = String(profile?.id ?? targetUserId ?? "").trim();
+    const followTargetId = String(profile?.id ?? targetUserId ?? "").trim();
 
-  if (!followTargetId) {
-    Alert.alert("Error", "Missing target user id.");
-    return;
-  }
-
-  if (me === followTargetId) return;
-
-  if (isBlocked) {
-    Alert.alert(
-      t("visitProfile.alerts.blockedTitle"),
-      t("visitProfile.alerts.blockedFollowMsg")
-    );
-    return;
-  }
-
-  // optimistic
-  const prevFollowing = isFollowing;
-  const prevCount = profile?.followerCount ?? 0;
-
-  const nextFollowing = !prevFollowing;
-  const nextCount = Math.max(0, prevCount + (nextFollowing ? 1 : -1));
-
-  setIsFollowing(nextFollowing);
-  setProfile((prev) => (prev ? { ...prev, followerCount: nextCount } : prev));
-  setFollowLoading(true);
-
-  try {
-    // ✅ follow lives on admin-api in your setup, so use ADMIN_API_BASE_URL
-    const base = String(ADMIN_API_BASE_URL || API_BASE_URL).replace(/\/+$/, "");
-    const url = `${base}/api/users/${encodeURIComponent(followTargetId)}/follow`;
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        userId: me,
-
-        // ✅ IMPORTANT: also send targetId in body (fixes your current error forever)
-        targetId: followTargetId,
-
-        // ✅ avoid server “toggle” ambiguity
-        action: nextFollowing ? "follow" : "unfollow",
-      }),
-    });
-
-    const json = await res.json().catch(() => null);
-
-    if (!res.ok) {
-      throw new Error(json?.error || `Follow failed (${res.status})`);
-    }
-
-    const serverFollowing =
-      typeof json?.isFollowing === "boolean" ? json.isFollowing : nextFollowing;
-
-    const serverFollowers =
-      typeof json?.followersCount === "number" ? json.followersCount : nextCount;
-
-    setIsFollowing(serverFollowing);
-    setProfile((prev) =>
-      prev ? { ...prev, followerCount: Math.max(0, serverFollowers) } : prev
-    );
-  } catch (err) {
-    console.error("toggle follow error", err);
-    setIsFollowing(prevFollowing);
-    setProfile((prev) => (prev ? { ...prev, followerCount: prevCount } : prev));
-  } finally {
-    setFollowLoading(false);
-  }
-};
-
-
-  /* -------------------------------------------------------------------------- */
-  /*  BLOCK / UNBLOCK                                                          */
-  /* -------------------------------------------------------------------------- */
-  const doBlock = useCallback(async () => {
-    if (!myUserId) {
-      Alert.alert(t("visitProfile.alerts.loginRequired"), t("visitProfile.alerts.loginToBlock"));
+    if (!followTargetId) {
+      Alert.alert("Error", "Missing target user id.");
       return;
     }
+
+    if (me === followTargetId) return;
+
+    if (isBlocked) {
+      Alert.alert(t("visitProfile.alerts.blockedTitle"), t("visitProfile.alerts.blockedFollowMsg"));
+      return;
+    }
+
+    // optimistic
+    const prevFollowing = isFollowing;
+    const prevCount = profile?.followerCount ?? 0;
+
+    const nextFollowing = !prevFollowing;
+    const nextCount = Math.max(0, prevCount + (nextFollowing ? 1 : -1));
+
+    setIsFollowing(nextFollowing);
+    setProfile((prev) => (prev ? { ...prev, followerCount: nextCount } : prev));
+    setFollowLoading(true);
+
+    try {
+      // ✅ follow lives on admin-api in your setup, so use ADMIN_API_BASE_URL
+      const base = String(ADMIN_API_BASE_URL || API_BASE_URL).replace(/\/+$/, "");
+      const url = `${base}/api/users/${encodeURIComponent(followTargetId)}/follow`;
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          userId: me,
+          targetId: followTargetId,
+          action: nextFollowing ? "follow" : "unfollow",
+        }),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(json?.error || `Follow failed (${res.status})`);
+      }
+
+      const serverFollowing =
+        typeof json?.isFollowing === "boolean" ? json.isFollowing : nextFollowing;
+
+      const serverFollowers =
+        typeof json?.followersCount === "number" ? json.followersCount : nextCount;
+
+      setIsFollowing(serverFollowing);
+      setProfile((prev) =>
+        prev ? { ...prev, followerCount: Math.max(0, serverFollowers) } : prev
+      );
+    } catch (err) {
+      console.error("toggle follow error", err);
+      setIsFollowing(prevFollowing);
+      setProfile((prev) => (prev ? { ...prev, followerCount: prevCount } : prev));
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  /* -------------------------------------------------------------------------- */
+  /*  BLOCK / UNBLOCK (full block)                                              */
+  /* -------------------------------------------------------------------------- */
+  const doBlock = useCallback(async () => {
+    if (!myUserId) return;
     if (!profile) return;
     if (myUserId === profile.id) return;
 
-    Alert.alert(t("visitProfile.menu.blockTitle"), t("visitProfile.menu.blockMsg"), [
-      { text: t("common.cancel"), style: "cancel" },
-      {
-        text: t("visitProfile.menu.block"),
-        style: "destructive",
-        onPress: async () => {
-          try {
-            setBlockLoading(true);
+    try {
+      setBlockLoading(true);
 
-            const res = await fetch(`${ADMIN_API_BASE_URL}/api/settings/blacklist`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ userId: myUserId, target: profile.id }),
-            });
+      const res = await fetch(`${ADMIN_API_BASE_URL}/api/settings/blacklist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: myUserId, target: profile.id }),
+      });
 
-            const json = await res.json().catch(() => null);
-            if (!res.ok) throw new Error(json?.error || t("visitProfile.errors.blockFailed"));
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || t("visitProfile.errors.blockFailed"));
 
-            setIsBlocked(true);
-            setIsFollowing(false);
-            setPosts([]);
-          } catch (e: any) {
-            console.error("block error", e);
-            Alert.alert(t("visitProfile.alerts.errorTitle"), String(e?.message || t("visitProfile.errors.blockFailed")));
-          } finally {
-            setBlockLoading(false);
-          }
-        },
-      },
-    ]);
+      setIsBlocked(true);
+      setIsFollowing(false);
+      setPosts([]);
+    } catch (e: any) {
+      console.error("block error", e);
+      Alert.alert(t("visitProfile.alerts.errorTitle"), String(e?.message || t("visitProfile.errors.blockFailed")));
+    } finally {
+      setBlockLoading(false);
+    }
   }, [myUserId, profile]);
 
   const doUnblock = useCallback(async () => {
-    if (!myUserId) {
-      Alert.alert(t("visitProfile.alerts.loginRequired"), t("visitProfile.alerts.loginRequired"));
-      return;
-    }
+    if (!myUserId) return;
     if (!profile) return;
 
     try {
@@ -421,27 +484,85 @@ const VisitProfileScreen: React.FC = () => {
     }
   }, [myUserId, profile, loadProfile, loadPosts]);
 
-  const openOptions = useCallback(() => {
+  /* -------------------------------------------------------------------------- */
+  /*  RESTRICT / UNRESTRICT (chat-only)                                         */
+  /* -------------------------------------------------------------------------- */
+  const setRestrict = useCallback(
+    async (action: "restrict" | "unrestrict") => {
+      if (!myUserId || !profile) return;
+
+      try {
+        setThreadLoading(true);
+
+        const res = await fetch(`${ADMIN_API_BASE_URL}/api/chat/thread`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            userId: myUserId,
+            peerId: profile.id,
+            action,
+          }),
+        });
+
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(json?.error || "Failed");
+        }
+
+        setThreadMeta(json?.thread ?? null);
+      } catch (e) {
+        console.error("restrict/unrestrict error", e);
+      } finally {
+        setThreadLoading(false);
+      }
+    },
+    [myUserId, profile]
+  );
+
+  /* -------------------------------------------------------------------------- */
+  /*  OPEN OPTIONS POPUP (no Alert)                                             */
+  /* -------------------------------------------------------------------------- */
+  const openOptions = useCallback(async () => {
     if (!myUserId) {
       Alert.alert(t("visitProfile.alerts.loginRequired"), t("visitProfile.alerts.loginRequired"));
       return;
     }
     if (!profile) return;
 
-    const buttons: any[] = [
-      { text: t("common.cancel"), style: "cancel" },
-      isBlocked
-        ? { text: t("visitProfile.menu.unblock"), onPress: doUnblock }
-        : { text: t("visitProfile.menu.block"), style: "destructive", onPress: doBlock },
-    ];
+    setOptionsOpen(true);
+    // refresh chat meta so Restrict state is correct
+    await loadThreadMeta();
+  }, [myUserId, profile, loadThreadMeta]);
 
-    Alert.alert(t("visitProfile.menu.title"), "", buttons);
-  }, [myUserId, profile, isBlocked, doBlock, doUnblock]);
+  const titleName = useMemo(() => profile?.userName ?? t("visitProfile.titleFallback"), [profile]);
 
-  const titleName = useMemo(
-    () => profile?.userName ?? t("visitProfile.titleFallback"),
-    [profile]
-  );
+  const goToChatRoom = useCallback(() => {
+    if (!profile) return;
+    if (!myUserId) return;
+
+    if (isBlocked) {
+      Alert.alert(t("visitProfile.alerts.blockedTitle"), t("visitProfile.states.blockedBody"));
+      return;
+    }
+    if (isChatRestricted) {
+      Alert.alert(t("visitProfile.alerts.errorTitle"), t("visitProfile.menu.restrictedChatMsg"));
+      return;
+    }
+
+    setOptionsOpen(false);
+
+    const ok = navigateToChatNested(navigation, {
+      screen: "ChatRoom",
+      params: {
+        userId: profile.id,
+        userName: profile.userName,
+      },
+    });
+
+    if (!ok) {
+      Alert.alert(t("visitProfile.alerts.navigationErrorTitle"), t("visitProfile.alerts.profileTabMissing"));
+    }
+  }, [profile, myUserId, navigation, isBlocked, isChatRestricted]);
 
   const handleToggleLike = useCallback(
     async (post: SquarePost) => {
@@ -459,9 +580,7 @@ const VisitProfileScreen: React.FC = () => {
 
       setPosts((prev) =>
         prev.map((p) =>
-          p.id === post.id
-            ? { ...p, isLikedByMe: !prevLiked, likeCount: nextCount }
-            : p
+          p.id === post.id ? { ...p, isLikedByMe: !prevLiked, likeCount: nextCount } : p
         )
       );
 
@@ -480,22 +599,44 @@ const VisitProfileScreen: React.FC = () => {
 
         setPosts((prev) =>
           prev.map((p) =>
-            p.id === post.id
-              ? { ...p, isLikedByMe: serverLiked, likeCount: Math.max(0, serverCount) }
-              : p
+            p.id === post.id ? { ...p, isLikedByMe: serverLiked, likeCount: Math.max(0, serverCount) } : p
           )
         );
       } catch (err) {
         console.error("toggle like error", err);
         // Revert optimistic update
         setPosts((prev) =>
-          prev.map((p) =>
-            p.id === post.id ? { ...p, isLikedByMe: prevLiked, likeCount: prevCount } : p
-          )
+          prev.map((p) => (p.id === post.id ? { ...p, isLikedByMe: prevLiked, likeCount: prevCount } : p))
         );
       }
     },
     [myUserId, isBlocked]
+  );
+
+  const OptionRow = ({
+    icon,
+    label,
+    danger,
+    onPress,
+    disabled,
+  }: {
+    icon: any;
+    label: string;
+    danger?: boolean;
+    onPress: () => void;
+    disabled?: boolean;
+  }) => (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={{ opacity: disabled ? 0.5 : 1 }}
+      className="flex-row items-center px-4 py-3"
+    >
+      <Ionicons name={icon} size={18} color={danger ? "#EF4444" : "#111827"} />
+      <Text className={`ml-3 text-[14px] ${danger ? "text-red-500 font-semibold" : "text-gray-900"}`}>
+        {label}
+      </Text>
+    </Pressable>
   );
 
   return (
@@ -518,7 +659,11 @@ const VisitProfileScreen: React.FC = () => {
         </Pressable>
       </View>
 
-      <ScrollView className="flex-1 bg-white" contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1 bg-white"
+        contentContainerStyle={{ paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View className="px-4 pt-4 pb-3">
           {!blockChecked || loadingProfile ? (
             <View className="h-20 items-center justify-center">
@@ -531,7 +676,11 @@ const VisitProfileScreen: React.FC = () => {
               <View className="flex-row items-center">
                 <View className="h-14 w-14 rounded-full bg-gray-200 mr-3 overflow-hidden">
                   {profile.avatarUrl && (
-                    <Image source={{ uri: profile.avatarUrl }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                    <Image
+                      source={{ uri: profile.avatarUrl }}
+                      style={{ width: "100%", height: "100%" }}
+                      resizeMode="cover"
+                    />
                   )}
                 </View>
 
@@ -634,10 +783,7 @@ const VisitProfileScreen: React.FC = () => {
                 });
 
                 if (!ok) {
-                  Alert.alert(
-                    t("visitProfile.alerts.navigationErrorTitle"),
-                    t("visitProfile.alerts.profileTabMissing")
-                  );
+                  Alert.alert(t("visitProfile.alerts.navigationErrorTitle"), t("visitProfile.alerts.profileTabMissing"));
                 }
               }}
               onToggleLike={handleToggleLike}
@@ -645,6 +791,138 @@ const VisitProfileScreen: React.FC = () => {
           ))
         )}
       </ScrollView>
+
+      {/* ✅ Options popup (NO Alert) */}
+      <Modal transparent visible={optionsOpen} animationType="fade" onRequestClose={() => setOptionsOpen(false)}>
+        <Pressable
+          onPress={() => setOptionsOpen(false)}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)" }}
+        >
+          <Pressable
+            onPress={() => {}}
+            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl overflow-hidden"
+            style={{ paddingBottom: 16 }}
+          >
+            <View className="px-4 pt-3 pb-2">
+              <View className="w-10 h-1.5 bg-gray-200 rounded-full self-center" />
+              <Text className="mt-3 text-[13px] text-gray-500">
+                {t("visitProfile.menu.title")}
+              </Text>
+            </View>
+
+            <View className="border-t border-gray-100" />
+
+            <OptionRow
+              icon="chatbubble-ellipses-outline"
+              label={t("visitProfile.menu.chat")}
+              onPress={goToChatRoom}
+              disabled={isBlocked || isChatRestricted || threadLoading}
+            />
+
+            <View className="border-t border-gray-100" />
+
+            {isChatRestricted ? (
+              <OptionRow
+                icon="shield-checkmark-outline"
+                label={t("visitProfile.menu.unrestrict")}
+                onPress={async () => {
+                  await setRestrict("unrestrict");
+                  setOptionsOpen(false);
+                }}
+                disabled={threadLoading}
+              />
+            ) : (
+              <OptionRow
+                icon="shield-outline"
+                label={t("visitProfile.menu.restrict")}
+                onPress={async () => {
+                  await setRestrict("restrict");
+                  setOptionsOpen(false);
+                }}
+                disabled={threadLoading}
+              />
+            )}
+
+            <View className="border-t border-gray-100" />
+
+            {isBlocked ? (
+              <OptionRow
+                icon="unlock-outline"
+                label={t("visitProfile.menu.unblock")}
+                onPress={async () => {
+                  setOptionsOpen(false);
+                  await doUnblock();
+                }}
+                disabled={blockLoading}
+              />
+            ) : (
+              <OptionRow
+                icon="ban-outline"
+                label={t("visitProfile.menu.block")}
+                danger
+                onPress={() => {
+                  setOptionsOpen(false);
+                  setConfirmBlockOpen(true);
+                }}
+                disabled={blockLoading}
+              />
+            )}
+
+            <View className="border-t border-gray-100 mt-2" />
+
+            <OptionRow
+              icon="close-outline"
+              label={t("common.cancel")}
+              onPress={() => setOptionsOpen(false)}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ✅ Confirm block popup (NO Alert) */}
+      <Modal transparent visible={confirmBlockOpen} animationType="fade" onRequestClose={() => setConfirmBlockOpen(false)}>
+        <Pressable
+          onPress={() => setConfirmBlockOpen(false)}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)" }}
+          className="items-center justify-center px-6"
+        >
+          <Pressable onPress={() => {}} className="bg-white w-full rounded-2xl overflow-hidden">
+            <View className="px-5 pt-5 pb-3">
+              <Text className="text-[16px] font-semibold text-gray-900">
+                {t("visitProfile.menu.blockTitle")}
+              </Text>
+              <Text className="mt-2 text-[13px] text-gray-600">
+                {t("visitProfile.menu.blockMsg")}
+              </Text>
+            </View>
+
+            <View className="border-t border-gray-100" />
+
+            <View className="flex-row">
+              <Pressable
+                className="flex-1 px-4 py-4 items-center"
+                onPress={() => setConfirmBlockOpen(false)}
+              >
+                <Text className="text-[14px] font-semibold text-gray-700">{t("common.cancel")}</Text>
+              </Pressable>
+
+              <View className="w-[1px] bg-gray-100" />
+
+              <Pressable
+                className="flex-1 px-4 py-4 items-center"
+                onPress={async () => {
+                  setConfirmBlockOpen(false);
+                  await doBlock();
+                }}
+              >
+                <Text className="text-[14px] font-semibold text-red-500">
+                  {t("visitProfile.menu.block")}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 };

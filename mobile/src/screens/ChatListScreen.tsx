@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TextInput,
   Platform,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -15,11 +16,11 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { ChatStackParamList } from "../navigation/ChatStackNavigator";
+import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ChatStackParamList, "ChatList">;
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.10.25:3000";
+type ChatThreadStatus = "REQUESTED" | "ACCEPTED" | "BLOCKED";
 
 type ConversationItem = {
   threadId: string;
@@ -30,10 +31,39 @@ type ConversationItem = {
   lastMessageText: string | null;
   lastMessageAt: string | null;
   unreadCount: number;
+
+  // ✅ NEW
+  status: ChatThreadStatus;
+  requestedById: string | null;
 };
+
+const USER_ID_KEY = "gl_user_id";
+
+function getApiBase() {
+  const raw =
+    (process.env.EXPO_PUBLIC_ADMIN_API_BASE_URL ??
+      process.env.EXPO_PUBLIC_API_URL ??
+      process.env.EXPO_PUBLIC_API_BASE_URL ??
+      "").trim();
+  const base = raw.replace(/\/+$/, "");
+  return base || "http://192.168.10.25:3000";
+}
+
+function normalizeUrl(base: string, url: string | null) {
+  if (!url) return null;
+  const u = String(url).trim();
+  if (!u) return null;
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  if (u.startsWith("//")) return `https:${u}`;
+  if (u.startsWith("/")) return `${base}${u}`;
+  return `${base}/${u}`;
+}
 
 const ChatListScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const base = useMemo(() => getApiBase(), []);
+
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   const [items, setItems] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,19 +76,23 @@ const ChatListScreen: React.FC = () => {
   const [searchMode, setSearchMode] = useState(false);
   const [q, setQ] = useState("");
 
+  const loadMyId = useCallback(async () => {
+    const uid = await AsyncStorage.getItem(USER_ID_KEY);
+    setMyUserId(uid || null);
+    return uid || null;
+  }, []);
+
   const loadUnreadNotifications = useCallback(async () => {
     try {
       setLoadingUnreadNotif(true);
-      const userId = await AsyncStorage.getItem("gl_user_id");
+      const userId = await AsyncStorage.getItem(USER_ID_KEY);
       if (!userId) {
         setUnreadNotif(0);
         return;
       }
 
       const res = await fetch(
-        `${API_BASE_URL}/api/notifications/unread-count?userId=${encodeURIComponent(
-          userId
-        )}`
+        `${base}/api/notifications/unread-count?userId=${encodeURIComponent(userId)}`
       );
 
       if (!res.ok) {
@@ -74,21 +108,19 @@ const ChatListScreen: React.FC = () => {
     } finally {
       setLoadingUnreadNotif(false);
     }
-  }, []);
+  }, [base]);
 
   const loadConversations = useCallback(async () => {
     try {
       setLoading(true);
-      const userId = await AsyncStorage.getItem("gl_user_id");
+      const userId = await AsyncStorage.getItem(USER_ID_KEY);
       if (!userId) {
         setHasUser(false);
         return;
       }
 
       const res = await fetch(
-        `${API_BASE_URL}/api/chat/conversations?userId=${encodeURIComponent(
-          userId
-        )}`
+        `${base}/api/chat/conversations?userId=${encodeURIComponent(userId)}`
       );
 
       if (!res.ok) {
@@ -103,17 +135,20 @@ const ChatListScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [base]);
 
   useEffect(() => {
+    loadMyId();
     loadConversations();
     loadUnreadNotifications();
-  }, [loadConversations, loadUnreadNotifications]);
+  }, [loadConversations, loadUnreadNotifications, loadMyId]);
 
   useFocusEffect(
     useCallback(() => {
+      loadMyId();
+      loadConversations();
       loadUnreadNotifications();
-    }, [loadUnreadNotifications])
+    }, [loadConversations, loadUnreadNotifications, loadMyId])
   );
 
   const openChat = (item: ConversationItem) => {
@@ -147,20 +182,102 @@ const ChatListScreen: React.FC = () => {
     });
   }, [items, q]);
 
+  const incomingRequests = useMemo(() => {
+    if (!myUserId) return [];
+    return filtered.filter((t) => t.status === "REQUESTED" && t.requestedById !== myUserId);
+  }, [filtered, myUserId]);
+
+  const acceptedChats = useMemo(() => {
+    return filtered.filter((t) => t.status === "ACCEPTED");
+  }, [filtered]);
+
+  const blockedChats = useMemo(() => {
+    return filtered.filter((t) => t.status === "BLOCKED");
+  }, [filtered]);
+
   if (!hasUser) {
     return (
       <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-[16px] font-semibold text-black mb-2">
-            You&apos;re logged out
+            {t("chatList.loggedOut.title")}
           </Text>
           <Text className="text-[12px] text-gray-500 text-center">
-            Please log in again to view your messages.
+            {t("chatList.loggedOut.subtitle")}
           </Text>
         </View>
       </SafeAreaView>
     );
   }
+
+  const renderRow = (item: ConversationItem) => {
+    const displayName = item.otherNickname || item.otherUsername;
+    const avatar = normalizeUrl(base, item.otherAvatarUrl);
+
+    const isRestricted = item.status === "BLOCKED";
+
+    return (
+      <Pressable
+        key={item.threadId}
+        onPress={() => (isRestricted ? null : openChat(item))}
+        className="mb-4 flex-row items-center"
+        style={{ opacity: isRestricted ? 0.55 : 1 }}
+      >
+        <View className="h-11 w-11 rounded-full bg-gray-200 overflow-hidden items-center justify-center">
+          {avatar ? (
+            <Image source={{ uri: avatar }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+          ) : (
+            <MaterialCommunityIcons name="account" size={22} color="#6B7280" />
+          )}
+        </View>
+
+        <View className="ml-3 flex-1">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center">
+              <Text className="text-[14px] font-semibold text-gray-900">{displayName}</Text>
+
+              {item.status === "REQUESTED" && (
+                <View className="ml-2 px-2 py-0.5 rounded-full bg-[#FFF7ED]">
+                  <Text className="text-[10px] font-semibold text-[#9A3412]">
+                    {t("chatList.badges.request")}
+                  </Text>
+                </View>
+              )}
+
+              {isRestricted && (
+                <View className="ml-2 px-2 py-0.5 rounded-full bg-red-50">
+                  <Text className="text-[10px] font-semibold text-red-600">
+                    {t("chatList.badges.restricted")}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {!!item.lastMessageAt && (
+              <Text className="text-[11px] text-gray-400">{formatTime(item.lastMessageAt)}</Text>
+            )}
+          </View>
+
+          <View className="flex-row items-center justify-between mt-0.5">
+            <Text className="text-[12px] text-gray-500 flex-1" numberOfLines={1}>
+              {item.lastMessageText || t("chatList.states.noMessages")}
+            </Text>
+
+            {item.unreadCount > 0 && (
+              <View className="ml-2 h-5 min-w-[18px] px-1 rounded-full bg-red-500 items-center justify-center">
+                <Text className="text-[10px] text-white font-semibold">
+                  {item.unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
+  const nothingFound =
+    incomingRequests.length === 0 && acceptedChats.length === 0 && blockedChats.length === 0;
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -168,7 +285,7 @@ const ChatListScreen: React.FC = () => {
         {/* Header */}
         {!searchMode ? (
           <View className="mb-4 flex-row items-center justify-between">
-            <Text className="text-[22px] font-bold text-black">Message</Text>
+            <Text className="text-[22px] font-bold text-black">{t("chatList.title")}</Text>
 
             <View className="flex-row items-center">
               <Pressable hitSlop={10} onPress={() => setSearchMode(true)}>
@@ -211,7 +328,7 @@ const ChatListScreen: React.FC = () => {
             <TextInput
               value={q}
               onChangeText={setQ}
-              placeholder="Search chats..."
+              placeholder={t("chatList.search.placeholder")}
               placeholderTextColor="#9CA3AF"
               autoCorrect={false}
               autoCapitalize="none"
@@ -235,7 +352,7 @@ const ChatListScreen: React.FC = () => {
               }}
               hitSlop={10}
             >
-              <Text className="ml-3 text-[13px] text-[#6C4DFF]">Cancel</Text>
+              <Text className="ml-3 text-[13px] text-[#6C4DFF]">{t("chatList.search.cancel")}</Text>
             </Pressable>
           </View>
         )}
@@ -253,28 +370,24 @@ const ChatListScreen: React.FC = () => {
               </View>
               <View>
                 <Text className="text-[14px] font-semibold text-gray-900">
-                  Notifications
+                  {t("chatList.notifications.title")}
                 </Text>
                 <Text className="text-[12px] text-gray-500">
-                  {unreadNotif > 0 ? `${unreadNotif} unread` : "No new notifications"}
+                  {unreadNotif > 0
+                    ? t("chatList.notifications.unread", { count: unreadNotif })
+                    : t("chatList.notifications.none")}
                 </Text>
               </View>
             </View>
 
-            {loadingUnreadNotif ? (
-              <ActivityIndicator size="small" />
-            ) : (
-              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-            )}
+            {loadingUnreadNotif ? <ActivityIndicator size="small" /> : <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />}
           </View>
         </Pressable>
 
         {loading ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator />
-            <Text className="mt-2 text-xs text-gray-500">
-              Loading conversations...
-            </Text>
+            <Text className="mt-2 text-xs text-gray-500">{t("chatList.states.loading")}</Text>
           </View>
         ) : (
           <ScrollView
@@ -288,54 +401,40 @@ const ChatListScreen: React.FC = () => {
                 <MaterialCommunityIcons name="gift" size={32} color="#F97316" />
               </View>
               <Text className="mt-3 text-[13px] font-semibold text-gray-700">
-                Unclaimed...
+                {t("chatList.unclaimed")}
               </Text>
             </View>
 
-            {filtered.map((item) => (
-              <Pressable
-                key={item.threadId}
-                onPress={() => openChat(item)}
-                className="mb-4 flex-row items-center"
-              >
-                <View className="h-11 w-11 items-center justify-center rounded-full bg-[#6C4DFF]">
-                  <MaterialCommunityIcons name="account" size={22} color="#FFFFFF" />
-                </View>
+            {incomingRequests.length > 0 && (
+              <View className="mb-4">
+                <Text className="mb-3 text-[13px] font-semibold text-gray-800">
+                  {t("chatList.sections.requests", { count: incomingRequests.length })}
+                </Text>
+                {incomingRequests.map(renderRow)}
+              </View>
+            )}
 
-                <View className="ml-3 flex-1">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-[14px] font-semibold text-gray-900">
-                      {item.otherNickname || item.otherUsername}
-                    </Text>
-                    {!!item.lastMessageAt && (
-                      <Text className="text-[11px] text-gray-400">
-                        {formatTime(item.lastMessageAt)}
-                      </Text>
-                    )}
-                  </View>
+            {acceptedChats.length > 0 && (
+              <View className="mb-4">
+                <Text className="mb-3 text-[13px] font-semibold text-gray-800">
+                  {t("chatList.sections.chats")}
+                </Text>
+                {acceptedChats.map(renderRow)}
+              </View>
+            )}
 
-                  <View className="flex-row items-center justify-between mt-0.5">
-                    <Text className="text-[12px] text-gray-500 flex-1" numberOfLines={1}>
-                      {item.lastMessageText || "No messages yet"}
-                    </Text>
+            {blockedChats.length > 0 && (
+              <View className="mb-4">
+                <Text className="mb-3 text-[13px] font-semibold text-gray-800">
+                  {t("chatList.sections.restricted")}
+                </Text>
+                {blockedChats.map(renderRow)}
+              </View>
+            )}
 
-                    {item.unreadCount > 0 && (
-                      <View className="ml-2 h-5 min-w-[18px] px-1 rounded-full bg-red-500 items-center justify-center">
-                        <Text className="text-[10px] text-white font-semibold">
-                          {item.unreadCount}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </Pressable>
-            ))}
-
-            {filtered.length === 0 && (
+            {nothingFound && (
               <Text className="text-center text-[12px] text-gray-400 mt-8">
-                {q.trim().length > 0
-                  ? "No chats matched your search."
-                  : "No chats yet. Start messaging your friends from their profile."}
+                {q.trim().length > 0 ? t("chatList.states.noSearch") : t("chatList.states.empty")}
               </Text>
             )}
           </ScrollView>

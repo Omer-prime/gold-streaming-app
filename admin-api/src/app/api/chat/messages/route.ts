@@ -21,34 +21,25 @@ export async function GET(req: NextRequest) {
     const take = clampTake(searchParams.get("take"));
 
     if (!userId || !peerId) {
-      return NextResponse.json(
-        { error: "userId and peerId are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "userId and peerId are required" }, { status: 400 });
     }
-
     if (userId === peerId) {
-      return NextResponse.json({ messages: [] }, { status: 200 });
+      return NextResponse.json({ thread: null, messages: [] }, { status: 200 });
     }
 
-    const [userAId, userBId] =
-      userId < peerId ? [userId, peerId] : [peerId, userId];
+    const [userAId, userBId] = userId < peerId ? [userId, peerId] : [peerId, userId];
 
     const thread = await prisma.chatThread.findUnique({
       where: { userAId_userBId: { userAId, userBId } },
     });
 
     if (!thread) {
-      return NextResponse.json({ messages: [] }, { status: 200 });
+      return NextResponse.json({ thread: null, messages: [] }, { status: 200 });
     }
 
     // mark incoming messages as read
     await prisma.chatMessage.updateMany({
-      where: {
-        threadId: thread.id,
-        senderId: { not: userId },
-        isRead: false,
-      },
+      where: { threadId: thread.id, senderId: { not: userId }, isRead: false },
       data: { isRead: true },
     });
 
@@ -66,13 +57,16 @@ export async function GET(req: NextRequest) {
       isMine: m.senderId === userId,
     }));
 
-    return NextResponse.json({ messages: data }, { status: 200 });
+    return NextResponse.json(
+      {
+        thread: { id: thread.id, status: thread.status, requestedById: thread.requestedById ?? null },
+        messages: data,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("[GET /api/chat/messages]", error);
-    return NextResponse.json(
-      { error: "Failed to load messages" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load messages" }, { status: 500 });
   }
 }
 
@@ -93,80 +87,99 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
     if (senderId === receiverId) {
-      return NextResponse.json(
-        { error: "Cannot send message to yourself" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Cannot send message to yourself" }, { status: 400 });
+    }
+    if (content.length > 2000) {
+      return NextResponse.json({ error: "Message is too long" }, { status: 400 });
     }
 
-    // basic length guard (avoid giant payloads)
-    if (content.length > 2000) {
-      return NextResponse.json(
-        { error: "Message is too long" },
-        { status: 400 }
-      );
+    // ✅ full-block check (either direction)
+    const blocked = await prisma.userBlock.findFirst({
+      where: {
+        OR: [
+          { userId: senderId, blockedId: receiverId },
+          { userId: receiverId, blockedId: senderId },
+        ],
+      },
+      select: { id: true },
+    });
+    if (blocked) {
+      return NextResponse.json({ error: "You cannot message this user." }, { status: 403 });
     }
 
     const [sender, receiver] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: senderId },
-        select: { id: true, username: true, nickname: true },
-      }),
-      prisma.user.findUnique({
-        where: { id: receiverId },
-        select: { id: true },
-      }),
+      prisma.user.findUnique({ where: { id: senderId }, select: { id: true, username: true, nickname: true } }),
+      prisma.user.findUnique({ where: { id: receiverId }, select: { id: true } }),
     ]);
 
-    if (!sender) {
-      return NextResponse.json({ error: "Sender not found" }, { status: 404 });
-    }
-    if (!receiver) {
-      return NextResponse.json(
-        { error: "Receiver not found" },
-        { status: 404 }
-      );
-    }
+    if (!sender) return NextResponse.json({ error: "Sender not found" }, { status: 404 });
+    if (!receiver) return NextResponse.json({ error: "Receiver not found" }, { status: 404 });
 
     const now = new Date();
     const [userAId, userBId] =
-      senderId < receiverId
-        ? [senderId, receiverId]
-        : [receiverId, senderId];
+      senderId < receiverId ? [senderId, receiverId] : [receiverId, senderId];
 
-    const thread = await prisma.chatThread.upsert({
+    let thread = await prisma.chatThread.findUnique({
       where: { userAId_userBId: { userAId, userBId } },
-      update: { lastMessageText: content, lastMessageAt: now },
-      create: { userAId, userBId, lastMessageText: content, lastMessageAt: now },
     });
+
+    if (!thread) {
+      // ✅ first message => REQUESTED
+      thread = await prisma.chatThread.create({
+        data: {
+          userAId,
+          userBId,
+          status: "REQUESTED",
+          requestedById: senderId,
+          lastMessageText: content,
+          lastMessageAt: now,
+        },
+      });
+    } else {
+      if (thread.status === "BLOCKED") {
+        return NextResponse.json({ error: "Chat is restricted." }, { status: 403 });
+      }
+
+      // ✅ if receiver replies to a request => auto-accept
+      const shouldAutoAccept =
+        thread.status === "REQUESTED" &&
+        !!thread.requestedById &&
+        thread.requestedById !== senderId;
+
+      thread = await prisma.chatThread.update({
+        where: { id: thread.id },
+        data: {
+          lastMessageText: content,
+          lastMessageAt: now,
+          status: shouldAutoAccept ? "ACCEPTED" : thread.status,
+          requestedById: shouldAutoAccept ? null : thread.requestedById,
+        },
+      });
+    }
 
     const message = await prisma.chatMessage.create({
       data: { threadId: thread.id, senderId, content },
     });
 
-    // ✅ new feature: create notification for receiver if they allow message notifications
+    // ✅ create notification (request vs normal message)
     try {
       const settings = await getOrCreateUserSettings(receiverId);
-
       if (Boolean((settings as any).notifyMessages)) {
         const displayName = sender.nickname || sender.username || "Someone";
+        const isRequest = thread.status === "REQUESTED" && thread.requestedById === senderId;
 
         await prisma.notification.create({
           data: {
             userId: receiverId,
             type: "MESSAGE",
-            title: `New message from ${displayName}`,
+            title: isRequest ? `Message request from ${displayName}` : `New message from ${displayName}`,
             body: content.length > 120 ? content.slice(0, 117) + "..." : content,
           },
         });
       }
     } catch (inner) {
-      console.error(
-        "[POST /api/chat/messages] notification creation failed",
-        inner
-      );
+      console.error("[POST /api/chat/messages] notification creation failed", inner);
     }
 
     return NextResponse.json(
@@ -183,9 +196,6 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("[POST /api/chat/messages]", error);
-    return NextResponse.json(
-      { error: "Failed to send message" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
   }
 }

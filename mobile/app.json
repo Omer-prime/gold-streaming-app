@@ -13,11 +13,12 @@
       "backgroundColor": "#ffffff"
     },
     "plugins": [
-       "./plugins/withNewArchEnabled",
+      "./plugins/withNewArchEnabled",
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
       "expo-localization",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": true,

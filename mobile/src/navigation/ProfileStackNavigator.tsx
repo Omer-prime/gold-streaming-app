@@ -54,7 +54,11 @@ import PrivilegeSettingsScreen from "../screens/PrivilegeSettingsScreen";
 import NewMessageNotificationScreen from "../screens/NewMessageNotificationScreen";
 import PrivacySettingsScreen from "../screens/PrivacySettingsScreen";
 import AboutGoldLiveScreen from "../screens/AboutGoldLiveScreen";
-
+import PrivacyPolicyScreen from "../screens/PrivacyPolicyScreen";
+import TermsOfServiceScreen from "../screens/TermsOfServiceScreen";
+import LiveAgreementScreen from "../screens/LiveAgreementScreen";
+import UserRechargeAgreementScreen from "../screens/UserRechargeAgreementScreen";
+import NoChildEndangermentPolicyScreen from "../screens/NoChildEndangermentPolicyScreen";
 // NEW: account-bind & device
 import DeviceManagementScreen from "../screens/DeviceManagementScreen";
 import BindPhoneScreen from "../screens/BindPhoneScreen";
@@ -137,6 +141,12 @@ export type ProfileStackParamList = {
   BindFacebook: undefined;
   BindInstagram: undefined;
   BindTiktok: undefined;
+
+  PrivacyPolicy: undefined;
+  TermsOfService: undefined;
+  LiveAgreement: undefined;
+  UserRechargeAgreement: undefined;
+  NoChildEndangermentPolicy: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -212,6 +222,13 @@ const ProfileStackNavigator: React.FC = () => {
 
       <Stack.Screen name="RealPersonAuth" component={RealPersonAuthScreen} options={{ headerShown: false }} />
       <Stack.Screen name="FaceScan" component={FaceScanScreen} options={{ headerShown: false }} />
+
+
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="LiveAgreement" component={LiveAgreementScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="UserRechargeAgreement" component={UserRechargeAgreementScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="NoChildEndangermentPolicy" component={NoChildEndangermentPolicyScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 };

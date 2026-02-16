@@ -1,6 +1,6 @@
 // src/screens/AboutGoldLiveScreen.tsx
 import React from "react";
-import { View, Text, ScrollView, Pressable, Alert } from "react-native";
+import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -10,14 +10,8 @@ import { t } from "../i18n";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "AboutGoldLive">;
 
-
-
 const AboutGoldLiveScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
-
-  const handleItemPress = (label: string) => {
-    Alert.alert(label, t("aboutGoldLive.alerts.comingSoon", { label }));
-  };
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -53,23 +47,23 @@ const AboutGoldLiveScreen: React.FC = () => {
 
         <InfoRow
           label={t("aboutGoldLive.items.privacyPolicy")}
-          onPress={() => handleItemPress(t("aboutGoldLive.items.privacyPolicy"))}
+          onPress={() => navigation.navigate("PrivacyPolicy")}
         />
         <InfoRow
           label={t("aboutGoldLive.items.termsOfService")}
-          onPress={() => handleItemPress(t("aboutGoldLive.items.termsOfService"))}
+          onPress={() => navigation.navigate("TermsOfService")}
         />
         <InfoRow
           label={t("aboutGoldLive.items.liveAgreement")}
-          onPress={() => handleItemPress(t("aboutGoldLive.items.liveAgreement"))}
+          onPress={() => navigation.navigate("LiveAgreement")}
         />
         <InfoRow
           label={t("aboutGoldLive.items.userRechargeAgreement")}
-          onPress={() => handleItemPress(t("aboutGoldLive.items.userRechargeAgreement"))}
+          onPress={() => navigation.navigate("UserRechargeAgreement")}
         />
         <InfoRow
           label={t("aboutGoldLive.items.noChildEndangermentPolicy")}
-          onPress={() => handleItemPress(t("aboutGoldLive.items.noChildEndangermentPolicy"))}
+          onPress={() => navigation.navigate("NoChildEndangermentPolicy")}
         />
       </ScrollView>
     </SafeAreaView>

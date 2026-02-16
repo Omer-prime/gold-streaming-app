@@ -404,7 +404,260 @@ export default {
             comingSoon: "{{label}} page will be added later for Gold Live.",
         },
     },
+    legalDocs: {
+        common: {
+            lastUpdated: "Last updated: February 16, 2026",
+        },
 
+        privacy: {
+            title: "Privacy Policy",
+            intro:
+                "Gold Live collects and uses data only when needed to run the platform. We do not sell your personal data.",
+
+            sections: {
+                transparency: {
+                    title: "1) What data we collect",
+                    p1:
+                        "We may collect account info (username, email, profile photo), and the content you submit (chats, comments, live streams).",
+                    p2:
+                        "We may collect technical data (IP address, device, operating system, logs) to keep the app stable and secure.",
+                    p3:
+                        "We may collect transaction data (purchase history of coins, diamonds, and virtual gifts). We do not collect sensitive data like biometrics, medical info, or precise real-time location.",
+                },
+
+                usage: {
+                    title: "2) How we use data",
+                    p1:
+                        "We use data to operate and maintain live streaming, enable user interaction, process in-app purchases, and prevent fraud, abuse, and illegal activity.",
+                    p2:
+                        "We do not use your data for selling or improper sharing.",
+                },
+
+                sharing: {
+                    title: "3) Sharing with third parties",
+                    p1:
+                        "We may share limited data with approved payment processors (Google Play Billing / Apple In-App Purchase), hosting and security providers, and legal authorities when required by law.",
+                    p2:
+                        "All third parties must follow strict data protection rules.",
+                },
+
+                iap: {
+                    title: "4) In-app purchases",
+                    p1:
+                        "Gold Live uses the official systems: Google Play Billing and Apple In-App Purchases.",
+                    p2:
+                        "We do not store full payment card details on our servers.",
+                },
+
+                analytics: {
+                    title: "5) Ads & analytics",
+                    p1:
+                        "Gold Live may use analytics tools to improve user experience and app performance.",
+                    p2:
+                        "These tools do not sell personal data and are designed not to identify users individually.",
+                },
+
+                ugc: {
+                    title: "6) User-generated content",
+                    p1:
+                        "Users are responsible for the content they post. Gold Live provides reporting tools and may remove illegal, abusive, or inappropriate content.",
+                    p2:
+                        "Accounts that violate the Terms may be suspended or terminated.",
+                },
+
+                children: {
+                    title: "7) Children’s privacy (18+ only)",
+                    p1:
+                        "Gold Live is not intended for anyone under 18 years old.",
+                    p2:
+                        "We do not intentionally collect data from children. Accounts identified as belonging to minors may be removed.",
+                    p3:
+                        "We follow child privacy protections (including COPPA where applicable).",
+                },
+
+                rights: {
+                    title: "8) Your rights",
+                    p1:
+                        "You may request access to your data, correct/update your information, request account deletion, or withdraw consent where applicable.",
+                    p2:
+                        "Requests can be made through the official support email.",
+                },
+
+                retention: {
+                    title: "9) Data retention & deletion",
+                    p1:
+                        "We keep data only as long as needed for the platform and legal requirements.",
+                    p2:
+                        "After account deletion, data is removed or anonymized where possible.",
+                },
+
+                changes: {
+                    title: "10) Changes to this policy",
+                    p1:
+                        "We may update this Privacy Policy at any time. Changes take effect when published.",
+                },
+
+                contact: {
+                    title: "11) Contact",
+                    p1:
+                        "Support phone: +33-6498415115",
+                    p2:
+                        "Support email: goldlive@gmail.com",
+                },
+            },
+        },
+
+        terms: {
+            title: "Terms of Service",
+            intro:
+                "These Terms explain how to use Gold Live. By using the app, you agree to follow these rules.",
+
+            sections: {
+                eligibility: {
+                    title: "1) Eligibility",
+                    p1:
+                        "Gold Live is for users aged 18 and above. If you are under 18, you must not use the app.",
+                },
+
+                account: {
+                    title: "2) Your account",
+                    p1:
+                        "You are responsible for your account activity and for keeping your login details safe.",
+                    p2:
+                        "You must provide accurate information and must not impersonate others.",
+                },
+
+                userContent: {
+                    title: "3) Content and behavior",
+                    p1:
+                        "You are responsible for anything you post, stream, or share (including chats and comments).",
+                    p2:
+                        "Illegal, abusive, or inappropriate content is not allowed. We may remove content and take action on accounts that break the rules.",
+                },
+
+                purchases: {
+                    title: "4) Coins, gifts, and purchases",
+                    p1:
+                        "Purchases are processed through Google Play Billing or Apple In-App Purchase.",
+                    p2:
+                        "Gold Live does not store full payment card details on its servers.",
+                },
+
+                enforcement: {
+                    title: "5) Enforcement",
+                    p1:
+                        "We may suspend or terminate accounts that violate these Terms or create risk to users or the platform.",
+                    p2:
+                        "We may cooperate with legal authorities when required by law.",
+                },
+
+                changes: {
+                    title: "6) Updates",
+                    p1:
+                        "We may update these Terms. Changes take effect when published in the app or on our official pages.",
+                },
+
+                contact: {
+                    title: "7) Contact",
+                    p1:
+                        "If you have questions, contact support using the details in the Privacy Policy page.",
+                },
+            },
+        },
+
+        liveAgreement: {
+            title: "Live Agreement",
+            intro:
+                "This agreement applies when you host or participate in live streams on Gold Live.",
+
+            sections: {
+                content: {
+                    title: "1) Live content rules",
+                    p1:
+                        "You must not stream illegal, abusive, or inappropriate content. You must respect other users.",
+                    p2:
+                        "You are responsible for everything you show or say during your live stream.",
+                },
+                reporting: {
+                    title: "2) Reporting & moderation",
+                    p1:
+                        "Gold Live provides reporting tools. We may review reports and remove content that violates rules.",
+                },
+                actions: {
+                    title: "3) Account actions",
+                    p1:
+                        "If you violate rules, your live stream may be limited, your content removed, or your account suspended/terminated.",
+                    p2:
+                        "We may take action to prevent fraud, abuse, or illegal activity.",
+                },
+                age: {
+                    title: "4) 18+ only",
+                    p1:
+                        "Live streaming is not available to anyone under 18. Accounts identified as minors may be removed.",
+                },
+            },
+        },
+
+        recharge: {
+            title: "User Recharge Agreement",
+            intro:
+                "This agreement explains how coin/diamond purchases and virtual gifts work in Gold Live.",
+
+            sections: {
+                providers: {
+                    title: "1) Official payment systems",
+                    p1:
+                        "Purchases are handled through Google Play Billing and Apple In-App Purchases.",
+                },
+                storage: {
+                    title: "2) Payment data",
+                    p1:
+                        "Gold Live does not store full payment card details on its servers.",
+                },
+                delivery: {
+                    title: "3) Purchase records",
+                    p1:
+                        "We keep purchase history records (coins, diamonds, gifts) for account and transaction tracking.",
+                },
+                support: {
+                    title: "4) Support",
+                    p1:
+                        "If you face purchase issues, contact support. Refund handling depends on the app store rules.",
+                },
+            },
+        },
+
+        childPolicy: {
+            title: "No Child Endangerment Policy",
+            intro:
+                "Gold Live is committed to protecting children. The platform is not intended for users under 18.",
+
+            sections: {
+                age: {
+                    title: "1) 18+ only",
+                    p1:
+                        "Gold Live is not for minors. If we identify an account belonging to a minor, we may remove it.",
+                },
+                noCollection: {
+                    title: "2) No intentional collection",
+                    p1:
+                        "We do not intentionally collect personal data from children.",
+                },
+                enforcement: {
+                    title: "3) Enforcement",
+                    p1:
+                        "We may remove content, suspend streams, and terminate accounts involved in child endangerment or exploitation.",
+                },
+                reporting: {
+                    title: "4) Reporting",
+                    p1:
+                        "Use in-app reporting tools to report harmful content.",
+                    p2:
+                        "You can also contact support using the official contact details in the Privacy Policy page.",
+                },
+            },
+        },
+    },
     ranking: {
         title: "Ranking",
         tabs: { host: "Host", rich: "Rich", gift: "Gift" },
@@ -1656,71 +1909,71 @@ export default {
             restrictedChatMsg: "You restricted this chat.",
         },
         chatList: {
-  title: "Message",
-  unclaimed: "Unclaimed...",
-  loggedOut: {
-    title: "You’re logged out",
-    subtitle: "Please log in again to view your messages.",
-  },
-  search: {
-    placeholder: "Search chats...",
-    cancel: "Cancel",
-  },
-  notifications: {
-    title: "Notifications",
-    unread: "{{count}} unread",
-    none: "No new notifications",
-  },
-  sections: {
-    requests: "Message requests ({{count}})",
-    chats: "Chats",
-    restricted: "Restricted",
-  },
-  badges: {
-    request: "REQUEST",
-    restricted: "RESTRICTED",
-  },
-  states: {
-    loading: "Loading conversations...",
-    noMessages: "No messages yet",
-    noSearch: "No chats matched your search.",
-    empty: "No chats yet. Start messaging your friends from their profile.",
-  },
-},
+            title: "Message",
+            unclaimed: "Unclaimed...",
+            loggedOut: {
+                title: "You’re logged out",
+                subtitle: "Please log in again to view your messages.",
+            },
+            search: {
+                placeholder: "Search chats...",
+                cancel: "Cancel",
+            },
+            notifications: {
+                title: "Notifications",
+                unread: "{{count}} unread",
+                none: "No new notifications",
+            },
+            sections: {
+                requests: "Message requests ({{count}})",
+                chats: "Chats",
+                restricted: "Restricted",
+            },
+            badges: {
+                request: "REQUEST",
+                restricted: "RESTRICTED",
+            },
+            states: {
+                loading: "Loading conversations...",
+                noMessages: "No messages yet",
+                noSearch: "No chats matched your search.",
+                empty: "No chats yet. Start messaging your friends from their profile.",
+            },
+        },
 
-chatRoom: {
-  loggedOut: {
-    title: "You’re logged out",
-    subtitle: "Please login again to use chat.",
-  },
-  labels: {
-    online: "Online",
-  },
-  states: {
-    loading: "Loading messages...",
-    empty: "Say hi to {{name}} 👋",
-  },
-  input: {
-    placeholder: "Type a message...",
-  },
-  request: {
-    incomingTitle: "Message request",
-    incomingBody: "{{name}} wants to message you.",
-    accept: "Accept",
-    decline: "Decline",
-    sentTitle: "Request sent",
-    sentBody: "Waiting for {{name}} to accept your request.",
-  },
-  restricted: {
-    title: "Restricted",
-    body: "You restricted this chat.",
-    unrestrict: "Unrestrict",
-  },
-  errors: {
-    loadFailed: "Failed to load messages",
-    sendFailed: "Send failed",
-  },
-},
+        chatRoom: {
+            loggedOut: {
+                title: "You’re logged out",
+                subtitle: "Please login again to use chat.",
+            },
+            labels: {
+                online: "Online",
+            },
+            states: {
+                loading: "Loading messages...",
+                empty: "Say hi to {{name}} 👋",
+            },
+            input: {
+                placeholder: "Type a message...",
+            },
+            request: {
+                incomingTitle: "Message request",
+                incomingBody: "{{name}} wants to message you.",
+                accept: "Accept",
+                decline: "Decline",
+                sentTitle: "Request sent",
+                sentBody: "Waiting for {{name}} to accept your request.",
+            },
+            restricted: {
+                title: "Restricted",
+                body: "You restricted this chat.",
+                unrestrict: "Unrestrict",
+            },
+            errors: {
+                loadFailed: "Failed to load messages",
+                sendFailed: "Send failed",
+            },
+        },
 
         alerts: {
             loginRequired: "Login required.",
@@ -1737,72 +1990,72 @@ chatRoom: {
         },
 
     },
-chatList: {
-  title: "Message",
-  unclaimed: "Unclaimed...",
-  loggedOut: {
-    title: "You’re logged out",
-    subtitle: "Please log in again to view your messages.",
-  },
-  search: {
-    placeholder: "Search chats...",
-    cancel: "Cancel",
-  },
-  notifications: {
-    title: "Notifications",
-    unread: "{{count}} unread",
-    none: "No new notifications",
-  },
-  sections: {
-    requests: "Message requests ({{count}})",
-    chats: "Chats",
-    restricted: "Restricted",
-  },
-  badges: {
-    request: "REQUEST",
-    restricted: "RESTRICTED",
-  },
-  states: {
-    loading: "Loading conversations...",
-    noMessages: "No messages yet",
-    noSearch: "No chats matched your search.",
-    empty: "No chats yet. Start messaging your friends from their profile.",
-  },
-},
+    chatList: {
+        title: "Message",
+        unclaimed: "Unclaimed...",
+        loggedOut: {
+            title: "You’re logged out",
+            subtitle: "Please log in again to view your messages.",
+        },
+        search: {
+            placeholder: "Search chats...",
+            cancel: "Cancel",
+        },
+        notifications: {
+            title: "Notifications",
+            unread: "{{count}} unread",
+            none: "No new notifications",
+        },
+        sections: {
+            requests: "Message requests ({{count}})",
+            chats: "Chats",
+            restricted: "Restricted",
+        },
+        badges: {
+            request: "REQUEST",
+            restricted: "RESTRICTED",
+        },
+        states: {
+            loading: "Loading conversations...",
+            noMessages: "No messages yet",
+            noSearch: "No chats matched your search.",
+            empty: "No chats yet. Start messaging your friends from their profile.",
+        },
+    },
 
-chatRoom: {
-  loggedOut: {
-    title: "You’re logged out",
-    subtitle: "Please login again to use chat.",
-  },
-  labels: {
-    online: "Online",
-  },
-  states: {
-    loading: "Loading messages...",
-    empty: "Say hi to {{name}} 👋",
-  },
-  input: {
-    placeholder: "Type a message...",
-  },
-  request: {
-    incomingTitle: "Message request",
-    incomingBody: "{{name}} wants to message you.",
-    accept: "Accept",
-    decline: "Decline",
-    sentTitle: "Request sent",
-    sentBody: "Waiting for {{name}} to accept your request.",
-  },
-  restricted: {
-    title: "Restricted",
-    body: "You restricted this chat.",
-    unrestrict: "Unrestrict",
-  },
-  errors: {
-    loadFailed: "Failed to load messages",
-    sendFailed: "Send failed",
-  },
-},
+    chatRoom: {
+        loggedOut: {
+            title: "You’re logged out",
+            subtitle: "Please login again to use chat.",
+        },
+        labels: {
+            online: "Online",
+        },
+        states: {
+            loading: "Loading messages...",
+            empty: "Say hi to {{name}} 👋",
+        },
+        input: {
+            placeholder: "Type a message...",
+        },
+        request: {
+            incomingTitle: "Message request",
+            incomingBody: "{{name}} wants to message you.",
+            accept: "Accept",
+            decline: "Decline",
+            sentTitle: "Request sent",
+            sentBody: "Waiting for {{name}} to accept your request.",
+        },
+        restricted: {
+            title: "Restricted",
+            body: "You restricted this chat.",
+            unrestrict: "Unrestrict",
+        },
+        errors: {
+            loadFailed: "Failed to load messages",
+            sendFailed: "Send failed",
+        },
+    },
 
     realPersonAuth: {
         title: "Auth",

@@ -1,6 +1,6 @@
 // src/i18n/es.ts
 export default {
- common: {
+  common: {
     ok: "OK",
     cancel: "Cancelar",
     loading: "...",
@@ -403,6 +403,260 @@ export default {
       comingSoon: "La página {{label}} se añadirá más adelante para Gold Live.",
     },
   },
+  legalDocs: {
+    common: {
+      lastUpdated: "Última actualización: 16 de febrero de 2026",
+    },
+
+    privacy: {
+      title: "Política de privacidad",
+      intro:
+        "Gold Live recopila y usa datos solo cuando es necesario para operar la plataforma. No vendemos tus datos personales.",
+
+      sections: {
+        transparency: {
+          title: "1) Qué datos recopilamos",
+          p1:
+            "Podemos recopilar información de la cuenta (nombre de usuario, email, foto de perfil) y el contenido que envías (chats, comentarios, transmisiones en vivo).",
+          p2:
+            "Podemos recopilar datos técnicos (dirección IP, dispositivo, sistema operativo, registros) para mantener la app estable y segura.",
+          p3:
+            "Podemos recopilar datos de transacciones (historial de compras de monedas, diamantes y regalos virtuales). No recopilamos datos sensibles como biometría, información médica o ubicación precisa en tiempo real.",
+        },
+
+        usage: {
+          title: "2) Cómo usamos los datos",
+          p1:
+            "Usamos los datos para operar y mantener las transmisiones en vivo, habilitar la interacción entre usuarios, procesar compras dentro de la app y prevenir fraude, abuso y actividades ilegales.",
+          p2:
+            "No usamos tus datos para venderlos ni para compartirlos de forma indebida.",
+        },
+
+        sharing: {
+          title: "3) Compartir con terceros",
+          p1:
+            "Podemos compartir datos limitados con procesadores de pago aprobados (Google Play Billing / Apple In-App Purchase), proveedores de hosting y seguridad, y autoridades legales cuando lo exija la ley.",
+          p2:
+            "Todos los terceros deben cumplir reglas estrictas de protección de datos.",
+        },
+
+        iap: {
+          title: "4) Compras dentro de la app",
+          p1:
+            "Gold Live utiliza los sistemas oficiales: Google Play Billing y Apple In-App Purchases.",
+          p2:
+            "No almacenamos los datos completos de tu tarjeta de pago en nuestros servidores.",
+        },
+
+        analytics: {
+          title: "5) Anuncios y analítica",
+          p1:
+            "Gold Live puede usar herramientas de analítica para mejorar la experiencia del usuario y el rendimiento de la app.",
+          p2:
+            "Estas herramientas no venden datos personales y están diseñadas para no identificar a los usuarios de forma individual.",
+        },
+
+        ugc: {
+          title: "6) Contenido generado por usuarios",
+          p1:
+            "Los usuarios son responsables del contenido que publican. Gold Live ofrece herramientas de denuncia y puede eliminar contenido ilegal, abusivo o inapropiado.",
+          p2:
+            "Las cuentas que violen los Términos pueden ser suspendidas o canceladas.",
+        },
+
+        children: {
+          title: "7) Privacidad de menores (solo 18+)",
+          p1:
+            "Gold Live no está pensado para nadie menor de 18 años.",
+          p2:
+            "No recopilamos intencionalmente datos de menores. Las cuentas identificadas como pertenecientes a menores pueden ser eliminadas.",
+          p3:
+            "Seguimos las protecciones de privacidad infantil (incluida la COPPA cuando corresponda).",
+        },
+
+        rights: {
+          title: "8) Tus derechos",
+          p1:
+            "Puedes solicitar acceso a tus datos, corregir/actualizar tu información, solicitar la eliminación de tu cuenta o retirar tu consentimiento cuando corresponda.",
+          p2:
+            "Las solicitudes pueden realizarse a través del email oficial de soporte.",
+        },
+
+        retention: {
+          title: "9) Retención y eliminación de datos",
+          p1:
+            "Conservamos los datos solo durante el tiempo necesario para la plataforma y por requisitos legales.",
+          p2:
+            "Tras la eliminación de la cuenta, los datos se eliminan o se anonimizan cuando sea posible.",
+        },
+
+        changes: {
+          title: "10) Cambios a esta política",
+          p1:
+            "Podemos actualizar esta Política de privacidad en cualquier momento. Los cambios entran en vigor cuando se publiquen.",
+        },
+
+        contact: {
+          title: "11) Contacto",
+          p1:
+            "Teléfono de soporte: +33-6498415115",
+          p2:
+            "goldlive@gmail.com",
+        },
+      },
+    },
+
+    terms: {
+      title: "Términos de servicio",
+      intro:
+        "Estos Términos explican cómo usar Gold Live. Al usar la app, aceptas seguir estas reglas.",
+
+      sections: {
+        eligibility: {
+          title: "1) Requisitos",
+          p1:
+            "Gold Live es para usuarios de 18 años o más. Si eres menor de 18, no debes usar la app.",
+        },
+
+        account: {
+          title: "2) Tu cuenta",
+          p1:
+            "Eres responsable de la actividad de tu cuenta y de mantener tus datos de inicio de sesión seguros.",
+          p2:
+            "Debes proporcionar información precisa y no debes hacerte pasar por otra persona.",
+        },
+
+        userContent: {
+          title: "3) Contenido y comportamiento",
+          p1:
+            "Eres responsable de todo lo que publiques, transmitas o compartas (incluidos chats y comentarios).",
+          p2:
+            "No se permite contenido ilegal, abusivo o inapropiado. Podemos eliminar contenido y tomar medidas con cuentas que incumplan las reglas.",
+        },
+
+        purchases: {
+          title: "4) Monedas, regalos y compras",
+          p1:
+            "Las compras se procesan a través de Google Play Billing o Apple In-App Purchase.",
+          p2:
+            "Gold Live no almacena los datos completos de tu tarjeta de pago en sus servidores.",
+        },
+
+        enforcement: {
+          title: "5) Aplicación de normas",
+          p1:
+            "Podemos suspender o cancelar cuentas que violen estos Términos o creen riesgo para los usuarios o la plataforma.",
+          p2:
+            "Podemos cooperar con autoridades legales cuando lo exija la ley.",
+        },
+
+        changes: {
+          title: "6) Actualizaciones",
+          p1:
+            "Podemos actualizar estos Términos. Los cambios entran en vigor cuando se publiquen en la app o en nuestras páginas oficiales.",
+        },
+
+        contact: {
+          title: "7) Contacto",
+          p1:
+            "Si tienes preguntas, contacta con soporte usando los detalles en la página de Política de privacidad.",
+        },
+      },
+    },
+
+    liveAgreement: {
+      title: "Acuerdo de transmisión en vivo",
+      intro:
+        "Este acuerdo aplica cuando realizas o participas en transmisiones en vivo en Gold Live.",
+
+      sections: {
+        content: {
+          title: "1) Reglas de contenido en vivo",
+          p1:
+            "No debes transmitir contenido ilegal, abusivo o inapropiado. Debes respetar a otros usuarios.",
+          p2:
+            "Eres responsable de todo lo que muestres o digas durante tu transmisión en vivo.",
+        },
+        reporting: {
+          title: "2) Denuncias y moderación",
+          p1:
+            "Gold Live ofrece herramientas de denuncia. Podemos revisar los reportes y eliminar contenido que viole las reglas.",
+        },
+        actions: {
+          title: "3) Medidas sobre la cuenta",
+          p1:
+            "Si violas las reglas, tu transmisión en vivo puede ser limitada, tu contenido eliminado o tu cuenta suspendida/cancelada.",
+          p2:
+            "Podemos tomar medidas para prevenir fraude, abuso o actividad ilegal.",
+        },
+        age: {
+          title: "4) Solo 18+",
+          p1:
+            "La transmisión en vivo no está disponible para menores de 18. Las cuentas identificadas como de menores pueden ser eliminadas.",
+        },
+      },
+    },
+
+    recharge: {
+      title: "Acuerdo de recarga del usuario",
+      intro:
+        "Este acuerdo explica cómo funcionan las compras de monedas/diamantes y los regalos virtuales en Gold Live.",
+
+      sections: {
+        providers: {
+          title: "1) Sistemas oficiales de pago",
+          p1:
+            "Las compras se gestionan a través de Google Play Billing y Apple In-App Purchases.",
+        },
+        storage: {
+          title: "2) Datos de pago",
+          p1:
+            "Gold Live no almacena los datos completos de tu tarjeta de pago en sus servidores.",
+        },
+        delivery: {
+          title: "3) Registros de compra",
+          p1:
+            "Conservamos registros del historial de compras (monedas, diamantes, regalos) para el seguimiento de la cuenta y de las transacciones.",
+        },
+        support: {
+          title: "4) Soporte",
+          p1:
+            "Si tienes problemas con compras, contacta con soporte. El manejo de reembolsos depende de las reglas de la tienda de apps.",
+        },
+      },
+    },
+
+    childPolicy: {
+      title: "Política de no poner en peligro a menores",
+      intro:
+        "Gold Live está comprometido con la protección de menores. La plataforma no está destinada a usuarios menores de 18.",
+
+      sections: {
+        age: {
+          title: "1) Solo 18+",
+          p1:
+            "Gold Live no es para menores. Si identificamos una cuenta perteneciente a un menor, podemos eliminarla.",
+        },
+        noCollection: {
+          title: "2) Sin recopilación intencional",
+          p1:
+            "No recopilamos intencionalmente datos personales de menores.",
+        },
+        enforcement: {
+          title: "3) Aplicación",
+          p1:
+            "Podemos eliminar contenido, suspender transmisiones y cancelar cuentas involucradas en poner en peligro a menores o en explotación.",
+        },
+        reporting: {
+          title: "4) Denuncias",
+          p1:
+            "Usa las herramientas de denuncia dentro de la app para reportar contenido dañino.",
+          p2:
+            "También puedes contactar con soporte usando los detalles oficiales de contacto en la página de Política de privacidad.",
+        },
+      },
+    },
+  },
 
   ranking: {
     title: "Ranking",
@@ -472,7 +726,7 @@ export default {
     },
   },
 
- store: {
+  store: {
     title: "Tienda",
     popular: "Popular",
     states: {
@@ -509,7 +763,8 @@ export default {
         buying: "Comprando...",
         recharge: "Recargar",
       },
-    },},
+    },
+  },
 
   invite: {
     title: "Bono de invitación",
@@ -1133,7 +1388,7 @@ export default {
       tapToUse: "Toca para equipar/desequipar",
     },
   },
-   giftGallery: {
+  giftGallery: {
     title: "Galería de regalos",
     states: {
       loading: "Cargando…",
@@ -1283,7 +1538,7 @@ export default {
     },
   },
 
-    coins: {
+  coins: {
     title: "Monedas",
     pointsTab: "Puntos",
     labels: {
@@ -1639,48 +1894,48 @@ export default {
     },
   },
 
-visitProfile: {
-  titleFallback: "Perfil",
-  labels: {
-    id: "ID: {{id}}",
-    followers: "Seguidores",
-    following: "Siguiendo",
+  visitProfile: {
+    titleFallback: "Perfil",
+    labels: {
+      id: "ID: {{id}}",
+      followers: "Seguidores",
+      following: "Siguiendo",
+    },
+    actions: {
+      follow: "Seguir",
+      following: "Siguiendo",
+      pleaseWait: "Por favor espera...",
+      unblock: "Desbloquear",
+    },
+    states: {
+      notFound: "Usuario no encontrado.",
+      noMoments: "Aún no hay momentos.",
+      blockedChip: "Has bloqueado a este usuario",
+      blockedBody: "Has bloqueado a este usuario. Desbloquéalo para ver sus momentos.",
+    },
+    menu: {
+      title: "Opciones",
+      blockTitle: "Bloquear usuario",
+      blockMsg:
+        "Ya no verás su contenido y puede que no pueda interactuar contigo.",
+      block: "Bloquear",
+      unblock: "Desbloquear",
+    },
+    alerts: {
+      loginRequired: "Inicio de sesión requerido.",
+      loginToBlock: "Inicio de sesión requerido para bloquear usuarios.",
+      blockedTitle: "Bloqueado",
+      blockedFollowMsg: "Primero desbloquea a este usuario para seguirlo.",
+      navigationErrorTitle: "Error de navegación",
+      profileTabMissing:
+        "No se encontró la pestaña de Perfil. Asegúrate de que tus pestañas inferiores tengan 'Perfil'.",
+      errorTitle: "Error",
+    },
+    errors: {
+      blockFailed: "No se pudo bloquear al usuario",
+      unblockFailed: "No se pudo desbloquear al usuario",
+    },
   },
-  actions: {
-    follow: "Seguir",
-    following: "Siguiendo",
-    pleaseWait: "Por favor espera...",
-    unblock: "Desbloquear",
-  },
-  states: {
-    notFound: "Usuario no encontrado.",
-    noMoments: "Aún no hay momentos.",
-    blockedChip: "Has bloqueado a este usuario",
-    blockedBody: "Has bloqueado a este usuario. Desbloquéalo para ver sus momentos.",
-  },
-  menu: {
-    title: "Opciones",
-    blockTitle: "Bloquear usuario",
-    blockMsg:
-      "Ya no verás su contenido y puede que no pueda interactuar contigo.",
-    block: "Bloquear",
-    unblock: "Desbloquear",
-  },
-  alerts: {
-    loginRequired: "Inicio de sesión requerido.",
-    loginToBlock: "Inicio de sesión requerido para bloquear usuarios.",
-    blockedTitle: "Bloqueado",
-    blockedFollowMsg: "Primero desbloquea a este usuario para seguirlo.",
-    navigationErrorTitle: "Error de navegación",
-    profileTabMissing:
-      "No se encontró la pestaña de Perfil. Asegúrate de que tus pestañas inferiores tengan 'Perfil'.",
-    errorTitle: "Error",
-  },
-  errors: {
-    blockFailed: "No se pudo bloquear al usuario",
-    unblockFailed: "No se pudo desbloquear al usuario",
-  },
-},
 
   realPersonAuth: {
     title: "Autenticación",
@@ -1752,7 +2007,7 @@ visitProfile: {
     ],
   },
 
-    points: {
+  points: {
     title: "Puntos",
     coinsTab: "Monedas",
     actions: {

@@ -1,30 +1,30 @@
 // src/i18n/pt.ts
 export default {
     common: {
-    ok: "OK",
-    cancel: "Cancelar",
-    loading: "...",
-    loadingText: "Carregando…",
+        ok: "OK",
+        cancel: "Cancelar",
+        loading: "...",
+        loadingText: "Carregando…",
 
-    error: "Erro",
-    success: "Sucesso",
-    done: "Concluído",
-    failed: "Falhou",
+        error: "Erro",
+        success: "Sucesso",
+        done: "Concluído",
+        failed: "Falhou",
 
-    edit: "Editar",
-    block: "Bloquear",
-    remove: "Remover",
-    you: "Você",
+        edit: "Editar",
+        block: "Bloquear",
+        remove: "Remover",
+        you: "Você",
 
-    sendCode: "Enviar código",
-    verifyAndBind: "Verificar e vincular",
-    bind: "Vincular",
-    unbind: "Desvincular",
-    changePhoneNumber: "Alterar número de telefone",
-    userFallback: "Usuário",
+        sendCode: "Enviar código",
+        verifyAndBind: "Verificar e vincular",
+        bind: "Vincular",
+        unbind: "Desvincular",
+        changePhoneNumber: "Alterar número de telefone",
+        userFallback: "Usuário",
 
-    codeSent: "Código enviado",
-  },
+        codeSent: "Código enviado",
+    },
     errors: {
         userNotFound: "Usuário não encontrado, faça login novamente.",
         updateFailed: "Falha ao atualizar o idioma.",
@@ -402,6 +402,260 @@ export default {
             comingSoon: "A página {{label}} será adicionada depois para o Gold Live.",
         },
     },
+    legalDocs: {
+        common: {
+            lastUpdated: "Última atualização: 16 de fevereiro de 2026",
+        },
+
+        privacy: {
+            title: "Política de Privacidade",
+            intro:
+                "O Gold Live coleta e usa dados apenas quando necessário para operar a plataforma. Não vendemos seus dados pessoais.",
+
+            sections: {
+                transparency: {
+                    title: "1) Quais dados coletamos",
+                    p1:
+                        "Podemos coletar informações da conta (nome de usuário, e-mail, foto de perfil) e o conteúdo que você envia (chats, comentários, transmissões ao vivo).",
+                    p2:
+                        "Podemos coletar dados técnicos (endereço IP, dispositivo, sistema operacional, logs) para manter o app estável e seguro.",
+                    p3:
+                        "Podemos coletar dados de transações (histórico de compras de moedas, diamantes e presentes virtuais). Não coletamos dados sensíveis como biometria, informações médicas ou localização precisa em tempo real.",
+                },
+
+                usage: {
+                    title: "2) Como usamos os dados",
+                    p1:
+                        "Usamos os dados para operar e manter as transmissões ao vivo, permitir a interação entre usuários, processar compras no app e prevenir fraude, abuso e atividade ilegal.",
+                    p2:
+                        "Não usamos seus dados para venda ou compartilhamento inadequado.",
+                },
+
+                sharing: {
+                    title: "3) Compartilhamento com terceiros",
+                    p1:
+                        "Podemos compartilhar dados limitados com processadores de pagamento aprovados (Google Play Billing / Apple In-App Purchase), provedores de hospedagem e segurança e autoridades legais quando exigido por lei.",
+                    p2:
+                        "Todos os terceiros devem seguir regras rigorosas de proteção de dados.",
+                },
+
+                iap: {
+                    title: "4) Compras no app",
+                    p1:
+                        "O Gold Live usa os sistemas oficiais: Google Play Billing e Apple In-App Purchases.",
+                    p2:
+                        "Não armazenamos os dados completos do cartão de pagamento em nossos servidores.",
+                },
+
+                analytics: {
+                    title: "5) Anúncios e análises",
+                    p1:
+                        "O Gold Live pode usar ferramentas de análise para melhorar a experiência do usuário e o desempenho do app.",
+                    p2:
+                        "Essas ferramentas não vendem dados pessoais e são projetadas para não identificar usuários individualmente.",
+                },
+
+                ugc: {
+                    title: "6) Conteúdo gerado pelo usuário",
+                    p1:
+                        "Os usuários são responsáveis pelo conteúdo que publicam. O Gold Live oferece ferramentas de denúncia e pode remover conteúdo ilegal, abusivo ou inadequado.",
+                    p2:
+                        "Contas que violarem os Termos podem ser suspensas ou encerradas.",
+                },
+
+                children: {
+                    title: "7) Privacidade de menores (apenas 18+)",
+                    p1:
+                        "O Gold Live não é destinado a pessoas com menos de 18 anos.",
+                    p2:
+                        "Não coletamos intencionalmente dados de menores. Contas identificadas como pertencentes a menores podem ser removidas.",
+                    p3:
+                        "Seguimos proteções de privacidade infantil (incluindo a COPPA quando aplicável).",
+                },
+
+                rights: {
+                    title: "8) Seus direitos",
+                    p1:
+                        "Você pode solicitar acesso aos seus dados, corrigir/atualizar suas informações, solicitar a exclusão da conta ou retirar o consentimento quando aplicável.",
+                    p2:
+                        "As solicitações podem ser feitas pelo e-mail oficial de suporte.",
+                },
+
+                retention: {
+                    title: "9) Retenção e exclusão de dados",
+                    p1:
+                        "Mantemos os dados apenas pelo tempo necessário para a plataforma e para requisitos legais.",
+                    p2:
+                        "Após a exclusão da conta, os dados são removidos ou anonimizados quando possível.",
+                },
+
+                changes: {
+                    title: "10) Alterações nesta política",
+                    p1:
+                        "Podemos atualizar esta Política de Privacidade a qualquer momento. As alterações entram em vigor quando publicadas.",
+                },
+
+                contact: {
+                    title: "11) Contato",
+                    p1:
+                        "Telefone de suporte: +33-6498415115",
+                    p2:
+                        "goldlive@gmail.com",
+                },
+            },
+        },
+
+        terms: {
+            title: "Termos de Serviço",
+            intro:
+                "Estes Termos explicam como usar o Gold Live. Ao usar o app, você concorda em seguir estas regras.",
+
+            sections: {
+                eligibility: {
+                    title: "1) Elegibilidade",
+                    p1:
+                        "O Gold Live é para usuários com 18 anos ou mais. Se você for menor de 18, não deve usar o app.",
+                },
+
+                account: {
+                    title: "2) Sua conta",
+                    p1:
+                        "Você é responsável pela atividade da sua conta e por manter seus dados de login seguros.",
+                    p2:
+                        "Você deve fornecer informações corretas e não deve se passar por outras pessoas.",
+                },
+
+                userContent: {
+                    title: "3) Conteúdo e comportamento",
+                    p1:
+                        "Você é responsável por tudo o que publicar, transmitir ou compartilhar (incluindo chats e comentários).",
+                    p2:
+                        "Conteúdo ilegal, abusivo ou inadequado não é permitido. Podemos remover conteúdo e tomar medidas contra contas que violarem as regras.",
+                },
+
+                purchases: {
+                    title: "4) Moedas, presentes e compras",
+                    p1:
+                        "As compras são processadas pelo Google Play Billing ou Apple In-App Purchase.",
+                    p2:
+                        "O Gold Live não armazena os dados completos do cartão de pagamento em seus servidores.",
+                },
+
+                enforcement: {
+                    title: "5) Aplicação",
+                    p1:
+                        "Podemos suspender ou encerrar contas que violarem estes Termos ou criarem risco para usuários ou para a plataforma.",
+                    p2:
+                        "Podemos cooperar com autoridades legais quando exigido por lei.",
+                },
+
+                changes: {
+                    title: "6) Atualizações",
+                    p1:
+                        "Podemos atualizar estes Termos. As alterações entram em vigor quando publicadas no app ou em nossas páginas oficiais.",
+                },
+
+                contact: {
+                    title: "7) Contato",
+                    p1:
+                        "Se você tiver dúvidas, entre em contato com o suporte usando os dados na página de Política de Privacidade.",
+                },
+            },
+        },
+
+        liveAgreement: {
+            title: "Acordo de Transmissão ao Vivo",
+            intro:
+                "Este acordo se aplica quando você hospeda ou participa de transmissões ao vivo no Gold Live.",
+
+            sections: {
+                content: {
+                    title: "1) Regras de conteúdo ao vivo",
+                    p1:
+                        "Você não deve transmitir conteúdo ilegal, abusivo ou inadequado. Você deve respeitar outros usuários.",
+                    p2:
+                        "Você é responsável por tudo o que mostrar ou disser durante sua transmissão ao vivo.",
+                },
+                reporting: {
+                    title: "2) Denúncias e moderação",
+                    p1:
+                        "O Gold Live oferece ferramentas de denúncia. Podemos revisar denúncias e remover conteúdo que viole as regras.",
+                },
+                actions: {
+                    title: "3) Ações na conta",
+                    p1:
+                        "Se você violar as regras, sua transmissão ao vivo pode ser limitada, seu conteúdo removido ou sua conta suspensa/encerrada.",
+                    p2:
+                        "Podemos tomar medidas para prevenir fraude, abuso ou atividade ilegal.",
+                },
+                age: {
+                    title: "4) Apenas 18+",
+                    p1:
+                        "Transmissão ao vivo não está disponível para menores de 18. Contas identificadas como de menores podem ser removidas.",
+                },
+            },
+        },
+
+        recharge: {
+            title: "Acordo de Recarga do Usuário",
+            intro:
+                "Este acordo explica como funcionam as compras de moedas/diamantes e os presentes virtuais no Gold Live.",
+
+            sections: {
+                providers: {
+                    title: "1) Sistemas oficiais de pagamento",
+                    p1:
+                        "As compras são feitas pelo Google Play Billing e Apple In-App Purchases.",
+                },
+                storage: {
+                    title: "2) Dados de pagamento",
+                    p1:
+                        "O Gold Live não armazena os dados completos do cartão de pagamento em seus servidores.",
+                },
+                delivery: {
+                    title: "3) Registros de compra",
+                    p1:
+                        "Mantemos registros do histórico de compras (moedas, diamantes, presentes) para rastreamento de conta e transações.",
+                },
+                support: {
+                    title: "4) Suporte",
+                    p1:
+                        "Se você tiver problemas com compras, entre em contato com o suporte. O tratamento de reembolsos depende das regras da loja de apps.",
+                },
+            },
+        },
+
+        childPolicy: {
+            title: "Política de Não Colocar Menores em Risco",
+            intro:
+                "O Gold Live tem compromisso com a proteção de crianças. A plataforma não é destinada a usuários menores de 18.",
+
+            sections: {
+                age: {
+                    title: "1) Apenas 18+",
+                    p1:
+                        "O Gold Live não é para menores. Se identificarmos uma conta pertencente a um menor, podemos removê-la.",
+                },
+                noCollection: {
+                    title: "2) Sem coleta intencional",
+                    p1:
+                        "Não coletamos intencionalmente dados pessoais de menores.",
+                },
+                enforcement: {
+                    title: "3) Aplicação",
+                    p1:
+                        "Podemos remover conteúdo, suspender transmissões e encerrar contas envolvidas em colocar menores em risco ou exploração.",
+                },
+                reporting: {
+                    title: "4) Denúncias",
+                    p1:
+                        "Use as ferramentas de denúncia dentro do app para reportar conteúdo prejudicial.",
+                    p2:
+                        "Você também pode entrar em contato com o suporte usando os dados oficiais de contato na página de Política de Privacidade.",
+                },
+            },
+        },
+    },
 
     ranking: {
         title: "Ranking",
@@ -471,45 +725,45 @@ export default {
         },
     },
 
-   store: {
-    title: "Loja",
-    popular: "Popular",
-    states: {
-      loading: "Carregando loja…",
-      empty: "Nenhum item encontrado",
+    store: {
+        title: "Loja",
+        popular: "Popular",
+        states: {
+            loading: "Carregando loja…",
+            empty: "Nenhum item encontrado",
+        },
+        actions: {
+            refresh: "Atualizar",
+            all: "Todos >",
+            recharge: "Recarregar",
+        },
+        labels: {
+            coins: "Moedas",
+            preview: "Pré-visualizar",
+            balance: "Seu saldo",
+            balanceHint: "Recarregue moedas para comprar itens da loja instantaneamente.",
+            durationDays: "{{days}} dias",
+            permanent: "Permanente",
+        },
+        errors: {
+            missingUser: "Falta userId. Faça login novamente.",
+        },
+        purchase: {
+            confirmTitle: "Confirmar compra",
+            confirmMsg: 'Comprar "{{title}}" por {{price}} moedas?',
+            successTitle: "Comprado",
+            successMsg: "O item foi adicionado à sua conta.",
+            failedTitle: "Falha na compra",
+            failedMsg: "Tente novamente.",
+            insufficientTitle: "Moedas insuficientes",
+            insufficientMsg: "Recarregue moedas para comprar este item.",
+            actions: {
+                buy: "Comprar agora",
+                buying: "Comprando...",
+                recharge: "Recarregar",
+            },
+        },
     },
-    actions: {
-      refresh: "Atualizar",
-      all: "Todos >",
-      recharge: "Recarregar",
-    },
-    labels: {
-      coins: "Moedas",
-      preview: "Pré-visualizar",
-      balance: "Seu saldo",
-      balanceHint: "Recarregue moedas para comprar itens da loja instantaneamente.",
-      durationDays: "{{days}} dias",
-      permanent: "Permanente",
-    },
-    errors: {
-      missingUser: "Falta userId. Faça login novamente.",
-    },
-    purchase: {
-      confirmTitle: "Confirmar compra",
-      confirmMsg: 'Comprar "{{title}}" por {{price}} moedas?',
-      successTitle: "Comprado",
-      successMsg: "O item foi adicionado à sua conta.",
-      failedTitle: "Falha na compra",
-      failedMsg: "Tente novamente.",
-      insufficientTitle: "Moedas insuficientes",
-      insufficientMsg: "Recarregue moedas para comprar este item.",
-      actions: {
-        buy: "Comprar agora",
-        buying: "Comprando...",
-        recharge: "Recarregar",
-      },
-    },
-  },
     invite: {
         title: "Bônus de convite",
         tabs: {
@@ -1084,75 +1338,75 @@ export default {
     },
 
     outfit: {
-    title: "Meu look",
+        title: "Meu look",
 
-    tabs: {
-      backpack: "Presentes da mochila",
-      avatar: "Moldura de avatar",
-      party: "Tema de festa",
-    },
+        tabs: {
+            backpack: "Presentes da mochila",
+            avatar: "Moldura de avatar",
+            party: "Tema de festa",
+        },
 
-    states: {
-      loading: "Carregando seus itens…",
-    },
+        states: {
+            loading: "Carregando seus itens…",
+        },
 
-    actions: {
-      retry: "Tentar novamente",
-      equip: "Equipar",
-      unequip: "Desequipar",
-    },
+        actions: {
+            retry: "Tentar novamente",
+            equip: "Equipar",
+            unequip: "Desequipar",
+        },
 
-    errors: {
-      loginRequired: "Login obrigatório (gl_user_id não encontrado).",
-      loadFailed: "Falha ao carregar os itens do look",
-    },
+        errors: {
+            loginRequired: "Login obrigatório (gl_user_id não encontrado).",
+            loadFailed: "Falha ao carregar os itens do look",
+        },
 
-    empty: {
-      backpack: "Ainda não há presentes na mochila",
-      avatar: "Ainda não há molduras de avatar",
-      party: "Ainda não há temas de festa",
-      hint:
-        "Compre itens na loja. Esta página mostra apenas os itens que você possui (UserStoreItem).",
-    },
+        empty: {
+            backpack: "Ainda não há presentes na mochila",
+            avatar: "Ainda não há molduras de avatar",
+            party: "Ainda não há temas de festa",
+            hint:
+                "Compre itens na loja. Esta página mostra apenas os itens que você possui (UserStoreItem).",
+        },
 
-    labels: {
-      permanent: "Permanente",
-      limited: "Limitado",
-      expired: "Expirado",
-      oneDayLeft: "Falta 1 dia",
-      daysLeft: "Faltam {{count}} dias",
+        labels: {
+            permanent: "Permanente",
+            limited: "Limitado",
+            expired: "Expirado",
+            oneDayLeft: "Falta 1 dia",
+            daysLeft: "Faltam {{count}} dias",
 
-      owned: "Possuído",
-      item: "Item",
+            owned: "Possuído",
+            item: "Item",
 
-      equipped: "Equipado",
-      tapToUse: "Toque para equipar/desequipar",
+            equipped: "Equipado",
+            tapToUse: "Toque para equipar/desequipar",
+        },
     },
-  },
-  giftGallery: {
-    title: "Galeria de presentes",
-    states: {
-      loading: "Carregando…",
+    giftGallery: {
+        title: "Galeria de presentes",
+        states: {
+            loading: "Carregando…",
+        },
+        errors: {
+            notLoggedIn: "Usuário não encontrado, faça login novamente.",
+            loadFailed: "Falha ao carregar a galeria de presentes.",
+            network: "Erro de rede. Tente novamente.",
+        },
+        summary: {
+            totalValue: "Valor total dos presentes",
+            totalGifts: "{{count}} presentes",
+            uniqueGifts: "{{count}} tipos",
+        },
+        actions: {
+            goToPoints: "Ir para Pontos",
+        },
+        labels: {
+            coins: "moedas",
+            qtyLine: "x{{qty}} • {{unit}} moedas cada",
+        },
+        empty: "Ainda não recebeu presentes.",
     },
-    errors: {
-      notLoggedIn: "Usuário não encontrado, faça login novamente.",
-      loadFailed: "Falha ao carregar a galeria de presentes.",
-      network: "Erro de rede. Tente novamente.",
-    },
-    summary: {
-      totalValue: "Valor total dos presentes",
-      totalGifts: "{{count}} presentes",
-      uniqueGifts: "{{count}} tipos",
-    },
-    actions: {
-      goToPoints: "Ir para Pontos",
-    },
-    labels: {
-      coins: "moedas",
-      qtyLine: "x{{qty}} • {{unit}} moedas cada",
-    },
-    empty: "Ainda não recebeu presentes.",
-  },
 
     followUs: {
         title: "Siga-nos",
@@ -1275,48 +1529,48 @@ export default {
     },
 
     coins: {
-    title: "Moedas",
-    pointsTab: "Pontos",
-    labels: {
-      remainingCoins: "Moedas restantes",
-      balanceAfter: "Saldo: {{balance}}",
-      pkgCoins: "{{coins}} moedas",
-      pkgId: "Pacote: {{id}}",
-      coinsUnit: "MOEDAS",
+        title: "Moedas",
+        pointsTab: "Pontos",
+        labels: {
+            remainingCoins: "Moedas restantes",
+            balanceAfter: "Saldo: {{balance}}",
+            pkgCoins: "{{coins}} moedas",
+            pkgId: "Pacote: {{id}}",
+            coinsUnit: "MOEDAS",
+        },
+        actions: { topUp: "Recarregar", refresh: "Atualizar" },
+        filters: { all: "Todos", topups: "Recargas", spent: "Gasto" },
+        states: {
+            loading: "Carregando…",
+            empty: "Sem histórico",
+            scrollMore: "Role para ver mais…",
+            end: "Fim",
+            loadingPackages: "Carregando pacotes…",
+            noPackages: "Sem pacotes",
+        },
+        types: { topup: "Recarga", giftSent: "Presente enviado" },
+        modal: {
+            title: "Recarregar",
+            note:
+                "Nota: Esta recarga é apenas em modo de teste. Pagamentos reais serão adicionados mais tarde.",
+        },
+        alerts: {
+            walletErrorTitle: "Erro na carteira",
+            historyErrorTitle: "Erro no histórico",
+            topupErrorTitle: "Erro na recarga",
+            loginRequiredTitle: "Login obrigatório",
+            topupFailedTitle: "Falha na recarga",
+            successTitle: "Sucesso",
+            addedCoinsMsg: "Adicionadas {{coins}} moedas",
+        },
+        errors: {
+            loadWallet: "Falha ao carregar a carteira",
+            loadHistory: "Falha ao carregar o histórico",
+            loadMore: "Falha ao carregar mais",
+            loadPackages: "Falha ao carregar os pacotes",
+            topupFailed: "Falha na recarga",
+        },
     },
-    actions: { topUp: "Recarregar", refresh: "Atualizar" },
-    filters: { all: "Todos", topups: "Recargas", spent: "Gasto" },
-    states: {
-      loading: "Carregando…",
-      empty: "Sem histórico",
-      scrollMore: "Role para ver mais…",
-      end: "Fim",
-      loadingPackages: "Carregando pacotes…",
-      noPackages: "Sem pacotes",
-    },
-    types: { topup: "Recarga", giftSent: "Presente enviado" },
-    modal: {
-      title: "Recarregar",
-      note:
-        "Nota: Esta recarga é apenas em modo de teste. Pagamentos reais serão adicionados mais tarde.",
-    },
-    alerts: {
-      walletErrorTitle: "Erro na carteira",
-      historyErrorTitle: "Erro no histórico",
-      topupErrorTitle: "Erro na recarga",
-      loginRequiredTitle: "Login obrigatório",
-      topupFailedTitle: "Falha na recarga",
-      successTitle: "Sucesso",
-      addedCoinsMsg: "Adicionadas {{coins}} moedas",
-    },
-    errors: {
-      loadWallet: "Falha ao carregar a carteira",
-      loadHistory: "Falha ao carregar o histórico",
-      loadMore: "Falha ao carregar mais",
-      loadPackages: "Falha ao carregar os pacotes",
-      topupFailed: "Falha na recarga",
-    },
-  },
     liveApplication: {
         title: "Aplicação de live",
         states: { loading: "Carregando..." },
@@ -1627,48 +1881,48 @@ export default {
         },
     },
 
-   visitProfile: {
-  titleFallback: "Perfil",
-  labels: {
-    id: "ID: {{id}}",
-    followers: "Seguidores",
-    following: "A seguir",
-  },
-  actions: {
-    follow: "Seguir",
-    following: "A seguir",
-    pleaseWait: "Por favor, aguarde...",
-    unblock: "Desbloquear",
-  },
-  states: {
-    notFound: "Utilizador não encontrado.",
-    noMoments: "Ainda não há momentos.",
-    blockedChip: "Bloqueaste este utilizador",
-    blockedBody: "Bloqueaste este utilizador. Desbloqueia para ver os momentos.",
-  },
-  menu: {
-    title: "Opções",
-    blockTitle: "Bloquear utilizador",
-    blockMsg:
-      "Já não verás o conteúdo dele e ele poderá não conseguir interagir contigo.",
-    block: "Bloquear",
-    unblock: "Desbloquear",
-  },
-  alerts: {
-    loginRequired: "Início de sessão obrigatório.",
-    loginToBlock: "Início de sessão obrigatório para bloquear utilizadores.",
-    blockedTitle: "Bloqueado",
-    blockedFollowMsg: "Desbloqueia este utilizador primeiro para seguir.",
-    navigationErrorTitle: "Erro de navegação",
-    profileTabMissing:
-      "Separador de Perfil não encontrado. Certifica-te de que as tuas tabs inferiores têm 'Perfil'.",
-    errorTitle: "Erro",
-  },
-  errors: {
-    blockFailed: "Falha ao bloquear o utilizador",
-    unblockFailed: "Falha ao desbloquear o utilizador",
-  },
-},
+    visitProfile: {
+        titleFallback: "Perfil",
+        labels: {
+            id: "ID: {{id}}",
+            followers: "Seguidores",
+            following: "A seguir",
+        },
+        actions: {
+            follow: "Seguir",
+            following: "A seguir",
+            pleaseWait: "Por favor, aguarde...",
+            unblock: "Desbloquear",
+        },
+        states: {
+            notFound: "Utilizador não encontrado.",
+            noMoments: "Ainda não há momentos.",
+            blockedChip: "Bloqueaste este utilizador",
+            blockedBody: "Bloqueaste este utilizador. Desbloqueia para ver os momentos.",
+        },
+        menu: {
+            title: "Opções",
+            blockTitle: "Bloquear utilizador",
+            blockMsg:
+                "Já não verás o conteúdo dele e ele poderá não conseguir interagir contigo.",
+            block: "Bloquear",
+            unblock: "Desbloquear",
+        },
+        alerts: {
+            loginRequired: "Início de sessão obrigatório.",
+            loginToBlock: "Início de sessão obrigatório para bloquear utilizadores.",
+            blockedTitle: "Bloqueado",
+            blockedFollowMsg: "Desbloqueia este utilizador primeiro para seguir.",
+            navigationErrorTitle: "Erro de navegação",
+            profileTabMissing:
+                "Separador de Perfil não encontrado. Certifica-te de que as tuas tabs inferiores têm 'Perfil'.",
+            errorTitle: "Erro",
+        },
+        errors: {
+            blockFailed: "Falha ao bloquear o utilizador",
+            unblockFailed: "Falha ao desbloquear o utilizador",
+        },
+    },
 
     realPersonAuth: {
         title: "Autenticação",
@@ -1740,104 +1994,104 @@ export default {
         ],
     },
 
-      points: {
-    title: "Pontos",
-    coinsTab: "Moedas",
-    actions: {
-      details: "Detalhes",
-      withdraw: "Sacar agora",
-      exchange: "Trocar pontos por moedas",
-      exchanging: "Trocando...",
-      refresh: "Atualizar",
+    points: {
+        title: "Pontos",
+        coinsTab: "Moedas",
+        actions: {
+            details: "Detalhes",
+            withdraw: "Sacar agora",
+            exchange: "Trocar pontos por moedas",
+            exchanging: "Trocando...",
+            refresh: "Atualizar",
+        },
+        labels: {
+            available: "Pontos disponíveis",
+            total: "Total: {{count}}",
+            unconfirmed: "Não confirmados: {{count}}",
+            income: "Receita",
+            last30: "Últimos 30 dias",
+        },
+        income: {
+            livestream: "Transmissão ao vivo",
+            party: "Festa",
+            platformRewards: "Recompensas da plataforma",
+        },
+        states: {
+            loading: "Carregando…",
+        },
+        hints: {
+            exchangeRate:
+                "A taxa de troca pode ser alterada mais tarde no backend (POINTS_PER_COIN).",
+        },
+        alerts: {
+            errorTitle: "Erro",
+            successTitle: "Sucesso",
+            loginRequiredTitle: "Login obrigatório",
+            loginRequiredMsg: "Faça login novamente.",
+            detailsSoon: "A tela de detalhes será adicionada em breve.",
+            withdrawSoon: "O recurso de saque será adicionado em breve.",
+            exchangeFailedTitle: "Falha na troca",
+            exchangeSuccessMsg: "Trocou {{points}} pontos → {{coins}} moedas.",
+        },
+        errors: {
+            loadFailed: "Falha ao carregar os pontos",
+            exchangeFailed: "Falha ao trocar pontos",
+        },
+        ranges: {
+            title: "Selecionar período",
+            last7: "Últimos 7 dias",
+            last30: "Últimos 30 dias",
+            last90: "Últimos 90 dias",
+        },
+        withdraw: {
+            title: "Sacar pontos",
+            available: "Disponíveis: {{points}} pontos",
+            fields: {
+                points: "Pontos para sacar",
+                method: "Método",
+                account: "Detalhes da conta",
+            },
+            placeholders: {
+                account: "ex.: 03xx-xxxxxxx / IBAN / Nome da conta",
+            },
+            actions: {
+                submit: "Enviar solicitação",
+                submitting: "Enviando...",
+            },
+            note:
+                "As solicitações de saque vão para o admin para aprovação. Os pontos podem ficar retidos até o processamento.",
+            alerts: {
+                successTitle: "Enviado",
+                successMsg: "Sua solicitação de saque foi enviada.",
+                failedTitle: "Falha no saque",
+            },
+            errors: {
+                invalidPoints: "Digite uma quantidade válida de pontos.",
+                accountRequired: "Informe os detalhes da conta.",
+                failed: "Não foi possível enviar a solicitação de saque.",
+            },
+        },
+        details: {
+            title: "Detalhes de pontos",
+            intro: "Veja como os pontos funcionam na plataforma:",
+            lines: {
+                available:
+                    "Pontos disponíveis são os pontos que você pode trocar ou sacar.",
+                unconfirmed:
+                    "Pontos não confirmados ainda estão sendo verificados e podem mudar.",
+                total:
+                    "Pontos totais incluem disponíveis + não confirmados.",
+                income:
+                    "Receita mostra de onde vieram seus pontos no período selecionado.",
+                exchange:
+                    "Trocar converte pontos em moedas. A taxa pode mudar conforme as regras da plataforma.",
+                withdraw:
+                    "Solicitações de saque são revisadas antes do pagamento. Verifique se os dados da sua conta estão corretos.",
+            },
+            footer:
+                "Se você tiver algum problema, entre em contato com o suporte na tela de Perfil.",
+        },
     },
-    labels: {
-      available: "Pontos disponíveis",
-      total: "Total: {{count}}",
-      unconfirmed: "Não confirmados: {{count}}",
-      income: "Receita",
-      last30: "Últimos 30 dias",
-    },
-    income: {
-      livestream: "Transmissão ao vivo",
-      party: "Festa",
-      platformRewards: "Recompensas da plataforma",
-    },
-    states: {
-      loading: "Carregando…",
-    },
-    hints: {
-      exchangeRate:
-        "A taxa de troca pode ser alterada mais tarde no backend (POINTS_PER_COIN).",
-    },
-    alerts: {
-      errorTitle: "Erro",
-      successTitle: "Sucesso",
-      loginRequiredTitle: "Login obrigatório",
-      loginRequiredMsg: "Faça login novamente.",
-      detailsSoon: "A tela de detalhes será adicionada em breve.",
-      withdrawSoon: "O recurso de saque será adicionado em breve.",
-      exchangeFailedTitle: "Falha na troca",
-      exchangeSuccessMsg: "Trocou {{points}} pontos → {{coins}} moedas.",
-    },
-    errors: {
-      loadFailed: "Falha ao carregar os pontos",
-      exchangeFailed: "Falha ao trocar pontos",
-    },
-    ranges: {
-      title: "Selecionar período",
-      last7: "Últimos 7 dias",
-      last30: "Últimos 30 dias",
-      last90: "Últimos 90 dias",
-    },
-    withdraw: {
-      title: "Sacar pontos",
-      available: "Disponíveis: {{points}} pontos",
-      fields: {
-        points: "Pontos para sacar",
-        method: "Método",
-        account: "Detalhes da conta",
-      },
-      placeholders: {
-        account: "ex.: 03xx-xxxxxxx / IBAN / Nome da conta",
-      },
-      actions: {
-        submit: "Enviar solicitação",
-        submitting: "Enviando...",
-      },
-      note:
-        "As solicitações de saque vão para o admin para aprovação. Os pontos podem ficar retidos até o processamento.",
-      alerts: {
-        successTitle: "Enviado",
-        successMsg: "Sua solicitação de saque foi enviada.",
-        failedTitle: "Falha no saque",
-      },
-      errors: {
-        invalidPoints: "Digite uma quantidade válida de pontos.",
-        accountRequired: "Informe os detalhes da conta.",
-        failed: "Não foi possível enviar a solicitação de saque.",
-      },
-    },
-    details: {
-      title: "Detalhes de pontos",
-      intro: "Veja como os pontos funcionam na plataforma:",
-      lines: {
-        available:
-          "Pontos disponíveis são os pontos que você pode trocar ou sacar.",
-        unconfirmed:
-          "Pontos não confirmados ainda estão sendo verificados e podem mudar.",
-        total:
-          "Pontos totais incluem disponíveis + não confirmados.",
-        income:
-          "Receita mostra de onde vieram seus pontos no período selecionado.",
-        exchange:
-          "Trocar converte pontos em moedas. A taxa pode mudar conforme as regras da plataforma.",
-        withdraw:
-          "Solicitações de saque são revisadas antes do pagamento. Verifique se os dados da sua conta estão corretos.",
-      },
-      footer:
-        "Se você tiver algum problema, entre em contato com o suporte na tela de Perfil.",
-    },
-  },
     momentComments: {
         title: "Momentos de {{owner}}",
         empty: "Ainda não há comentários. Seja o primeiro a responder!",
